@@ -1,4 +1,3 @@
-```vue
 <template>
     <div class="card">
         <Toast />
@@ -83,7 +82,7 @@
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle !text-3xl" />
                 <span v-if="kichCo"
-                    >Bạn có chắc muốn xóa kích cỡ <b>{{ kichCo.tenKichCo }}</b
+                    >Bạn có chắc muốn xóa kích cỡ <b>{{ kichCo.id }}</b
                     >?</span
                 >
             </div>
@@ -107,10 +106,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useToast } from 'primevue/usetoast';
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
+import { useToast } from 'primevue/usetoast';
+import { onMounted, ref } from 'vue';
 
 const toast = useToast();
 const dt = ref();
@@ -302,4 +301,3 @@ function exportCSV() {
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
 </style>
-```

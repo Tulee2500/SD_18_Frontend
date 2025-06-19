@@ -110,44 +110,9 @@ const router = createRouter({
                     component: () => import('@/views/sanpham/SanPhamList.vue')
                 },
                 {
-                    name: 'SanPhamAdd',
-                    path: '/san-pham/add',
-                    component: () => import('@/views/sanpham/SanPhamAdd.vue')
-                },
-                {
-                    name: 'SanPhamEdit',
-                    path: '/san-pham/edit/:id',
-                    component: () => import('@/views/sanpham/SanPhamEdit.vue')
-                },
-                {
-                    name: 'SanPhamChiTiet',
-                    path: '/san-pham/chi-tiet/:id',
-                    component: () => import('@/views/sanpham/SanPhamChiTiet.vue')
-                },
-                {
-                    name: 'SanPhamChiTietAdd',
-                    path: '/san-pham/chi-tiet/add/:id',
-                    component: () => import('@/views/sanpham/SanPhamChiTietAdd.vue')
-                },
-                {
-                    name: 'SanPhamChiTietUpdate',
-                    path: '/san-pham/chi-tiet/edit/:id',
-                    component: () => import('@/views/sanpham/SanPhamChiTietEdit.vue')
-                },
-                {
                     name: 'NhanVien',
                     path: '/nhan-vien',
                     component: () => import('@/views/TaiKhoan/NhanVien/NhanVienView.vue')
-                },
-                {
-                    name: 'NhanVienAdd',
-                    path: '/nhan-vien/add',
-                    component: () => import('@/views/TaiKhoan/NhanVien/NhanVienAdd.vue')
-                },
-                {
-                    name: 'NhanVienUpdate',
-                    path: '/nhan-vien/update/:id',
-                    component: () => import('@/views/TaiKhoan/NhanVien/NhanVienUpdate.vue')
                 },
                 {
                     name: 'KhachHang',
@@ -155,29 +120,9 @@ const router = createRouter({
                     component: () => import('@/views/TaiKhoan/KhachHang/KhachHangView.vue')
                 },
                 {
-                    name: 'KhachHangAdd',
-                    path: '/khach-hang/add',
-                    component: () => import('@/views/TaiKhoan/KhachHang/KhachHangAdd.vue')
-                },
-                {
-                    name: 'KhachHangUpdate',
-                    path: '/khach-hang/update/:id',
-                    component: () => import('@/views/TaiKhoan/KhachHang/KhachHangUpdate.vue')
-                },
-                {
                     name: 'ChatLieu',
                     path: '/chat-lieu',
                     component: () => import('@/views/ThuocTinh/ChatLieu/ChatLieuView.vue')
-                },
-                {
-                    name: 'ChatLieuAdd',
-                    path: '/chat-lieu/add',
-                    component: () => import('@/views/ThuocTinh/ChatLieu/ChatLieuAdd.vue')
-                },
-                {
-                    name: 'ChatLieuUpdate',
-                    path: '/chat-lieu/update/:id',
-                    component: () => import('@/views/ThuocTinh/ChatLieu/ChatLieuUpdate.vue')
                 },
                 {
                     name: 'DanhMuc',
@@ -185,29 +130,9 @@ const router = createRouter({
                     component: () => import('@/views/ThuocTinh/DanhMuc/DanhMucView.vue')
                 },
                 {
-                    name: 'DanhMucAdd',
-                    path: '/danh-muc/add',
-                    component: () => import('@/views/ThuocTinh/DanhMuc/DanhMucAdd.vue')
-                },
-                {
-                    name: 'DanhMucUpdate',
-                    path: '/danh-muc/update/:id',
-                    component: () => import('@/views/ThuocTinh/DanhMuc/DanhMucUpdate.vue')
-                },
-                {
                     name: 'DeGiay',
                     path: '/de-giay',
                     component: () => import('@/views/ThuocTinh/DeGiay/DeGiayView.vue')
-                },
-                {
-                    name: 'DeGiayAdd',
-                    path: '/de-giay/add',
-                    component: () => import('@/views/ThuocTinh/DeGiay/DeGiayAdd.vue')
-                },
-                {
-                    name: 'DeGiayUpdate',
-                    path: '/de-giay/update/:id',
-                    component: () => import('@/views/ThuocTinh/DeGiay/DeGiayUpdate.vue')
                 },
                 {
                     name: 'ThuongHieu',
@@ -215,45 +140,14 @@ const router = createRouter({
                     component: () => import('@/views/ThuocTinh/ThuongHieu/ThuongHieuView.vue')
                 },
                 {
-                    name: 'ThuongHieuAdd',
-                    path: '/thuong-hieu/add',
-                    component: () => import('@/views/ThuocTinh/ThuongHieu/ThuongHieuAdd.vue')
-                },
-                {
-                    name: 'ThuongHieuUpdate',
-                    path: '/thuong-hieu/update/:id',
-                    component: () => import('@/views/ThuocTinh/ThuongHieu/ThuongHieuUpdate.vue')
-                },
-                {
                     name: 'MauSac',
                     path: '/mau-sac',
                     component: () => import('@/views/ThuocTinh/MauSac/MauSacView.vue')
-                },
-
-                {
-                    name: 'MauSacAdd',
-                    path: '/mau-sac/add',
-                    component: () => import('@/views/ThuocTinh/MauSac/MauSacAdd.vue')
-                },
-                {
-                    name: 'MauSacUpdate',
-                    path: '/mau-sac/update/:id',
-                    component: () => import('@/views/ThuocTinh/MauSac/MauSacUpdate.vue')
                 },
                 {
                     name: 'KichCo',
                     path: '/kich-co',
                     component: () => import('@/views/ThuocTinh/KichCo/KichCoView.vue')
-                },
-                {
-                    name: 'KichCoAdd',
-                    path: '/kich-co/add',
-                    component: () => import('@/views/ThuocTinh/KichCo/KichCoAdd.vue')
-                },
-                {
-                    name: 'KichCoUpdate',
-                    path: '/kich-co/update/:id',
-                    component: () => import('@/views/ThuocTinh/KichCo/KichCoUpdate.vue')
                 },
                 {
                     name: 'ThongBaoList',
@@ -269,6 +163,11 @@ const router = createRouter({
                     name: 'KhuyenMai',
                     path: '/khuyen-mai',
                     component: () => import('@/views/KhuyenMai/KhuyenMaiList.vue')
+                },
+                {
+                    name: 'HinhAnh',
+                    path: '/hinh-anh',
+                    component: () => import('@/views/ThuocTinh/ImageManagement.vue')
                 }
             ]
         },

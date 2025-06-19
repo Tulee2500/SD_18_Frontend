@@ -42,6 +42,11 @@ const model = ref([
                         label: 'Đế giày',
                         icon: 'pi pi-fw pi-lock',
                         to: 'de-giay'
+                    },
+                    {
+                        label: 'Hình ảnh',
+                        icon: 'pi pi-fw pi-lock',
+                        to: 'hinh-anh'
                     }
                 ]
             },
