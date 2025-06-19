@@ -28,6 +28,7 @@ const model = ref([
                         icon: 'pi pi-fw pi-lock',
                         to: '/mau-sac'
                     },
+                
                     {
                         label: 'Kích cỡ',
                         icon: 'pi pi-fw pi-pencil',
@@ -66,6 +67,11 @@ const model = ref([
                     }
                 ]
             },
+            {
+                        label: 'Hóa đơn',
+                        icon: 'pi pi-fw pi-pencil',
+                        to: '/hoa-don'
+                    },
             { label: 'Thông báo', icon: 'pi pi-fw pi-file', to: '/thong-bao' }
         ]
     },

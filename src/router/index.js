@@ -110,6 +110,11 @@ const router = createRouter({
                     component: () => import('@/views/sanpham/SanPhamList.vue')
                 },
                 {
+                    name: 'HoaDon',
+                    path: '/hoa-don',
+                    component: () => import('@/views/HoaDon/ViewHoaDon.vue')
+                },
+                {
                     name: 'NhanVien',
                     path: '/nhan-vien',
                     component: () => import('@/views/TaiKhoan/NhanVien/NhanVienView.vue')
