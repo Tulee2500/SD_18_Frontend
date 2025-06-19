@@ -1,0 +1,303 @@
+<template>
+    <div class="card">
+        <Toast />
+        <Toolbar class="mb-6">
+            <template #start>
+                <Button label="Thêm mới" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" />
+                <Button label="Xóa" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedDeGiay || !selectedDeGiay.length" />
+            </template>
+            <template #end>
+                <Button label="Xuất CSV" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
+            </template>
+        </Toolbar>
+
+        <DataTable
+            ref="dt"
+            v-model:selection="selectedDeGiay"
+            :value="ListDeGiay"
+            dataKey="id"
+            :paginator="true"
+            :rows="10"
+            :filters="filters"
+            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+            :rowsPerPageOptions="[5, 10, 25]"
+            currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} đế giày"
+        >
+            <template #header>
+                <div class="flex flex-wrap gap-2 items-center justify-between">
+                    <h4 class="m-0">📋 Quản lý Đế Giày</h4>
+                    <IconField>
+                        <InputIcon>
+                            <i class="pi pi-search" />
+                        </InputIcon>
+                        <InputText v-model="filters['global'].value" placeholder="Tìm kiếm..." />
+                    </IconField>
+                </div>
+            </template>
+
+            <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
+            <Column field="id" header="ID" sortable style="min-width: 8rem"></Column>
+            <Column field="maDeGiay" header="Mã Đế Giày" sortable style="min-width: 12rem"></Column>
+            <Column field="tenDeGiay" header="Tên Đế Giày" sortable style="min-width: 16rem"></Column>
+            <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
+                <template #body="slotProps">
+                    <Tag :value="slotProps.data.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động'" :severity="getStatusLabel(slotProps.data.trangThai)" />
+                </template>
+            </Column>
+            <Column :exportable="false" style="width: 10rem">
+                <template #body="slotProps">
+                    <div class="flex justify-between gap-2">
+                        <Button icon="pi pi-pencil" outlined rounded size="small" @click="editDeGiay(slotProps.data)" />
+                        <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteDeGiay(slotProps.data)" />
+                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" />
+                    </div>
+                </template>
+            </Column>
+        </DataTable>
+
+        <Dialog v-model:visible="deGiayDialog" :style="{ width: '450px' }" header="Chi tiết Đế Giày" :modal="true">
+            <div class="flex flex-col gap-6">
+                <div>
+                    <label for="maDeGiay" class="block font-bold mb-3">Mã Đế Giày</label>
+                    <InputText id="maDeGiay" v-model.trim="deGiay.maDeGiay" required="true" autofocus :invalid="submitted && !deGiay.maDeGiay" fluid />
+                    <small v-if="submitted && !deGiay.maDeGiay" class="text-red-500">Mã Đế Giày là bắt buộc.</small>
+                </div>
+                <div>
+                    <label for="tenDeGiay" class="block font-bold mb-3">Tên Đế Giày</label>
+                    <InputText id="tenDeGiay" v-model.trim="deGiay.tenDeGiay" required="true" :invalid="submitted && !deGiay.tenDeGiay" fluid />
+                    <small v-if="submitted && !deGiay.tenDeGiay" class="text-red-500">Tên Đế Giày là bắt buộc.</small>
+                </div>
+                <div>
+                    <label for="trangThai" class="block font-bold mb-3">Trạng Thái</label>
+                    <Select id="trangThai" v-model="deGiay.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
+                <Button label="Lưu" icon="pi pi-check" @click="saveDeGiay" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="deleteDeGiayDialog" :style="{ width: '450px' }" header="Xác nhận" :modal="true">
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl" />
+                <span v-if="deGiay"
+                    >Bạn có chắc muốn xóa đế giày <b>{{ deGiay.tenDeGiay }}</b
+                    >?</span
+                >
+            </div>
+            <template #footer>
+                <Button label="Không" icon="pi pi-times" text @click="deleteDeGiayDialog = false" />
+                <Button label="Có" icon="pi pi-check" @click="deleteDeGiay" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="deleteDeGiaysDialog" :style="{ width: '450px' }" header="Xác nhận" :modal="true">
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl" />
+                <span>Bạn có chắc muốn xóa các đế giày đã chọn?</span>
+            </div>
+            <template #footer>
+                <Button label="Không" icon="pi pi-times" text @click="deleteDeGiaysDialog = false" />
+                <Button label="Có" icon="pi pi-check" text @click="deleteSelectedDeGiays" />
+            </template>
+        </Dialog>
+    </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useToast } from 'primevue/usetoast';
+import { FilterMatchMode } from '@primevue/core/api';
+import axios from 'axios';
+
+const toast = useToast();
+const dt = ref();
+const ListDeGiay = ref([]);
+const deGiayDialog = ref(false);
+const deleteDeGiayDialog = ref(false);
+const deleteDeGiaysDialog = ref(false);
+const deGiay = ref({});
+const selectedDeGiay = ref();
+const submitted = ref(false);
+const filters = ref({
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+});
+const statuses = ref([
+    { label: 'Hoạt động', value: 1 },
+    { label: 'Ngừng hoạt động', value: 0 }
+]);
+
+onMounted(() => {
+    fetchData();
+});
+
+async function fetchData() {
+    try {
+        const res = await axios.get('http://localhost:8080/de-giay');
+        ListDeGiay.value = res.data;
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể tải danh sách đế giày',
+            life: 3000
+        });
+    }
+}
+
+function openNew() {
+    deGiay.value = { trangThai: 1 };
+    submitted.value = false;
+    deGiayDialog.value = true;
+}
+
+function hideDialog() {
+    deGiayDialog.value = false;
+    submitted.value = false;
+}
+
+async function saveDeGiay() {
+    submitted.value = true;
+
+    if (deGiay.value.maDeGiay?.trim() && deGiay.value.tenDeGiay?.trim()) {
+        try {
+            if (deGiay.value.id) {
+                await axios.put(`http://localhost:8080/de-giay/${deGiay.value.id}`, deGiay.value);
+                toast.add({
+                    severity: 'success',
+                    summary: 'Thành công',
+                    detail: 'Cập nhật đế giày thành công',
+                    life: 3000
+                });
+            } else {
+                await axios.post('http://localhost:8080/de-giay', deGiay.value);
+                toast.add({
+                    severity: 'success',
+                    summary: 'Thành công',
+                    detail: 'Tạo đế giày thành công',
+                    life: 3000
+                });
+            }
+            fetchData();
+            deGiayDialog.value = false;
+            deGiay.value = {};
+        } catch (error) {
+            console.error('Error saving đế giày:', error);
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: error.response?.data?.message || 'Lưu đế giày thất bại',
+                life: 3000
+            });
+        }
+    } else {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+            life: 3000
+        });
+    }
+}
+
+function editDeGiay(dg) {
+    deGiay.value = { ...dg };
+    deGiayDialog.value = true;
+}
+
+function confirmDeleteDeGiay(dg) {
+    deGiay.value = dg;
+    deleteDeGiayDialog.value = true;
+}
+
+async function deleteDeGiay() {
+    try {
+        await axios.delete(`http://localhost:8080/de-giay/${deGiay.value.id}`);
+        fetchData();
+        deleteDeGiayDialog.value = false;
+        deGiay.value = {};
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Xóa đế giày thành công',
+            life: 3000
+        });
+    } catch (error) {
+        console.error('Error deleting đế giày:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: error.response?.data?.message || 'Xóa đế giày thất bại',
+            life: 3000
+        });
+    }
+}
+
+function confirmDeleteSelected() {
+    deleteDeGiaysDialog.value = true;
+}
+
+async function deleteSelectedDeGiays() {
+    try {
+        for (const dg of selectedDeGiay.value) {
+            await axios.delete(`http://localhost:8080/de-giay/${dg.id}`);
+        }
+        fetchData();
+        deleteDeGiaysDialog.value = false;
+        selectedDeGiay.value = null;
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Xóa các đế giày thành công',
+            life: 3000
+        });
+    } catch (error) {
+        console.error('Error deleting đế giày:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: error.response?.data?.message || 'Xóa các đế giày thất bại',
+            life: 3000
+        });
+    }
+}
+
+async function changeStatus(dg) {
+    try {
+        const updatedDeGiay = { ...dg, trangThai: dg.trangThai === 1 ? 0 : 1 };
+        await axios.put(`http://localhost:8080/de-giay/${dg.id}`, updatedDeGiay);
+        fetchData();
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Cập nhật trạng thái thành công',
+            life: 3000
+        });
+    } catch (error) {
+        console.error('Error changing status:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: error.response?.data?.message || 'Cập nhật trạng thái thất bại',
+            life: 3000
+        });
+    }
+}
+
+function getStatusLabel(status) {
+    return status === 1 ? 'success' : 'danger';
+}
+
+function exportCSV() {
+    dt.value.exportCSV();
+}
+</script>
+
+<style scoped>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+</style>

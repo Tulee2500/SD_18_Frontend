@@ -1,0 +1,467 @@
+
+<template>
+  <div class="card">
+    <!-- Toolbar -->
+    <Toolbar class="mb-6">
+      <template #start>
+        <Button label="Thêm mới" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" />
+        <Button
+          label="Xóa"
+          icon="pi pi-trash"
+          severity="secondary"
+          @click="confirmDeleteSelected"
+          :disabled="!selectedNhanVien || !selectedNhanVien.length"
+        />
+      </template>
+      <template #end>
+        <Button label="Xuất CSV" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
+      </template>
+    </Toolbar>
+
+    <!-- DataTable -->
+    <DataTable
+      ref="dt"
+      v-model:selection="selectedNhanVien"
+      :value="filteredNhanVien"
+      dataKey="id"
+      :paginator="true"
+      :rows="10"
+      :filters="filters"
+      paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+      :rowsPerPageOptions="[5, 10, 25]"
+      currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} nhân viên"
+      :loading="isLoading"
+    >
+      <template #header>
+        <div class="flex flex-wrap gap-2 items-center justify-between">
+          <h4 class="m-0">Quản Lý Nhân Viên</h4>
+          <IconField>
+            <InputIcon>
+              <i class="pi pi-search" />
+            </InputIcon>
+            <InputText v-model="filters['global'].value" placeholder="Tìm kiếm..." />
+          </IconField>
+          <Select
+            v-model="statusFilter"
+            :options="statusOptions"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Lọc trạng thái"
+            class="w-12rem"
+          />
+        </div>
+      </template>
+
+      <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
+      <Column field="id" header="ID" sortable style="width: 8rem">
+        <template #body="slotProps">
+          <span class="font-bold text-primary">#{{ slotProps.data.id }}</span>
+        </template>
+      </Column>
+      <Column field="maNhanVien" header="Mã NV" sortable style="width: 10rem">
+        <template #body="slotProps">
+          <Tag :value="slotProps.data.maNhanVien" severity="secondary" />
+        </template>
+      </Column>
+      <Column field="hoTen" header="Thông tin" sortable style="min-width: 16rem">
+        <template #body="slotProps">
+          <div class="flex items-center">
+            <span
+              class="rounded-circle w-2rem h-2rem flex items-center justify-center text-white font-bold mr-2"
+              :style="{ background: 'linear-gradient(45deg, #007bff, #6f42c1)' }"
+            >
+              {{ getInitials(slotProps.data.hoTen) }}
+            </span>
+            <span class="font-semibold">{{ slotProps.data.hoTen }}</span>
+          </div>
+        </template>
+      </Column>
+      <Column header="Liên hệ" style="min-width: 16rem">
+        <template #body="slotProps">
+          <div class="flex flex-col">
+            <span class="mb-1">
+              <i class="pi pi-envelope mr-1 text-muted"></i>
+              {{ slotProps.data.email }}
+            </span>
+            <span>
+              <i class="pi pi-phone mr-1 text-muted"></i>
+              {{ slotProps.data.sdt }}
+            </span>
+          </div>
+        </template>
+      </Column>
+      <Column field="trangThai" header="Trạng thái" sortable style="width: 12rem">
+        <template #body="slotProps">
+          <Tag
+            :value="slotProps.data.trangThai === 1 ? 'Hoạt động' : 'Ngưng'"
+            :severity="slotProps.data.trangThai === 1 ? 'success' : 'danger'"
+          >
+            <i
+              :class="slotProps.data.trangThai === 1 ? 'pi pi-check-circle' : 'pi pi-times-circle'"
+              class="mr-1"
+            ></i>
+            {{ slotProps.data.trangThai === 1 ? "Hoạt động" : "Ngưng" }}
+          </Tag>
+        </template>
+      </Column>
+      <Column :exportable="false" style="width: 12rem">
+        <template #body="slotProps">
+          <Button
+            icon="pi pi-pencil"
+            outlined
+            rounded
+            class="mr-2"
+            @click="editNhanVien(slotProps.data)"
+          />
+          <Button
+            icon="pi pi-trash"
+            outlined
+            rounded
+            severity="danger"
+            @click="confirmDeleteNhanVien(slotProps.data)"
+          />
+          <Button
+            icon="pi pi-refresh"
+            outlined
+            rounded
+            severity="secondary"
+            class="ml-2"
+            @click="changeStatus(slotProps.data)"
+            :title="slotProps.data.trangThai === 1 ? 'Ngưng hoạt động' : 'Kích hoạt'"
+          />
+        </template>
+      </Column>
+      <template #empty>
+        <div class="text-center p-5">
+          <i class="pi pi-users text-5xl text-muted mb-3"></i>
+          <h5 class="text-muted">Không tìm thấy nhân viên</h5>
+          <p class="text-muted">Thử thay đổi bộ lọc hoặc thêm nhân viên mới.</p>
+        </div>
+      </template>
+    </DataTable>
+
+    <!-- Add/Edit Employee Dialog -->
+    <Dialog
+      v-model:visible="nhanVienDialog"
+      :style="{ width: '450px' }"
+      :header="nhanVien.id ? 'Cập nhật nhân viên' : 'Thêm nhân viên'"
+      :modal="true"
+    >
+      <div class="flex flex-col gap-6">
+        <div>
+          <label for="hoTen" class="block font-bold mb-3">Họ Tên</label>
+          <InputText
+            id="hoTen"
+            v-model.trim="nhanVien.hoTen"
+            required="true"
+            autofocus
+            :invalid="submitted && !nhanVien.hoTen"
+            fluid
+          />
+          <small v-if="submitted && !nhanVien.hoTen" class="text-red-500"
+            >Họ tên là bắt buộc.</small
+          >
+        </div>
+        <div>
+          <label for="email" class="block font-bold mb-3">Email</label>
+          <InputText id="email" v-model="nhanVien.email" fluid />
+        </div>
+        <div>
+          <label for="sdt" class="block font-bold mb-3">Số điện thoại</label>
+          <InputText id="sdt" v-model="nhanVien.sdt" fluid />
+        </div>
+        <div>
+          <label for="maNhanVien" class="block font-bold mb-3">Mã nhân viên</label>
+          <InputText id="maNhanVien" v-model="nhanVien.maNhanVien" fluid />
+        </div>
+        <div>
+          <label for="taiKhoan" class="block font-bold mb-3">ID Tài khoản</label>
+          <InputText id="taiKhoan" v-model.number="nhanVien.taiKhoan" fluid type="number" />
+        </div>
+        <div>
+          <label for="diaChi" class="block font-bold mb-3">ID Địa chỉ</label>
+          <InputText id="diaChi" v-model.number="nhanVien.diaChi" fluid type="number" />
+        </div>
+        <div>
+          <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
+          <Select
+            id="trangThai"
+            v-model="nhanVien.trangThai"
+            :options="statusOptions"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Chọn trạng thái"
+            fluid
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
+        <Button label="Lưu" icon="pi pi-check" @click="saveNhanVien" />
+      </template>
+    </Dialog>
+
+    <!-- Delete Employee Dialog -->
+    <Dialog
+      v-model:visible="deleteNhanVienDialog"
+      :style="{ width: '450px' }"
+      header="Xác nhận xóa"
+      :modal="true"
+    >
+      <div class="flex items-center gap-4">
+        <i class="pi pi-exclamation-triangle !text-3xl" />
+        <span v-if="nhanVien"
+          >Bạn có chắc chắn muốn xóa <b>{{ nhanVien.hoTen }}</b>?</span
+        >
+      </div>
+      <template #footer>
+        <Button label="Không" icon="pi pi-times" text @click="deleteNhanVienDialog = false" />
+        <Button label="Có" icon="pi pi-check" @click="deleteNhanVien" />
+      </template>
+    </Dialog>
+
+    <!-- Delete Selected Employees Dialog -->
+    <Dialog
+      v-model:visible="deleteNhanViensDialog"
+      :style="{ width: '450px' }"
+      header="Xác nhận xóa"
+      :modal="true"
+    >
+      <div class="flex items-center gap-4">
+        <i class="pi pi-exclamation-triangle !text-3xl" />
+        <span>Bạn có chắc chắn muốn xóa các nhân viên đã chọn?</span>
+      </div>
+      <template #footer>
+        <Button label="Không" icon="pi pi-times" text @click="deleteNhanViensDialog = false" />
+        <Button label="Có" icon="pi pi-check" text @click="deleteSelectedNhanViens" />
+      </template>
+    </Dialog>
+
+    <!-- Toast Notifications -->
+    <Toast />
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import { FilterMatchMode } from '@primevue/core/api';
+import { useToast } from 'primevue/usetoast';
+import axios from 'axios';
+
+const toast = useToast();
+const dt = ref();
+const nhanViens = ref([]);
+const nhanVienDialog = ref(false);
+const deleteNhanVienDialog = ref(false);
+const deleteNhanViensDialog = ref(false);
+const nhanVien = ref({});
+const selectedNhanVien = ref();
+const filters = ref({
+  global: { value: null, matchMode: FilterMatchMode.CONTAINS },
+});
+const statusFilter = ref('');
+const submitted = ref(false);
+const isLoading = ref(false);
+const statusOptions = ref([
+  { label: 'Tất cả trạng thái', value: '' },
+  { label: 'Hoạt động', value: 1 },
+  { label: 'Ngưng hoạt động', value: 0 },
+]);
+
+onMounted(() => {
+  fetchData();
+});
+
+async function fetchData() {
+  isLoading.value = true;
+  try {
+    const res = await axios.get('http://localhost:8080/nhan-vien');
+    nhanViens.value = res.data;
+  } catch (error) {
+    console.error('Error fetching data:', error.response?.data || error.message);
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.response?.data?.message || 'Có lỗi xảy ra khi tải dữ liệu',
+      life: 3000,
+    });
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+const filteredNhanVien = computed(() => {
+  let filtered = nhanViens.value;
+
+  if (statusFilter.value !== '') {
+    filtered = filtered.filter((nv) => nv.trangThai === parseInt(statusFilter.value));
+  }
+
+  return filtered;
+});
+
+function openNew() {
+  nhanVien.value = { trangThai: 1 };
+  submitted.value = false;
+  nhanVienDialog.value = true;
+}
+
+function hideDialog() {
+  nhanVienDialog.value = false;
+  submitted.value = false;
+}
+
+async function saveNhanVien() {
+  submitted.value = true;
+
+  if (nhanVien.value.hoTen?.trim()) {
+    try {
+      if (nhanVien.value.id) {
+        await axios.put(`http://localhost:8080/nhan-vien/${nhanVien.value.id}`, nhanVien.value);
+        toast.add({
+          severity: 'success',
+          summary: 'Thành công',
+          detail: 'Cập nhật nhân viên thành công',
+          life: 3000,
+        });
+      } else {
+        nhanVien.value.maNhanVien = nhanVien.value.maNhanVien || createId();
+        await axios.post('http://localhost:8080/nhan-vien', nhanVien.value);
+        toast.add({
+          severity: 'success',
+          summary: 'Thành công',
+          detail: 'Thêm nhân viên thành công',
+          life: 3000,
+        });
+      }
+      await fetchData();
+      nhanVienDialog.value = false;
+      nhanVien.value = {};
+    } catch (error) {
+      console.error('Error saving employee:', error.response?.data || error.message);
+      toast.add({
+        severity: 'error',
+        summary: 'Lỗi',
+        detail: error.response?.data?.message || 'Có lỗi xảy ra khi lưu nhân viên',
+        life: 3000,
+      });
+    }
+  }
+}
+
+function editNhanVien(nv) {
+  nhanVien.value = { ...nv };
+  nhanVienDialog.value = true;
+}
+
+function confirmDeleteNhanVien(nv) {
+  nhanVien.value = nv;
+  deleteNhanVienDialog.value = true;
+}
+
+async function deleteNhanVien() {
+  try {
+    await axios.delete(`http://localhost:8080/nhan-vien/${nhanVien.value.id}`);
+    await fetchData();
+    deleteNhanVienDialog.value = false;
+    nhanVien.value = {};
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: 'Xóa nhân viên thành công',
+      life: 3000,
+    });
+  } catch (error) {
+    console.error('Error deleting employee:', error.response?.data || error.message);
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.response?.data?.message || 'Có lỗi xảy ra khi xóa nhân viên',
+      life: 3000,
+    });
+  }
+}
+
+async function changeStatus(nv) {
+  try {
+    const newStatus = nv.trangThai === 1 ? 0 : 1;
+    await axios.put(`http://localhost:8080/nhan-vien/${nv.id}`, {
+      ...nv,
+      trangThai: newStatus,
+    });
+    await fetchData();
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: `Đã ${newStatus === 1 ? 'kích hoạt' : 'ngưng'} nhân viên`,
+      life: 3000,
+    });
+  } catch (error) {
+    console.error('Error changing status:', error.response?.data || error.message);
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.response?.data?.message || 'Có lỗi xảy ra khi thay đổi trạng thái',
+      life: 3000,
+    });
+  }
+}
+
+function confirmDeleteSelected() {
+  deleteNhanViensDialog.value = true;
+}
+
+async function deleteSelectedNhanViens() {
+  try {
+    for (const nv of selectedNhanVien.value) {
+      await axios.delete(`http://localhost:8080/nhan-vien/${nv.id}`);
+    }
+    await fetchData();
+    deleteNhanViensDialog.value = false;
+    selectedNhanVien.value = null;
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: 'Xóa các nhân viên thành công',
+      life: 3000,
+    });
+  } catch (error) {
+    console.error('Error deleting employees:', error.response?.data || error.message);
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.response?.data?.message || 'Có lỗi xảy ra khi xóa nhân viên',
+      life: 3000,
+    });
+  }
+}
+
+function exportCSV() {
+  dt.value.exportCSV();
+}
+
+function createId() {
+  let id = '';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 5; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
+}
+
+function getInitials(name) {
+  return name
+    .split(' ')
+    .map((word) => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+</script>
+
+<style scoped>
+.card {
+  border: none;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+</style>
