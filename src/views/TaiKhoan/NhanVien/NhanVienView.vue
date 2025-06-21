@@ -1,4 +1,3 @@
-
 <template>
   <div class="card">
     <!-- Toolbar -->
@@ -76,6 +75,17 @@
           </div>
         </template>
       </Column>
+      <!-- Cột địa chỉ -->
+      <Column header="Địa chỉ" style="min-width: 18rem">
+        <template #body="slotProps">
+          <div class="flex flex-col">
+            <span class="text-sm text-muted">
+              <i class="pi pi-map-marker mr-1 text-muted"></i>
+              {{ formatFullAddress(slotProps.data.diaChiInfo) }}
+            </span>
+          </div>
+        </template>
+      </Column>
       <Column header="Liên hệ" style="min-width: 16rem">
         <template #body="slotProps">
           <div class="flex flex-col">
@@ -143,61 +153,124 @@
     <!-- Add/Edit Employee Dialog -->
     <Dialog
       v-model:visible="nhanVienDialog"
-      :style="{ width: '450px' }"
+      :style="{ width: '700px' }"
       :header="nhanVien.id ? 'Cập nhật nhân viên' : 'Thêm nhân viên'"
       :modal="true"
     >
       <div class="flex flex-col gap-6">
-        <div>
-          <label for="hoTen" class="block font-bold mb-3">Họ Tên</label>
-          <InputText
-            id="hoTen"
-            v-model.trim="nhanVien.hoTen"
-            required="true"
-            autofocus
-            :invalid="submitted && !nhanVien.hoTen"
-            fluid
-          />
-          <small v-if="submitted && !nhanVien.hoTen" class="text-red-500"
-            >Họ tên là bắt buộc.</small
-          >
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="hoTen" class="block font-bold mb-3">Họ Tên</label>
+            <InputText
+              id="hoTen"
+              v-model.trim="nhanVien.hoTen"
+              required="true"
+              autofocus
+              :invalid="submitted && !nhanVien.hoTen"
+              fluid
+            />
+            <small v-if="submitted && !nhanVien.hoTen" class="text-red-500"
+              >Họ tên là bắt buộc.</small
+            >
+          </div>
+          <div>
+            <label for="maNhanVien" class="block font-bold mb-3">Mã nhân viên</label>
+            <InputText id="maNhanVien" v-model="nhanVien.maNhanVien" fluid />
+          </div>
         </div>
-        <div>
-          <label for="email" class="block font-bold mb-3">Email</label>
-          <InputText id="email" v-model="nhanVien.email" fluid />
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="email" class="block font-bold mb-3">Email</label>
+            <InputText id="email" v-model="nhanVien.email" fluid />
+          </div>
+          <div>
+            <label for="sdt" class="block font-bold mb-3">Số điện thoại</label>
+            <InputText id="sdt" v-model="nhanVien.sdt" fluid />
+          </div>
         </div>
-        <div>
-          <label for="sdt" class="block font-bold mb-3">Số điện thoại</label>
-          <InputText id="sdt" v-model="nhanVien.sdt" fluid />
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="taiKhoan" class="block font-bold mb-3">ID Tài khoản</label>
+            <InputText id="taiKhoan" v-model.number="nhanVien.taiKhoan" fluid type="number" />
+          </div>
+          <div>
+            <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
+            <Select
+              id="trangThai"
+              v-model="nhanVien.trangThai"
+              :options="statusOptions"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Chọn trạng thái"
+              fluid
+            />
+          </div>
         </div>
-        <div>
-          <label for="maNhanVien" class="block font-bold mb-3">Mã nhân viên</label>
-          <InputText id="maNhanVien" v-model="nhanVien.maNhanVien" fluid />
-        </div>
-        <div>
-          <label for="taiKhoan" class="block font-bold mb-3">ID Tài khoản</label>
-          <InputText id="taiKhoan" v-model.number="nhanVien.taiKhoan" fluid type="number" />
-        </div>
-        <div>
-          <label for="diaChi" class="block font-bold mb-3">ID Địa chỉ</label>
-          <InputText id="diaChi" v-model.number="nhanVien.diaChi" fluid type="number" />
-        </div>
-        <div>
-          <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
-          <Select
-            id="trangThai"
-            v-model="nhanVien.trangThai"
-            :options="statusOptions"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="Chọn trạng thái"
-            fluid
-          />
+
+        <!-- Phần địa chỉ -->
+        <div class="border-top pt-4">
+          <div class="flex justify-between items-center mb-3">
+            <h5 class="mb-0">Thông tin địa chỉ</h5>
+            <Button 
+              v-if="nhanVien.diaChi" 
+              label="Chọn địa chỉ khác" 
+              icon="pi pi-search" 
+              size="small" 
+              outlined 
+              @click="showAddressSelector = true"
+            />
+          </div>
+          <div class="grid grid-cols-1 gap-4">
+            <div>
+              <label for="tenKhachHang" class="block font-bold mb-3">Tên (trong địa chỉ)</label>
+              <InputText id="tenKhachHang" v-model="nhanVien.newAddress.tenKhachHang" placeholder="Tên trong địa chỉ..." fluid />
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label for="tenPhuong" class="block font-bold mb-3">Tên Phường</label>
+                <InputText id="tenPhuong" v-model="nhanVien.newAddress.tenPhuong" placeholder="Tên phường" fluid />
+              </div>
+              <div>
+                <label for="tenHuyen" class="block font-bold mb-3">Tên Huyện</label>
+                <InputText id="tenHuyen" v-model="nhanVien.newAddress.tenHuyen" placeholder="Tên huyện" fluid />
+              </div>
+              <div>
+                <label for="tenTinh" class="block font-bold mb-3">Tên Tỉnh</label>
+                <InputText id="tenTinh" v-model="nhanVien.newAddress.tenTinh" placeholder="Tên tỉnh" fluid />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <template #footer>
         <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
         <Button label="Lưu" icon="pi pi-check" @click="saveNhanVien" />
+      </template>
+    </Dialog>
+
+    <!-- Address Selector Dialog -->
+    <Dialog v-model:visible="showAddressSelector" :style="{ width: '800px' }" header="Chọn địa chỉ" :modal="true">
+      <div class="mb-4">
+        <IconField>
+          <InputIcon>
+            <i class="pi pi-search" />
+          </InputIcon>
+          <InputText v-model="addressSearchKeyword" placeholder="Tìm kiếm địa chỉ..." fluid @input="searchAddresses" />
+        </IconField>
+      </div>
+      <DataTable :value="addresses" dataKey="id" :paginator="true" :rows="5" selectionMode="single" @row-select="selectAddress">
+        <Column field="id" header="ID" style="width: 5rem"></Column>
+        <Column field="tenKhachHang" header="Tên"></Column>
+        <Column header="Khu vực">
+          <template #body="slotProps">
+            {{ formatFullAddress(slotProps.data) }}
+          </template>
+        </Column>
+      </DataTable>
+      <template #footer>
+        <Button label="Đóng" icon="pi pi-times" text @click="showAddressSelector = false" />
       </template>
     </Dialog>
 
@@ -251,11 +324,14 @@ import axios from 'axios';
 const toast = useToast();
 const dt = ref();
 const nhanViens = ref([]);
+const addresses = ref([]);
 const nhanVienDialog = ref(false);
+const showAddressSelector = ref(false);
 const deleteNhanVienDialog = ref(false);
 const deleteNhanViensDialog = ref(false);
 const nhanVien = ref({});
 const selectedNhanVien = ref();
+const addressSearchKeyword = ref('');
 const filters = ref({
   global: { value: null, matchMode: FilterMatchMode.CONTAINS },
 });
@@ -270,24 +346,77 @@ const statusOptions = ref([
 
 onMounted(() => {
   fetchData();
+  fetchAddresses();
 });
 
 async function fetchData() {
   isLoading.value = true;
   try {
     const res = await axios.get('http://localhost:8080/nhan-vien');
-    nhanViens.value = res.data;
+    const nhanViensData = res.data;
+    
+    // Fetch địa chỉ cho mỗi nhân viên
+    for (let nhanVienItem of nhanViensData) {
+      if (nhanVienItem.diaChi) {
+        try {
+          const addressRes = await axios.get(`http://localhost:8080/api/dia-chi/${nhanVienItem.diaChi}`);
+          nhanVienItem.diaChiInfo = addressRes.data;
+        } catch (error) {
+          console.error(`Error fetching address for employee ${nhanVienItem.id}:`, error);
+          nhanVienItem.diaChiInfo = null;
+        }
+      }
+    }
+    
+    nhanViens.value = nhanViensData;
+    
   } catch (error) {
     console.error('Error fetching data:', error.response?.data || error.message);
     toast.add({
       severity: 'error',
       summary: 'Lỗi',
-      detail: error.response?.data?.message || 'Có lỗi xảy ra khi tải dữ liệu',
+      detail: error.response?.data?.message || 'Có lỗi xảy ra khi tải dữ liệu nhân viên',
       life: 3000,
     });
   } finally {
     isLoading.value = false;
   }
+}
+
+async function fetchAddresses() {
+  try {
+    const res = await axios.get('http://localhost:8080/api/dia-chi');
+    addresses.value = res.data;
+  } catch (error) {
+    console.error('Error fetching addresses:', error);
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Có lỗi xảy ra khi tải danh sách địa chỉ', life: 3000 });
+  }
+}
+
+async function searchAddresses() {
+  if (addressSearchKeyword.value.trim()) {
+    try {
+      const res = await axios.get(`http://localhost:8080/api/dia-chi/search?keyword=${encodeURIComponent(addressSearchKeyword.value)}`);
+      addresses.value = res.data;
+    } catch (error) {
+      console.error('Error searching addresses:', error);
+    }
+  } else {
+    fetchAddresses();
+  }
+}
+
+// Hàm format địa chỉ đầy đủ theo DTO structure
+function formatFullAddress(diaChiInfo) {
+  if (!diaChiInfo) return 'Chưa cập nhật địa chỉ';
+  
+  const parts = [
+    diaChiInfo.tenPhuong,
+    diaChiInfo.tenHuyen, 
+    diaChiInfo.tenTinh
+  ].filter(part => part && part.trim() !== '');
+  
+  return parts.length > 0 ? parts.join(', ') : 'Chưa cập nhật thông tin';
 }
 
 const filteredNhanVien = computed(() => {
@@ -301,7 +430,15 @@ const filteredNhanVien = computed(() => {
 });
 
 function openNew() {
-  nhanVien.value = { trangThai: 1 };
+  nhanVien.value = { 
+    trangThai: 1,
+    newAddress: {
+      tenKhachHang: '',
+      tenTinh: '',
+      tenHuyen: '',
+      tenPhuong: ''
+    }
+  };
   submitted.value = false;
   nhanVienDialog.value = true;
 }
@@ -316,8 +453,39 @@ async function saveNhanVien() {
 
   if (nhanVien.value.hoTen?.trim()) {
     try {
+      let addressId = nhanVien.value.diaChi;
+      
+      // Nếu có thông tin địa chỉ mới, tạo hoặc cập nhật địa chỉ
+      if (nhanVien.value.newAddress && (
+        nhanVien.value.newAddress.tenKhachHang || 
+        nhanVien.value.newAddress.tenTinh || 
+        nhanVien.value.newAddress.tenHuyen || 
+        nhanVien.value.newAddress.tenPhuong
+      )) {
+        if (addressId) {
+          // Cập nhật địa chỉ hiện có
+          await axios.put(`http://localhost:8080/api/dia-chi/${addressId}`, nhanVien.value.newAddress);
+        } else {
+          // Tạo địa chỉ mới
+          const addressRes = await axios.post('http://localhost:8080/api/dia-chi', nhanVien.value.newAddress);
+          addressId = addressRes.data.id;
+        }
+      }
+
+      // Chuẩn bị dữ liệu nhân viên theo DTO structure
+      const nhanVienData = {
+        id: nhanVien.value.id,
+        maNhanVien: nhanVien.value.maNhanVien || createId(),
+        email: nhanVien.value.email,
+        hoTen: nhanVien.value.hoTen,
+        sdt: nhanVien.value.sdt,
+        trangThai: nhanVien.value.trangThai,
+        diaChi: addressId, // Chỉ gửi ID
+        taiKhoan: nhanVien.value.taiKhoan || 1 // Default value
+      };
+
       if (nhanVien.value.id) {
-        await axios.put(`http://localhost:8080/nhan-vien/${nhanVien.value.id}`, nhanVien.value);
+        await axios.put(`http://localhost:8080/nhan-vien/${nhanVien.value.id}`, nhanVienData);
         toast.add({
           severity: 'success',
           summary: 'Thành công',
@@ -325,8 +493,7 @@ async function saveNhanVien() {
           life: 3000,
         });
       } else {
-        nhanVien.value.maNhanVien = nhanVien.value.maNhanVien || createId();
-        await axios.post('http://localhost:8080/nhan-vien', nhanVien.value);
+        await axios.post('http://localhost:8080/nhan-vien', nhanVienData);
         toast.add({
           severity: 'success',
           summary: 'Thành công',
@@ -334,7 +501,9 @@ async function saveNhanVien() {
           life: 3000,
         });
       }
+      
       await fetchData();
+      await fetchAddresses();
       nhanVienDialog.value = false;
       nhanVien.value = {};
     } catch (error) {
@@ -350,8 +519,22 @@ async function saveNhanVien() {
 }
 
 function editNhanVien(nv) {
-  nhanVien.value = { ...nv };
+  nhanVien.value = { 
+    ...nv,
+    newAddress: nv.diaChiInfo ? { ...nv.diaChiInfo } : {
+      tenKhachHang: '',
+      tenTinh: '',
+      tenHuyen: '',
+      tenPhuong: ''
+    }
+  };
   nhanVienDialog.value = true;
+}
+
+function selectAddress(event) {
+  nhanVien.value.diaChi = event.data.id;
+  nhanVien.value.newAddress = { ...event.data };
+  showAddressSelector.value = false;
 }
 
 function confirmDeleteNhanVien(nv) {
