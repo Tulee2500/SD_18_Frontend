@@ -362,6 +362,7 @@ function getStatusLabel(status) {
 //     dt.value.exportCSV();
 // }
 
+// Chuyen thanh file CSV Voucher + date 
 function exportCSV() {
     try {
         // If no data, show warning

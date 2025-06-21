@@ -701,6 +701,7 @@ function collapseAll() {
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-4">
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
+                        <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="product.soLuong" integeronly fluid placeholder="0" :min="0" />
                     </div>
                     <div class="col-span-4">
@@ -749,6 +750,7 @@ function collapseAll() {
                     </div>
                     <div class="col-span-4">
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
+                        <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
                     </div>
                 </div>
