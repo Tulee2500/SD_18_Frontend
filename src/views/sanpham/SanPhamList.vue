@@ -424,8 +424,93 @@ function getStockSeverity(product) {
     return 'danger';
 }
 
+// function exportCSV() {
+//     dt.value.exportCSV();
+// }
 function exportCSV() {
-    dt.value.exportCSV();
+    try {
+        // If no data, show warning
+        if (!products.value || products.value.length === 0) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Cảnh báo',
+                detail: 'Không có dữ liệu để xuất',
+                life: 3000
+            });
+            return;
+        }
+
+        // Create CSV headers with Vietnamese labels
+        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
+
+        // Convert data to CSV format
+        const csvData = products.value.map(item => {
+            return [
+                item.id || '',
+                item.maSanPham || '',
+                item.tenSanPham || '',
+                item.soLuong || '',
+                item.danhMuc || '',
+                item.thuongHieu || '',
+                item.chatLieu || '',
+                item.deGiay || '',
+                item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động',
+                item.ngayTao || ''
+            ];
+        });
+
+        // Combine headers and data
+        const csvContent = [headers, ...csvData]
+            .map(row => row.map(field => {
+                // Handle fields that might contain commas or quotes
+                const stringField = String(field);
+                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                    return `"${stringField.replace(/"/g, '""')}"`;
+                }
+                return stringField;
+            }).join(','))
+            .join('\n');
+
+        // Add BOM for proper UTF-8 encoding in Excel
+        const BOM = '\uFEFF';
+        const csvWithBOM = BOM + csvContent;
+
+        // Create and download file
+        const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            
+            // Generate filename with current date
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+            const filename = `SanPham-${dateStr}.csv`;
+
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Show success message
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã xuất ${products.value.length} bản ghi ra file CSV`,
+                life: 3000
+            });
+        }
+    } catch (error) {
+        console.error('Error exporting CSV:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Xuất CSV thất bại',
+            life: 3000
+        });
+    }
 }
 
 async function refreshData() {
@@ -616,7 +701,7 @@ function collapseAll() {
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-4">
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
-                        <InputNumber id="soLuong" v-model="product.soLuong" integeronly fluid placeholder="0" :min="0" />
+                        <InputText id="soLuong" v-model.number="product.soLuong" integeronly fluid placeholder="0" :min="0" />
                     </div>
                     <div class="col-span-4">
                         <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
@@ -664,7 +749,7 @@ function collapseAll() {
                     </div>
                     <div class="col-span-4">
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
-                        <InputNumber id="soLuong" v-model="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
+                        <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
                     </div>
                 </div>
 
