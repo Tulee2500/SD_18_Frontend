@@ -173,6 +173,11 @@ const router = createRouter({
                     name: 'HinhAnh',
                     path: '/hinh-anh',
                     component: () => import('@/views/ThuocTinh/ImageManagement.vue')
+                },
+                {
+                    name: 'TaiKhoan',
+                    path: '/tai-khoan',
+                    component: () => import('@/views/TaiKhoan/TaiKhoanManagement.vue')
                 }
             ]
         },
