@@ -1,4 +1,3 @@
-
 <template>
     <div class="card">
         <!-- Toolbar -->
@@ -51,7 +50,11 @@
                 </template>
             </Column>
             <Column field="tenKhuyenMai" header="Tên Khuyến Mãi" sortable style="min-width: 16rem" />
-            <Column field="giaTri" header="Giá Trị Giảm" sortable style="width: 12rem" />
+            <Column field="giaTri" header="Giá Trị Giảm" sortable style="width: 12rem">
+                <template #body="slotProps">
+                    <span class="text-red-600 font-bold">{{ (slotProps.data.giaTri * 100).toFixed(0) }}%</span>
+                </template>
+            </Column>
             <Column field="ngayBatDau" header="Ngày Bắt Đầu" sortable style="width: 12rem" />
             <Column field="ngayKetThuc" header="Ngày Kết Thúc" sortable style="width: 12rem" />
             <Column field="trangThai" header="Trạng Thái" sortable style="width: 12rem">
@@ -62,9 +65,10 @@
                     </Tag>
                 </template>
             </Column>
-            <Column :exportable="false" style="width: 10rem">
+            <Column :exportable="false" style="width: 12rem">
                 <template #body="slotProps">
                     <div class="flex justify-between gap-2">
+                        <Button icon="pi pi-eye" outlined rounded size="small" severity="info" @click="viewDetail(slotProps.data)" title="Xem chi tiết" />
                         <Button icon="pi pi-pencil" outlined rounded size="small" @click="editKhuyenMai(slotProps.data)" />
                         <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteKhuyenMai(slotProps.data)" />
                         <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" :title="slotProps.data.trangThai === 1 ? 'Hết hạn' : 'Còn hạn'" />
@@ -93,9 +97,10 @@
                     <InputText id="maKhuyenMai" v-model="khuyenMai.maKhuyenMai" fluid />
                 </div>
                 <div>
-                    <label for="giaTri" class="block font-bold mb-3">Giá Trị Giảm</label>
-                    <InputNumber id="giaTri" v-model="khuyenMai.giaTri" :min="0" fluid :invalid="submitted && khuyenMai.giaTri == null" />
-                    <small v-if="submitted && khuyenMai.giaTri == null" class="text-red-500">Giá trị giảm là bắt buộc.</small>
+                    <label for="giaTri" class="block font-bold mb-3">Giá Trị Giảm (%)</label>
+                    <InputText id="giaTri" v-model.number="giaTriPercent" type="number" :min="0" :max="100" fluid :invalid="submitted && giaTriPercent == null" />
+                    <small v-if="submitted && giaTriPercent == null" class="text-red-500">Giá trị giảm là bắt buộc.</small>
+                    <small class="text-gray-500">Nhập số từ 0-100 (ví dụ: 15 = 15%)</small>
                 </div>
                 <div>
                     <label for="ngayBatDau" class="block font-bold mb-3">Ngày Bắt Đầu</label>
@@ -115,6 +120,156 @@
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
                 <Button label="Lưu" icon="pi pi-check" @click="saveKhuyenMai" />
+            </template>
+        </Dialog>
+
+        <!-- Detail Promotion Dialog -->
+        <Dialog v-model:visible="detailDialog" :style="{ width: '800px' }" header="Chi Tiết Khuyến Mãi" :modal="true">
+            <div v-if="selectedDetail" class="flex flex-col gap-6">
+                <!-- Thông tin khuyến mãi -->
+                <div class="border-2 border-gray-200 rounded-lg p-4">
+                    <h5 class="text-lg font-bold mb-4 text-primary">
+                        <i class="pi pi-tag mr-2"></i>Thông Tin Khuyến Mãi
+                    </h5>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Mã Khuyến Mãi:</label>
+                            <Tag :value="selectedDetail.khuyenMai.maKhuyenMai" severity="secondary" />
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Tên Khuyến Mãi:</label>
+                            <span class="text-gray-800">{{ selectedDetail.khuyenMai.tenKhuyenMai }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Giá Trị Giảm:</label>
+                            <span class="text-red-600 font-bold">{{ (selectedDetail.khuyenMai.giaTri * 100).toFixed(0) }}%</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Trạng Thái:</label>
+                            <Tag :value="selectedDetail.khuyenMai.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'" 
+                                 :severity="selectedDetail.khuyenMai.trangThai === 1 ? 'success' : 'danger'">
+                                <i :class="selectedDetail.khuyenMai.trangThai === 1 ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i>
+                                {{ selectedDetail.khuyenMai.trangThai === 1 ? 'Còn hạn' : 'Hết hạn' }}
+                            </Tag>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Ngày Bắt Đầu:</label>
+                            <span class="text-gray-800">{{ formatDate(selectedDetail.khuyenMai.ngayBatDau) }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Ngày Kết Thúc:</label>
+                            <span class="text-gray-800">{{ formatDate(selectedDetail.khuyenMai.ngayKetThuc) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thông tin sản phẩm -->
+                <div class="border-2 border-gray-200 rounded-lg p-4">
+                    <h5 class="text-lg font-bold mb-4 text-primary">
+                        <i class="pi pi-shopping-bag mr-2"></i>Thông Tin Sản Phẩm
+                    </h5>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Mã Sản Phẩm:</label>
+                            <Tag :value="selectedDetail.chiTietSanPham.sanPham.maSanPham" severity="info" />
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Tên Sản Phẩm:</label>
+                            <span class="text-gray-800 font-medium">{{ selectedDetail.chiTietSanPham.sanPham.tenSanPham }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Thương Hiệu:</label>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.thuongHieu.tenThuongHieu }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Danh Mục:</label>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.danhMuc.tenDanhMuc }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Chất Liệu:</label>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.chatLieu.tenChatLieu }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Đế Giày:</label>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.deGiay.tenDeGiay }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chi tiết sản phẩm -->
+                <div class="border-2 border-gray-200 rounded-lg p-4">
+                    <h5 class="text-lg font-bold mb-4 text-primary">
+                        <i class="pi pi-info-circle mr-2"></i>Chi Tiết Sản Phẩm
+                    </h5>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Mã Chi Tiết:</label>
+                            <Tag :value="selectedDetail.chiTietSanPham.maChiTiet" severity="warning" />
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Mã QR:</label>
+                            <Tag :value="selectedDetail.chiTietSanPham.maQR" severity="success" />
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Số Lượng:</label>
+                            <span class="text-gray-800 font-medium">{{ selectedDetail.chiTietSanPham.soLuong }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Màu Sắc:</label>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.mauSac.tenMauSac }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Kích Cỡ:</label>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.kichCo.tenKichCo }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Trạng Thái:</label>
+                            <Tag :value="selectedDetail.chiTietSanPham.trangThai === 1 ? 'Còn hàng' : 'Hết hàng'" 
+                                 :severity="selectedDetail.chiTietSanPham.trangThai === 1 ? 'success' : 'danger'" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thông tin giá -->
+                <div class="border-2 border-gray-200 rounded-lg p-4">
+                    <h5 class="text-lg font-bold mb-4 text-primary">
+                        <i class="pi pi-dollar mr-2"></i>Thông Tin Giá
+                    </h5>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Giá Gốc:</label>
+                            <span class="text-blue-600 font-bold">{{ formatCurrency(selectedDetail.chiTietSanPham.giaBan) }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Giá Sau Khuyến Mãi:</label>
+                            <span class="text-red-600 font-bold">{{ formatCurrency(selectedDetail.chiTietSanPham.giaBan * (1 - selectedDetail.khuyenMai.giaTri)) }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Tiết Kiệm:</label>
+                            <span class="text-green-600 font-bold">{{ formatCurrency(selectedDetail.chiTietSanPham.giaBan * selectedDetail.khuyenMai.giaTri) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thông tin thời gian -->
+                <div class="border-2 border-gray-200 rounded-lg p-4">
+                    <h5 class="text-lg font-bold mb-4 text-primary">
+                        <i class="pi pi-calendar mr-2"></i>Thông Tin Thời Gian
+                    </h5>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Ngày Tạo:</label>
+                            <span class="text-gray-800">{{ formatDate(selectedDetail.ngayTao) }}</span>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-700 mb-1">Ngày Cập Nhật:</label>
+                            <span class="text-gray-800">{{ formatDate(selectedDetail.ngayCapNhat) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Đóng" icon="pi pi-times" @click="detailDialog = false" />
             </template>
         </Dialog>
 
@@ -155,6 +310,7 @@ import { ref, computed, onMounted } from 'vue';
 import { FilterMatchMode } from '@primevue/core/api';
 import { useToast } from 'primevue/usetoast';
 import axios from 'axios';
+import { InputText } from 'primevue';
 
 const toast = useToast();
 const dt = ref();
@@ -162,8 +318,11 @@ const khuyenMais = ref([]);
 const khuyenMaiDialog = ref(false);
 const deleteKhuyenMaiDialog = ref(false);
 const deleteKhuyenMaisDialog = ref(false);
+const detailDialog = ref(false);
 const khuyenMai = ref({});
 const selectedKhuyenMai = ref();
+const selectedDetail = ref(null);
+const giaTriPercent = ref(0); // Thêm biến để lưu giá trị % hiển thị
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
@@ -208,8 +367,45 @@ const filteredKhuyenMai = computed(() => {
     return filtered;
 });
 
+async function viewDetail(km) {
+    try {
+        // Gọi API để lấy chi tiết khuyến mãi
+        const res = await axios.get(`http://localhost:8080/khuyen-mai-chi-tiet/${km.id}`);
+        selectedDetail.value = res.data;
+        detailDialog.value = true;
+    } catch (error) {
+        console.error('Error fetching detail:', error.response?.data || error.message);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: error.response?.data?.message || 'Có lỗi xảy ra khi tải chi tiết khuyến mãi',
+            life: 3000
+        });
+    }
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND'
+    }).format(amount);
+}
+
 function openNew() {
     khuyenMai.value = { trangThai: 1 };
+    giaTriPercent.value = 0; // Reset giá trị %
     submitted.value = false;
     khuyenMaiDialog.value = true;
 }
@@ -222,8 +418,11 @@ function hideDialog() {
 async function saveKhuyenMai() {
     submitted.value = true;
 
-    if (khuyenMai.value.tenKhuyenMai?.trim() && khuyenMai.value.giaTri != null && khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc) {
+    if (khuyenMai.value.tenKhuyenMai?.trim() && giaTriPercent.value != null && khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc) {
         try {
+            // Chuyển đổi từ % sang decimal (15% -> 0.15)
+            khuyenMai.value.giaTri = giaTriPercent.value / 100;
+            
             if (khuyenMai.value.id) {
                 await axios.put(`http://localhost:8080/khuyen-mai/${khuyenMai.value.id}`, khuyenMai.value);
                 toast.add({
@@ -245,6 +444,7 @@ async function saveKhuyenMai() {
             await fetchData();
             khuyenMaiDialog.value = false;
             khuyenMai.value = {};
+            giaTriPercent.value = 0;
         } catch (error) {
             console.error('Error saving promotion:', error.response?.data || error.message);
             toast.add({
@@ -266,6 +466,9 @@ async function saveKhuyenMai() {
 
 function editKhuyenMai(km) {
     khuyenMai.value = { ...km };
+    // Chuyển đổi từ decimal sang % để hiển thị (0.15 -> 15)
+    giaTriPercent.value = km.giaTri * 100;
+    
     // Convert date strings to Date objects for Calendar
     if (khuyenMai.value.ngayBatDau) {
         khuyenMai.value.ngayBatDau = new Date(khuyenMai.value.ngayBatDau);
@@ -377,5 +580,92 @@ function createId() {
     border: none;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
-</style>
 
+.grid {
+    display: grid;
+}
+
+.grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gap-4 {
+    gap: 1rem;
+}
+
+.border-2 {
+    border-width: 2px;
+}
+
+.border-gray-200 {
+    border-color: #e5e7eb;
+}
+
+.rounded-lg {
+    border-radius: 0.5rem;
+}
+
+.p-4 {
+    padding: 1rem;
+}
+
+.mb-4 {
+    margin-bottom: 1rem;
+}
+
+.mb-1 {
+    margin-bottom: 0.25rem;
+}
+
+.text-lg {
+    font-size: 1.125rem;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.font-medium {
+    font-weight: 500;
+}
+
+.text-primary {
+    color: var(--primary-color);
+}
+
+.text-gray-700 {
+    color: #374151;
+}
+
+.text-gray-800 {
+    color: #1f2937;
+}
+
+.text-red-600 {
+    color: #dc2626;
+}
+
+.text-blue-600 {
+    color: #2563eb;
+}
+
+.text-green-600 {
+    color: #16a34a;
+}
+
+.block {
+    display: block;
+}
+
+.mr-2 {
+    margin-right: 0.5rem;
+}
+</style>

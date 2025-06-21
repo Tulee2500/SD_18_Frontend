@@ -165,6 +165,7 @@ import { ref, computed, onMounted } from 'vue';
 import { FilterMatchMode } from '@primevue/core/api';
 import { useToast } from 'primevue/usetoast';
 import axios from 'axios';
+import ListDoc from '@/views/uikit/ListDoc.vue';
 
 const toast = useToast();
 const dt = ref();
@@ -349,8 +350,89 @@ async function deleteSelectedCustomers() {
     }
 }
 
+// function exportCSV() {
+//     dt.value.exportCSV();
+// }
 function exportCSV() {
-    dt.value.exportCSV();
+    try {
+        // If no data, show warning
+        if (!customers.value || customers.value.length === 0) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Cảnh báo',
+                detail: 'Không có dữ liệu để xuất',
+                life: 3000
+            });
+            return;
+        }
+
+        // Create CSV headers with Vietnamese labels
+        const headers = ['ID', 'Mã Khách Hàng', 'Tên Khách Hàng', 'Email', 'Số Điện Thoại', 'Trạng Thái'];
+
+        // Convert data to CSV format
+        const csvData = customers.value.map(item => {
+            return [
+                item.id || '',
+                item.maKhachHang || '',
+                item.hoTen || '',
+                item.email || '',
+                item.sdt || '',
+                item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động'
+            ];
+        });
+
+        // Combine headers and data
+        const csvContent = [headers, ...csvData]
+            .map(row => row.map(field => {
+                // Handle fields that might contain commas or quotes
+                const stringField = String(field);
+                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                    return `"${stringField.replace(/"/g, '""')}"`;
+                }
+                return stringField;
+            }).join(','))
+            .join('\n');
+
+        // Add BOM for proper UTF-8 encoding in Excel
+        const BOM = '\uFEFF';
+        const csvWithBOM = BOM + csvContent;
+
+        // Create and download file
+        const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            
+            // Generate filename with current date
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+            const filename = `KhachHang-${dateStr}.csv`;
+
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Show success message
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã xuất ${customers.value.length} bản ghi ra file CSV`,
+                life: 3000
+            });
+        }
+    } catch (error) {
+        console.error('Error exporting CSV:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Xuất CSV thất bại',
+            life: 3000
+        });
+    }
 }
 
 function createId() {
