@@ -286,6 +286,10 @@ async function changeStatus(cl) {
     }
 }
 
+// function exportCSV() {
+//     dt.value.exportCSV();
+// }
+
 function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
 }

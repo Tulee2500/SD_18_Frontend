@@ -293,6 +293,7 @@ function getStatusLabel(status) {
 // function exportCSV() {
 //     dt.value.exportCSV();
 // }
+// Xuat ra fie thoe dinh dang CSV
 function exportCSV() {
     try {
         // If no data, show warning
