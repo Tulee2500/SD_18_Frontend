@@ -61,6 +61,7 @@ async function loadProducts() {
             material: item.chatLieu?.tenChatLieu || 'Không có',
             sole: item.deGiay?.tenDeGiay || 'Không có',
             quantity: item.soLuong || 0,
+            ngayTao: item.ngayTao, // Lưu nguyên giá trị ngayTao
             createdAt: item.ngayTao ? new Date(item.ngayTao).toLocaleDateString('vi-VN') : 'N/A',
             updatedAt: item.ngayCapNhat ? new Date(item.ngayCapNhat).toLocaleDateString('vi-VN') : 'N/A'
         }));
@@ -227,7 +228,8 @@ function editProduct(prod) {
         danhMuc: prod.danhMuc,
         thuongHieu: prod.thuongHieu,
         chatLieu: prod.chatLieu,
-        deGiay: prod.deGiay
+        deGiay: prod.deGiay,
+        ngayTao: prod.ngayTao
     };
     productDialog.value = true;
 }
@@ -248,7 +250,8 @@ async function saveProduct() {
             danhMuc: product.value.danhMuc,
             thuongHieu: product.value.thuongHieu,
             chatLieu: product.value.chatLieu,
-            deGiay: product.value.deGiay
+            deGiay: product.value.deGiay,
+            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find(p => p.id === product.value.id)?.ngayTao : new Date().toISOString()) // Giữ hoặc tạo mới
         };
         if (product.value.id) {
             await axios.put(`${API_BASE_URL}/api/san-pham/update/${product.value.id}`, productData);
