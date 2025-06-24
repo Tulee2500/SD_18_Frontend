@@ -95,12 +95,21 @@
                 <div>
                     <label for="maKhuyenMai" class="block font-bold mb-3">Mã Khuyến Mãi</label>
                     <InputText id="maKhuyenMai" v-model="khuyenMai.maKhuyenMai" fluid />
+                    <small v-if="submitted && !khuyenMai.maKhuyenMai" class="text-red-500">Mã khuyến mãi là bắt buộc.</small>
                 </div>
                 <div>
                     <label for="giaTri" class="block font-bold mb-3">Giá Trị Giảm (%)</label>
                     <InputText id="giaTri" v-model.number="giaTriPercent" type="number" :min="0" :max="100" fluid :invalid="submitted && giaTriPercent == null" />
-                    <small v-if="submitted && giaTriPercent == null" class="text-red-500">Giá trị giảm là bắt buộc.</small>
-                    <small class="text-gray-500">Nhập số từ 0-100 (ví dụ: 15 = 15%)</small>
+                    <small v-if="submitted && giaTriPercent== null" class="text-red-500">Giá trị giảm là bắt buộc.</small>
+                    <small v-if="submitted && (giaTriPercent == null || giaTriPercent === '')" class="text-red-500">
+                        Giá trị giảm là bắt buộc.
+                    </small>
+                    <small v-else-if="submitted && giaTriPercent <= 0" class="text-red-500">
+                        Giá trị giảm phải lớn hơn 0.
+                    </small>
+                    <small v-else-if="submitted && giaTriPercent > 100" class="text-red-500">
+                        Giá trị giảm không được vượt quá 100%.
+                    </small>
                 </div>
                 <div>
                     <label for="ngayBatDau" class="block font-bold mb-3">Ngày Bắt Đầu</label>
@@ -123,115 +132,131 @@
             </template>
         </Dialog>
 
-        <!-- Detail Promotion Dialog -->
+            <!-- Detail Promotion Dialog -->
         <Dialog v-model:visible="detailDialog" :style="{ width: '800px' }" header="Chi Tiết Khuyến Mãi" :modal="true">
-            <div v-if="selectedDetail" class="flex flex-col gap-6">
+            <!-- Loading State -->
+            <div v-if="isLoading" class="text-center p-8">
+                <i class="pi pi-spinner pi-spin text-4xl text-primary mb-4"></i>
+                <p>Đang tải chi tiết khuyến mãi...</p>
+            </div>
+            
+            <!-- No Data State -->
+            <div v-else-if="!selectedDetail" class="text-center p-8">
+                <i class="pi pi-exclamation-triangle text-4xl text-orange-500 mb-4"></i>
+                <p>Không có dữ liệu chi tiết để hiển thị</p>
+            </div>
+            
+            <!-- Main Content -->
+            <div v-else-if="selectedDetail" class="flex flex-col gap-6">
+                
                 <!-- Thông tin khuyến mãi -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
+                <div v-if="selectedDetail.khuyenMai" class="border-2 border-gray-200 rounded-lg p-4">
                     <h5 class="text-lg font-bold mb-4 text-primary">
                         <i class="pi pi-tag mr-2"></i>Thông Tin Khuyến Mãi
                     </h5>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Mã Khuyến Mãi:</label>
-                            <Tag :value="selectedDetail.khuyenMai.maKhuyenMai" severity="secondary" />
+                            <Tag :value="selectedDetail.khuyenMai?.maKhuyenMai || 'N/A'" severity="secondary" />
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Tên Khuyến Mãi:</label>
-                            <span class="text-gray-800">{{ selectedDetail.khuyenMai.tenKhuyenMai }}</span>
+                            <span class="text-gray-800">{{ selectedDetail.khuyenMai?.tenKhuyenMai || 'N/A' }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Giá Trị Giảm:</label>
-                            <span class="text-red-600 font-bold">{{ (selectedDetail.khuyenMai.giaTri * 100).toFixed(0) }}%</span>
+                            <span class="text-red-600 font-bold">
+                                {{ selectedDetail.khuyenMai?.giaTri ? (selectedDetail.khuyenMai.giaTri * 100).toFixed(0) + '%' : 'N/A' }}
+                            </span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Trạng Thái:</label>
-                            <Tag :value="selectedDetail.khuyenMai.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'" 
-                                 :severity="selectedDetail.khuyenMai.trangThai === 1 ? 'success' : 'danger'">
-                                <i :class="selectedDetail.khuyenMai.trangThai === 1 ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i>
-                                {{ selectedDetail.khuyenMai.trangThai === 1 ? 'Còn hạn' : 'Hết hạn' }}
+                            <Tag :value="selectedDetail.khuyenMai?.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'" 
+                                :severity="selectedDetail.khuyenMai?.trangThai === 1 ? 'success' : 'danger'">
+                                <i :class="selectedDetail.khuyenMai?.trangThai === 1 ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i>
+                                {{ selectedDetail.khuyenMai?.trangThai === 1 ? 'Còn hạn' : 'Hết hạn' }}
                             </Tag>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Ngày Bắt Đầu:</label>
-                            <span class="text-gray-800">{{ formatDate(selectedDetail.khuyenMai.ngayBatDau) }}</span>
+                            <span class="text-gray-800">{{ formatDate(selectedDetail.khuyenMai?.ngayBatDau) }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Ngày Kết Thúc:</label>
-                            <span class="text-gray-800">{{ formatDate(selectedDetail.khuyenMai.ngayKetThuc) }}</span>
+                            <span class="text-gray-800">{{ formatDate(selectedDetail.khuyenMai?.ngayKetThuc) }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Thông tin sản phẩm -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
+                <div v-if="selectedDetail.chiTietSanPham?.sanPham" class="border-2 border-gray-200 rounded-lg p-4">
                     <h5 class="text-lg font-bold mb-4 text-primary">
                         <i class="pi pi-shopping-bag mr-2"></i>Thông Tin Sản Phẩm
                     </h5>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Mã Sản Phẩm:</label>
-                            <Tag :value="selectedDetail.chiTietSanPham.sanPham.maSanPham" severity="info" />
+                            <Tag :value="selectedDetail.chiTietSanPham?.sanPham?.maSanPham || 'N/A'" severity="info" />
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Tên Sản Phẩm:</label>
-                            <span class="text-gray-800 font-medium">{{ selectedDetail.chiTietSanPham.sanPham.tenSanPham }}</span>
+                            <span class="text-gray-800 font-medium">{{ selectedDetail.chiTietSanPham?.sanPham?.tenSanPham || 'N/A' }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Thương Hiệu:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.thuongHieu.tenThuongHieu }}</span>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham?.sanPham?.thuongHieu?.tenThuongHieu || 'N/A' }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Danh Mục:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.danhMuc.tenDanhMuc }}</span>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham?.sanPham?.danhMuc?.tenDanhMuc || 'N/A' }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Chất Liệu:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.chatLieu.tenChatLieu }}</span>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham?.sanPham?.chatLieu?.tenChatLieu || 'N/A' }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Đế Giày:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.deGiay.tenDeGiay }}</span>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham?.sanPham?.deGiay?.tenDeGiay || 'N/A' }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Chi tiết sản phẩm -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
+                <div v-if="selectedDetail.chiTietSanPham" class="border-2 border-gray-200 rounded-lg p-4">
                     <h5 class="text-lg font-bold mb-4 text-primary">
                         <i class="pi pi-info-circle mr-2"></i>Chi Tiết Sản Phẩm
                     </h5>
                     <div class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Mã Chi Tiết:</label>
-                            <Tag :value="selectedDetail.chiTietSanPham.maChiTiet" severity="warning" />
+                            <Tag :value="selectedDetail.chiTietSanPham?.maChiTiet || 'N/A'" severity="warning" />
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Mã QR:</label>
-                            <Tag :value="selectedDetail.chiTietSanPham.maQR" severity="success" />
+                            <Tag :value="selectedDetail.chiTietSanPham?.maQR || 'N/A'" severity="success" />
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Số Lượng:</label>
-                            <span class="text-gray-800 font-medium">{{ selectedDetail.chiTietSanPham.soLuong }}</span>
+                            <span class="text-gray-800 font-medium">{{ selectedDetail.chiTietSanPham?.soLuong || 'N/A' }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Màu Sắc:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.mauSac.tenMauSac }}</span>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham?.mauSac?.tenMauSac || 'N/A' }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Kích Cỡ:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.kichCo.tenKichCo }}</span>
+                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham?.kichCo?.tenKichCo || 'N/A' }}</span>
                         </div>
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Trạng Thái:</label>
-                            <Tag :value="selectedDetail.chiTietSanPham.trangThai === 1 ? 'Còn hàng' : 'Hết hàng'" 
-                                 :severity="selectedDetail.chiTietSanPham.trangThai === 1 ? 'success' : 'danger'" />
+                            <Tag :value="selectedDetail.chiTietSanPham?.trangThai === 1 ? 'Còn hàng' : 'Hết hàng'" 
+                                :severity="selectedDetail.chiTietSanPham?.trangThai === 1 ? 'success' : 'danger'" />
                         </div>
                     </div>
                 </div>
 
                 <!-- Thông tin giá -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
+                <div v-if="selectedDetail.chiTietSanPham?.giaBan && selectedDetail.khuyenMai?.giaTri" class="border-2 border-gray-200 rounded-lg p-4">
                     <h5 class="text-lg font-bold mb-4 text-primary">
                         <i class="pi pi-dollar mr-2"></i>Thông Tin Giá
                     </h5>
@@ -268,6 +293,7 @@
                     </div>
                 </div>
             </div>
+            
             <template #footer>
                 <Button label="Đóng" icon="pi pi-times" @click="detailDialog = false" />
             </template>
@@ -368,19 +394,66 @@ const filteredKhuyenMai = computed(() => {
 });
 
 async function viewDetail(km) {
+    console.log('Viewing detail for promotion:', km); // Debug log
+    
     try {
+        // Hiển thị loading state
+        isLoading.value = true;
+        
         // Gọi API để lấy chi tiết khuyến mãi
+        console.log(`Calling API: http://localhost:8080/khuyen-mai-chi-tiet/${km.id}`);
         const res = await axios.get(`http://localhost:8080/khuyen-mai-chi-tiet/${km.id}`);
+        
+        console.log('API Response:', res.data); // Debug log
+        
+        // Kiểm tra xem response có dữ liệu không
+        if (!res.data) {
+            throw new Error('Không có dữ liệu chi tiết');
+        }
+        
         selectedDetail.value = res.data;
         detailDialog.value = true;
+        
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Tải chi tiết khuyến mãi thành công',
+            life: 2000
+        });
+        
     } catch (error) {
-        console.error('Error fetching detail:', error.response?.data || error.message);
+        console.error('Error fetching detail:', error);
+        
+        // Xử lý các loại lỗi khác nhau
+        let errorMessage = 'Có lỗi xảy ra khi tải chi tiết khuyến mãi';
+        
+        if (error.response) {
+            // Server responded with error status
+            console.error('Server Error:', error.response.status, error.response.data);
+            if (error.response.status === 404) {
+                errorMessage = 'Không tìm thấy chi tiết khuyến mãi';
+            } else if (error.response.status === 500) {
+                errorMessage = 'Lỗi server khi tải chi tiết';
+            } else {
+                errorMessage = error.response.data?.message || errorMessage;
+            }
+        } else if (error.request) {
+            // Network error
+            console.error('Network Error:', error.request);
+            errorMessage = 'Không thể kết nối đến server';
+        } else {
+            // Other error
+            errorMessage = error.message || errorMessage;
+        }
+        
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: error.response?.data?.message || 'Có lỗi xảy ra khi tải chi tiết khuyến mãi',
-            life: 3000
+            detail: errorMessage,
+            life: 5000
         });
+    } finally {
+        isLoading.value = false;
     }
 }
 
@@ -403,9 +476,10 @@ function formatCurrency(amount) {
     }).format(amount);
 }
 
+
 function openNew() {
     khuyenMai.value = { trangThai: 1 };
-    giaTriPercent.value = 0; // Reset giá trị %
+    giaTriPercent.value = 1; // Giá trị mặc định là 1% thay vì 0
     submitted.value = false;
     khuyenMaiDialog.value = true;
 }
@@ -413,52 +487,133 @@ function openNew() {
 function hideDialog() {
     khuyenMaiDialog.value = false;
     submitted.value = false;
+    // Reset values to prevent issues
+    khuyenMai.value = {};
+    giaTriPercent.value = 1; // Reset về giá trị hợp lệ
 }
 
 async function saveKhuyenMai() {
     submitted.value = true;
 
-    if (khuyenMai.value.tenKhuyenMai?.trim() && giaTriPercent.value != null && khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc) {
-        try {
-            // Chuyển đổi từ % sang decimal (15% -> 0.15)
-            khuyenMai.value.giaTri = giaTriPercent.value / 100;
-            
-            if (khuyenMai.value.id) {
-                await axios.put(`http://localhost:8080/khuyen-mai/${khuyenMai.value.id}`, khuyenMai.value);
-                toast.add({
-                    severity: 'success',
-                    summary: 'Thành công',
-                    detail: 'Cập nhật khuyến mãi thành công',
-                    life: 3000
-                });
-            } else {
-                khuyenMai.value.maKhuyenMai = khuyenMai.value.maKhuyenMai || createId();
-                await axios.post('http://localhost:8080/khuyen-mai', khuyenMai.value);
-                toast.add({
-                    severity: 'success',
-                    summary: 'Thành công',
-                    detail: 'Thêm khuyến mãi thành công',
-                    life: 3000
-                });
-            }
-            await fetchData();
-            khuyenMaiDialog.value = false;
-            khuyenMai.value = {};
-            giaTriPercent.value = 0;
-        } catch (error) {
-            console.error('Error saving promotion:', error.response?.data || error.message);
-            toast.add({
-                severity: 'error',
-                summary: 'Lỗi',
-                detail: error.response?.data?.message || 'Có lỗi xảy ra khi lưu khuyến mãi',
-                life: 3000
-            });
-        }
-    } else {
+    // Validate tên khuyến mãi
+    if (!khuyenMai.value.tenKhuyenMai?.trim()) {
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+            detail: 'Tên khuyến mãi là bắt buộc',
+            life: 3000
+        });
+        return;
+    }
+
+    // Validate mã khuyến mãi
+    if (!khuyenMai.value.maKhuyenMai?.trim()) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Mã khuyến mãi là bắt buộc',
+            life: 3000
+        });
+        return;
+    }
+
+    // Validate giá trị giảm
+    if (giaTriPercent.value == null || giaTriPercent.value === '') {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Giá trị giảm là bắt buộc',
+            life: 3000
+        });
+        return;
+    }
+
+    // Kiểm tra giá trị giảm phải > 0 và <= 100
+    if (giaTriPercent.value <= 0) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Giá trị giảm phải lớn hơn 0',
+            life: 3000
+        });
+        return;
+    }
+
+    if (giaTriPercent.value > 100) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Giá trị giảm không được vượt quá 100%',
+            life: 3000
+        });
+        return;
+    }
+
+    // Validate ngày bắt đầu
+    if (!khuyenMai.value.ngayBatDau) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Ngày bắt đầu là bắt buộc',
+            life: 3000
+        });
+        return;
+    }
+
+    // Validate ngày kết thúc
+    if (!khuyenMai.value.ngayKetThuc) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Ngày kết thúc là bắt buộc',
+            life: 3000
+        });
+        return;
+    }
+
+    // Kiểm tra ngày kết thúc phải sau ngày bắt đầu
+    if (new Date(khuyenMai.value.ngayKetThuc) <= new Date(khuyenMai.value.ngayBatDau)) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Ngày kết thúc phải sau ngày bắt đầu',
+            life: 3000
+        });
+        return;
+    }
+
+    try {
+        // Chuyển đổi từ % sang decimal (15% -> 0.15)
+        khuyenMai.value.giaTri = giaTriPercent.value / 100;
+        
+        if (khuyenMai.value.id) {
+            await axios.put(`http://localhost:8080/khuyen-mai/${khuyenMai.value.id}`, khuyenMai.value);
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Cập nhật khuyến mãi thành công',
+                life: 3000
+            });
+        } else {
+            khuyenMai.value.maKhuyenMai = khuyenMai.value.maKhuyenMai || createId();
+            await axios.post('http://localhost:8080/khuyen-mai', khuyenMai.value);
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Thêm khuyến mãi thành công',
+                life: 3000
+            });
+        }
+        await fetchData();
+        khuyenMaiDialog.value = false;
+        khuyenMai.value = {};
+        giaTriPercent.value = 0;
+    } catch (error) {
+        console.error('Error saving promotion:', error.response?.data || error.message);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: error.response?.data?.message || 'Có lỗi xảy ra khi lưu khuyến mãi',
             life: 3000
         });
     }
@@ -466,8 +621,14 @@ async function saveKhuyenMai() {
 
 function editKhuyenMai(km) {
     khuyenMai.value = { ...km };
+    
     // Chuyển đổi từ decimal sang % để hiển thị (0.15 -> 15)
-    giaTriPercent.value = km.giaTri * 100;
+    // Đảm bảo giá trị hợp lệ khi edit
+    if (km.giaTri != null && km.giaTri > 0) {
+        giaTriPercent.value = Math.round(km.giaTri * 100);
+    } else {
+        giaTriPercent.value = 1; // Giá trị mặc định là 1% thay vì 0
+    }
     
     // Convert date strings to Date objects for Calendar
     if (khuyenMai.value.ngayBatDau) {
@@ -476,6 +637,9 @@ function editKhuyenMai(km) {
     if (khuyenMai.value.ngayKetThuc) {
         khuyenMai.value.ngayKetThuc = new Date(khuyenMai.value.ngayKetThuc);
     }
+    
+    // Reset validation state
+    submitted.value = false;
     khuyenMaiDialog.value = true;
 }
 

@@ -704,10 +704,12 @@ function collapseAll() {
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
                         <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="product.soLuong" integeronly fluid placeholder="0" :min="0" />
+                        <small v-if="submitted && (product.soLuong == null || product.soLuong < 0)" class="text-red-500">Số lượng không hợp lệ.</small>
                     </div>
                     <div class="col-span-4">
                         <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
                         <Select id="trangThai" v-model="product.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
+                        
                     </div>
                 </div>
 
@@ -715,10 +717,12 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="danhMuc" class="block font-bold mb-3">Danh mục</label>
                         <Select id="danhMuc" v-model="product.danhMuc" :options="danhMucs" optionLabel="tenDanhMuc" placeholder="Chọn danh mục" fluid />
+                        <small v-if="submitted && !product.danhMuc" class="text-red-500">Danh mục là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="thuongHieu" class="block font-bold mb-3">Thương hiệu</label>
                         <Select id="thuongHieu" v-model="product.thuongHieu" :options="thuongHieus" optionLabel="tenThuongHieu" placeholder="Chọn thương hiệu" fluid />
+                        <small v-if="submitted && !product.thuongHieu" class="text-red-500">Thương hiệu là bắt buộc.</small>
                     </div>
                 </div>
 
@@ -726,17 +730,19 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="chatLieu" class="block font-bold mb-3">Chất liệu</label>
                         <Select id="chatLieu" v-model="product.chatLieu" :options="chatLieus" optionLabel="tenChatLieu" placeholder="Chọn chất liệu" fluid />
+                        <small v-if="submitted && !product.chatLieu" class="text-red-500">Chất liệu là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="deGiay" class="block font-bold mb-3">Đế giày</label>
                         <Select id="deGiay" v-model="product.deGiay" :options="deGiays" optionLabel="tenDeGiay" placeholder="Chọn đế giày" fluid />
+                        <small v-if="submitted && !product.deGiay" class="text-red-500">Đế giày là bắt buộc.</small>
                     </div>
                 </div>
             </div>
 
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
-                <Button label="Lưu lại" icon="pi pi-check" @click="saveProduct" :loading="loading || submitted" />
+                <Button label="Lưu lại" icon="pi pi-check" @click="saveProduct"  />
             </template>
         </Dialog>
 
@@ -753,18 +759,19 @@ function collapseAll() {
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
                         <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
+                        <small v-if="submitted && (detail.soLuong == null || detail.soLuong < 0)" class="text-red-500">Số lượng không hợp lệ.</small>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
                         <label for="giaNhap" class="block font-bold mb-3">Giá nhập *</label>
-                        <InputNumber id="giaNhap" v-model="detail.giaNhap" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaNhap == null || detail.giaNhap < 0)" />
+                        <InputText id="giaNhap" v-model.number="detail.giaNhap" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaNhap == null || detail.giaNhap < 0)" />
                         <small v-if="submitted && (detail.giaNhap == null || detail.giaNhap < 0)" class="text-red-500">Giá nhập phải là số không âm.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="giaBan" class="block font-bold mb-3">Giá bán *</label>
-                        <InputNumber id="giaBan" v-model="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan < 0)" />
+                        <InputText id="giaBan" v-model.numberx="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan < 0)" />
                         <small v-if="submitted && (detail.giaBan == null || detail.giaBan < 0)" class="text-red-500">Giá bán phải là số không âm.</small>
                     </div>
                 </div>
@@ -773,10 +780,12 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="mauSac" class="block font-bold mb-3">Màu sắc</label>
                         <Select id="mauSac" v-model="detail.mauSac" :options="mauSacs" optionLabel="tenMauSac" placeholder="Chọn màu sắc" fluid />
+                        <small v-if="submitted && !detail.mauSac" class="text-red-500">Màu sắc là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="kichCo" class="block font-bold mb-3">Kích cỡ</label>
                         <Select id="kichCo" v-model="detail.kichCo" :options="kichCos" optionLabel="tenKichCo" placeholder="Chọn kích cỡ" fluid />
+                        <small v-if="submitted && !detail.kichCo" class="text-red-500">Kích cỡ là bắt buộc.</small>
                     </div>
                 </div>
 
@@ -784,13 +793,14 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
                         <Select id="trangThai" v-model="detail.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
+                        <small v-if="submitted && !detail.trangThai" class="text-red-500">Trạng thái là bắt buộc.</small>
                     </div>
                 </div>
             </div>
 
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDetailDialog" :disabled="loading" />
-                <Button label="Lưu lại" icon="pi pi-check" @click="saveDetail" :loading="loading || submitted" />
+                <Button label="Lưu lại" icon="pi pi-check" @click="saveDetail" />
             </template>
         </Dialog>
 
