@@ -55,8 +55,24 @@
                     <span class="text-red-600 font-bold">{{ (slotProps.data.giaTri * 100).toFixed(0) }}%</span>
                 </template>
             </Column>
-            <Column field="ngayBatDau" header="Ngày Bắt Đầu" sortable style="width: 12rem" />
-            <Column field="ngayKetThuc" header="Ngày Kết Thúc" sortable style="width: 12rem" />
+            <Column field="soLuongSanPham" header="Sản Phẩm" sortable style="width: 10rem">
+                <template #body="slotProps">
+                    <Tag :value="slotProps.data.soLuongSanPham || 0" severity="info">
+                        <i class="pi pi-shopping-bag mr-1"></i>
+                        {{ slotProps.data.soLuongSanPham || 0 }}
+                    </Tag>
+                </template>
+            </Column>
+            <Column field="ngayBatDau" header="Ngày Bắt Đầu" sortable style="width: 12rem">
+                <template #body="slotProps">
+                    {{ formatDateDisplay(slotProps.data.ngayBatDau) }}
+                </template>
+            </Column>
+            <Column field="ngayKetThuc" header="Ngày Kết Thúc" sortable style="width: 12rem">
+                <template #body="slotProps">
+                    {{ formatDateDisplay(slotProps.data.ngayKetThuc) }}
+                </template>
+            </Column>
             <Column field="trangThai" header="Trạng Thái" sortable style="width: 12rem">
                 <template #body="slotProps">
                     <Tag :value="slotProps.data.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'" :severity="slotProps.data.trangThai === 1 ? 'success' : 'danger'">
@@ -65,13 +81,14 @@
                     </Tag>
                 </template>
             </Column>
-            <Column :exportable="false" style="width: 12rem">
+            <Column :exportable="false" style="width: 18rem">
                 <template #body="slotProps">
-                    <div class="flex justify-between gap-2">
-                        <Button icon="pi pi-eye" outlined rounded size="small" severity="info" @click="viewDetail(slotProps.data)" title="Xem chi tiết" />
-                        <Button icon="pi pi-pencil" outlined rounded size="small" @click="editKhuyenMai(slotProps.data)" />
-                        <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteKhuyenMai(slotProps.data)" />
-                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" :title="slotProps.data.trangThai === 1 ? 'Hết hạn' : 'Còn hạn'" />
+                    <div class="flex justify-between gap-1">
+                        <Button icon="pi pi-eye" outlined rounded size="small" severity="info" @click="viewPromotionProducts(slotProps.data)" title="Xem sản phẩm" />
+                        <Button icon="pi pi-plus" outlined rounded size="small" severity="warning" @click="openApplyProductsDialog(slotProps.data)" title="Áp dụng sản phẩm" />
+                        <Button icon="pi pi-pencil" outlined rounded size="small" @click="editKhuyenMai(slotProps.data)" title="Chỉnh sửa" />
+                        <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteKhuyenMai(slotProps.data)" title="Xóa" />
+                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" :title="slotProps.data.trangThai === 1 ? 'Vô hiệu hóa' : 'Kích hoạt'" />
                     </div>
                 </template>
             </Column>
@@ -85,7 +102,7 @@
         </DataTable>
 
         <!-- Add/Edit Promotion Dialog -->
-        <Dialog v-model:visible="khuyenMaiDialog" :style="{ width: '450px' }" :header="khuyenMai.id ? 'Cập nhật khuyến mãi' : 'Thêm khuyến mãi'" :modal="true">
+        <Dialog v-model:visible="khuyenMaiDialog" :style="{ width: '500px' }" :header="khuyenMai.id ? 'Cập nhật khuyến mãi' : 'Thêm khuyến mãi'" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="tenKhuyenMai" class="block font-bold mb-3">Tên Khuyến Mãi</label>
@@ -95,208 +112,342 @@
                 <div>
                     <label for="maKhuyenMai" class="block font-bold mb-3">Mã Khuyến Mãi</label>
                     <InputText id="maKhuyenMai" v-model="khuyenMai.maKhuyenMai" fluid />
+                    <small class="text-gray-500">Để trống để tự động tạo mã</small>
                 </div>
                 <div>
                     <label for="giaTri" class="block font-bold mb-3">Giá Trị Giảm (%)</label>
-                    <InputText id="giaTri" v-model.number="giaTriPercent" type="number" :min="0" :max="100" fluid :invalid="submitted && giaTriPercent == null" />
-                    <small v-if="submitted && giaTriPercent == null" class="text-red-500">Giá trị giảm là bắt buộc.</small>
-                    <small class="text-gray-500">Nhập số từ 0-100 (ví dụ: 15 = 15%)</small>
+                    <InputNumber id="giaTri" v-model="giaTriPercent" :min="0" :max="100" suffix="%" fluid :invalid="submitted && (giaTriPercent == null || giaTriPercent <= 0)" />
+                    <small v-if="submitted && (giaTriPercent == null || giaTriPercent <= 0)" class="text-red-500">Giá trị giảm phải lớn hơn 0.</small>
+                    <small class="text-gray-500">Nhập số từ 1-100 (ví dụ: 15 = 15%)</small>
                 </div>
                 <div>
                     <label for="ngayBatDau" class="block font-bold mb-3">Ngày Bắt Đầu</label>
-                    <Calendar id="ngayBatDau" v-model="khuyenMai.ngayBatDau" dateFormat="yy-mm-dd" fluid :invalid="submitted && !khuyenMai.ngayBatDau" />
+                    <Calendar id="ngayBatDau" v-model="khuyenMai.ngayBatDau" dateFormat="dd/mm/yy" showTime hourFormat="24" fluid :invalid="submitted && !khuyenMai.ngayBatDau" />
                     <small v-if="submitted && !khuyenMai.ngayBatDau" class="text-red-500">Ngày bắt đầu là bắt buộc.</small>
                 </div>
                 <div>
                     <label for="ngayKetThuc" class="block font-bold mb-3">Ngày Kết Thúc</label>
-                    <Calendar id="ngayKetThuc" v-model="khuyenMai.ngayKetThuc" dateFormat="yy-mm-dd" fluid :invalid="submitted && !khuyenMai.ngayKetThuc" />
+                    <Calendar id="ngayKetThuc" v-model="khuyenMai.ngayKetThuc" dateFormat="dd/mm/yy" showTime hourFormat="24" fluid :invalid="submitted && (!khuyenMai.ngayKetThuc || isEndDateBeforeStartDate)" />
                     <small v-if="submitted && !khuyenMai.ngayKetThuc" class="text-red-500">Ngày kết thúc là bắt buộc.</small>
+                    <small v-if="submitted && isEndDateBeforeStartDate" class="text-red-500">Ngày kết thúc phải sau ngày bắt đầu.</small>
                 </div>
                 <div>
                     <label for="trangThai" class="block font-bold mb-3">Trạng Thái</label>
-                    <Select id="trangThai" v-model="khuyenMai.trangThai" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
+                    <Select id="trangThai" v-model="khuyenMai.trangThai" :options="statusOptionsForForm" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
                 </div>
             </div>
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveKhuyenMai" />
+                <Button label="Lưu" icon="pi pi-check" @click="saveKhuyenMai" :loading="isSaving" />
             </template>
         </Dialog>
 
-        <!-- Detail Promotion Dialog -->
-        <Dialog v-model:visible="detailDialog" :style="{ width: '800px' }" header="Chi Tiết Khuyến Mãi" :modal="true">
-            <div v-if="selectedDetail" class="flex flex-col gap-6">
-                <!-- Thông tin khuyến mãi -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
-                    <h5 class="text-lg font-bold mb-4 text-primary">
-                        <i class="pi pi-tag mr-2"></i>Thông Tin Khuyến Mãi
-                    </h5>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Mã Khuyến Mãi:</label>
-                            <Tag :value="selectedDetail.khuyenMai.maKhuyenMai" severity="secondary" />
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Tên Khuyến Mãi:</label>
-                            <span class="text-gray-800">{{ selectedDetail.khuyenMai.tenKhuyenMai }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Giá Trị Giảm:</label>
-                            <span class="text-red-600 font-bold">{{ (selectedDetail.khuyenMai.giaTri * 100).toFixed(0) }}%</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Trạng Thái:</label>
-                            <Tag :value="selectedDetail.khuyenMai.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'" 
-                                 :severity="selectedDetail.khuyenMai.trangThai === 1 ? 'success' : 'danger'">
-                                <i :class="selectedDetail.khuyenMai.trangThai === 1 ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i>
-                                {{ selectedDetail.khuyenMai.trangThai === 1 ? 'Còn hạn' : 'Hết hạn' }}
-                            </Tag>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Ngày Bắt Đầu:</label>
-                            <span class="text-gray-800">{{ formatDate(selectedDetail.khuyenMai.ngayBatDau) }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Ngày Kết Thúc:</label>
-                            <span class="text-gray-800">{{ formatDate(selectedDetail.khuyenMai.ngayKetThuc) }}</span>
-                        </div>
+        <!-- Apply Products Dialog -->
+        <Dialog v-model:visible="applyProductsDialog" :style="{ width: '95vw', height: '85vh' }" header="Áp Dụng Sản Phẩm Cho Khuyến Mãi" :modal="true" class="apply-products-dialog">
+            <div class="h-full flex flex-col">
+                <!-- Promotion info -->
+                <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                    <h6 class="font-bold text-blue-800 mb-2"><i class="pi pi-tag mr-2"></i>Khuyến mãi được chọn:</h6>
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <Tag :value="selectedPromotionForApply?.maKhuyenMai" severity="secondary" />
+                        <span class="font-medium">{{ selectedPromotionForApply?.tenKhuyenMai }}</span>
+                        <span class="text-red-600 font-bold"> Giảm {{ selectedPromotionForApply ? (selectedPromotionForApply.giaTri * 100).toFixed(0) : 0 }}% </span>
+                        <Tag :value="`${selectedProductsForApply?.length || 0} sản phẩm đã chọn`" severity="success" />
                     </div>
                 </div>
 
-                <!-- Thông tin sản phẩm -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
-                    <h5 class="text-lg font-bold mb-4 text-primary">
-                        <i class="pi pi-shopping-bag mr-2"></i>Thông Tin Sản Phẩm
-                    </h5>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Mã Sản Phẩm:</label>
-                            <Tag :value="selectedDetail.chiTietSanPham.sanPham.maSanPham" severity="info" />
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Tên Sản Phẩm:</label>
-                            <span class="text-gray-800 font-medium">{{ selectedDetail.chiTietSanPham.sanPham.tenSanPham }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Thương Hiệu:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.thuongHieu.tenThuongHieu }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Danh Mục:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.danhMuc.tenDanhMuc }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Chất Liệu:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.chatLieu.tenChatLieu }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Đế Giày:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.sanPham.deGiay.tenDeGiay }}</span>
-                        </div>
+                <!-- Search and filter -->
+                <div class="mb-4 flex gap-4 items-center flex-wrap">
+                    <IconField class="flex-1 min-w-64">
+                        <InputIcon>
+                            <i class="pi pi-search" />
+                        </InputIcon>
+                        <InputText v-model="productSearchKeyword" placeholder="Tìm kiếm theo tên, mã sản phẩm..." @input="debounceSearch" fluid />
+                    </IconField>
+                    <Button label="Tải lại" icon="pi pi-refresh" @click="loadAvailableProducts" severity="secondary" />
+                    <Button label="Chọn tất cả" icon="pi pi-check-square" @click="selectAllProducts" severity="info" :disabled="!availableProducts.length" />
+                    <Button label="Bỏ chọn" icon="pi pi-square" @click="clearSelectedProducts" text />
+                </div>
+
+                <!-- Products table -->
+                <div class="flex-1 overflow-hidden">
+                    <DataTable
+                        v-model:selection="selectedProductsForApply"
+                        :value="availableProducts"
+                        dataKey="id"
+                        :paginator="true"
+                        :rows="15"
+                        :loading="isLoadingProducts"
+                        scrollable
+                        scrollHeight="flex"
+                        class="h-full"
+                        :rowsPerPageOptions="[15, 25, 50, 100]"
+                        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                        currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} sản phẩm"
+                        stripedRows
+                    >
+                        <Column selectionMode="multiple" style="width: 3rem" frozen></Column>
+                        <Column field="maChiTiet" header="Mã Chi Tiết" style="width: 130px" frozen>
+                            <template #body="slotProps">
+                                <Tag :value="slotProps.data.maChiTiet" severity="warning" />
+                            </template>
+                        </Column>
+                        <Column field="sanPham.tenSanPham" header="Tên Sản Phẩm" style="min-width: 250px">
+                            <template #body="slotProps">
+                                <div class="font-medium">{{ slotProps.data.sanPham?.tenSanPham }}</div>
+                                <small class="text-gray-500">{{ slotProps.data.sanPham?.maSanPham }}</small>
+                            </template>
+                        </Column>
+                        <Column field="sanPham.thuongHieu.tenThuongHieu" header="Thương Hiệu" style="width: 130px" />
+                        <Column field="sanPham.danhMuc.tenDanhMuc" header="Danh Mục" style="width: 130px" />
+                        <Column field="mauSac.tenMauSac" header="Màu Sắc" style="width: 120px">
+                            <template #body="slotProps">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-block w-4 h-4 rounded-full border" :style="{ backgroundColor: slotProps.data.mauSac?.maMau || '#ccc' }"></span>
+                                    <span>{{ slotProps.data.mauSac?.tenMauSac }}</span>
+                                </div>
+                            </template>
+                        </Column>
+                        <Column field="kichCo.tenKichCo" header="Size" style="width: 80px" sortable>
+                            <template #body="slotProps">
+                                <Tag :value="slotProps.data.kichCo?.tenKichCo" severity="info" />
+                            </template>
+                        </Column>
+                        <Column field="soLuong" header="Tồn Kho" style="width: 100px" sortable>
+                            <template #body="slotProps">
+                                <Tag :value="slotProps.data.soLuong" :severity="slotProps.data.soLuong > 10 ? 'success' : slotProps.data.soLuong > 0 ? 'warning' : 'danger'" />
+                            </template>
+                        </Column>
+                        <Column field="giaGoc" header="Giá Gốc" style="width: 130px" sortable>
+                            <template #body="slotProps">
+                                <span class="font-bold text-blue-600">{{ formatCurrency(slotProps.data.giaGoc) }}</span>
+                            </template>
+                        </Column>
+                        <Column header="Giá Sau KM" style="width: 130px">
+                            <template #body="slotProps">
+                                <span class="font-bold text-red-600">
+                                    {{ formatCurrency(slotProps.data.giaGoc * (1 - (selectedPromotionForApply?.giaTri || 0))) }}
+                                </span>
+                            </template>
+                        </Column>
+                        <Column header="Tiết Kiệm" style="width: 130px">
+                            <template #body="slotProps">
+                                <span class="font-bold text-green-600">
+                                    {{ formatCurrency(slotProps.data.giaGoc * (selectedPromotionForApply?.giaTri || 0)) }}
+                                </span>
+                            </template>
+                        </Column>
+                        <template #empty>
+                            <div class="text-center p-8">
+                                <i class="pi pi-shopping-bag text-6xl text-gray-400 mb-4"></i>
+                                <h5 class="text-gray-600 mb-2">Không có sản phẩm khả dụng</h5>
+                                <p class="text-gray-500">
+                                    {{ productSearchKeyword ? 'Không tìm thấy sản phẩm phù hợp' : 'Tất cả sản phẩm đã được áp dụng khuyến mãi hoặc hết hàng' }}
+                                </p>
+                                <Button v-if="productSearchKeyword" label="Xóa bộ lọc" icon="pi pi-times" text @click="clearSearch" class="mt-3" />
+                            </div>
+                        </template>
+                    </DataTable>
+                </div>
+            </div>
+            <template #footer>
+                <div class="flex justify-between items-center w-full">
+                    <span class="font-medium text-gray-600">
+                        Đã chọn: <strong class="text-blue-600">{{ selectedProductsForApply?.length || 0 }}</strong> sản phẩm
+                    </span>
+                    <div class="flex gap-2">
+                        <Button label="Hủy" icon="pi pi-times" text @click="applyProductsDialog = false" />
+                        <Button label="Áp Dụng Khuyến Mãi" icon="pi pi-check" @click="applyPromotionToProducts" :disabled="!selectedProductsForApply || selectedProductsForApply.length === 0" :loading="isApplyingPromotion" />
+                    </div>
+                </div>
+            </template>
+        </Dialog>
+
+        <!-- View Promotion Products Dialog -->
+        <Dialog v-model:visible="viewProductsDialog" :style="{ width: '95vw', height: '85vh' }" header="Sản Phẩm Được Áp Dụng Khuyến Mãi" :modal="true">
+            <div class="h-full flex flex-col">
+                <!-- Promotion info -->
+                <div class="bg-green-50 p-4 rounded-lg mb-4">
+                    <h6 class="font-bold text-green-800 mb-2"><i class="pi pi-info-circle mr-2"></i>Thông tin khuyến mãi:</h6>
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <Tag :value="selectedPromotionForView?.maKhuyenMai" severity="secondary" />
+                        <span class="font-medium">{{ selectedPromotionForView?.tenKhuyenMai }}</span>
+                        <span class="text-red-600 font-bold"> Giảm {{ selectedPromotionForView ? (selectedPromotionForView.giaTri * 100).toFixed(0) : 0 }}% </span>
+                        <Tag :value="`${promotionProducts.length} sản phẩm`" severity="info" />
+                        <Tag :value="selectedPromotionForView?.trangThai === 1 ? 'Đang hoạt động' : 'Đã dừng'" :severity="selectedPromotionForView?.trangThai === 1 ? 'success' : 'danger'" />
                     </div>
                 </div>
 
-                <!-- Chi tiết sản phẩm -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
-                    <h5 class="text-lg font-bold mb-4 text-primary">
-                        <i class="pi pi-info-circle mr-2"></i>Chi Tiết Sản Phẩm
-                    </h5>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Mã Chi Tiết:</label>
-                            <Tag :value="selectedDetail.chiTietSanPham.maChiTiet" severity="warning" />
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Mã QR:</label>
-                            <Tag :value="selectedDetail.chiTietSanPham.maQR" severity="success" />
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Số Lượng:</label>
-                            <span class="text-gray-800 font-medium">{{ selectedDetail.chiTietSanPham.soLuong }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Màu Sắc:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.mauSac.tenMauSac }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Kích Cỡ:</label>
-                            <span class="text-gray-800">{{ selectedDetail.chiTietSanPham.kichCo.tenKichCo }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Trạng Thái:</label>
-                            <Tag :value="selectedDetail.chiTietSanPham.trangThai === 1 ? 'Còn hàng' : 'Hết hàng'" 
-                                 :severity="selectedDetail.chiTietSanPham.trangThai === 1 ? 'success' : 'danger'" />
-                        </div>
+                <!-- Summary stats -->
+                <div class="grid grid-cols-4 gap-4 mb-4">
+                    <div class="bg-blue-50 p-3 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-blue-600">{{ promotionProducts.length }}</div>
+                        <div class="text-sm text-blue-800">Sản phẩm</div>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-green-600">{{ formatCurrency(totalPromotionValue) }}</div>
+                        <div class="text-sm text-green-800">Tổng tiết kiệm</div>
+                    </div>
+                    <div class="bg-orange-50 p-3 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-orange-600">{{ formatCurrency(totalOriginalValue) }}</div>
+                        <div class="text-sm text-orange-800">Tổng giá gốc</div>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(totalDiscountedValue) }}</div>
+                        <div class="text-sm text-purple-800">Tổng sau KM</div>
                     </div>
                 </div>
 
-                <!-- Thông tin giá -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
-                    <h5 class="text-lg font-bold mb-4 text-primary">
-                        <i class="pi pi-dollar mr-2"></i>Thông Tin Giá
-                    </h5>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Giá Gốc:</label>
-                            <span class="text-blue-600 font-bold">{{ formatCurrency(selectedDetail.chiTietSanPham.giaBan) }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Giá Sau Khuyến Mãi:</label>
-                            <span class="text-red-600 font-bold">{{ formatCurrency(selectedDetail.chiTietSanPham.giaBan * (1 - selectedDetail.khuyenMai.giaTri)) }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Tiết Kiệm:</label>
-                            <span class="text-green-600 font-bold">{{ formatCurrency(selectedDetail.chiTietSanPham.giaBan * selectedDetail.khuyenMai.giaTri) }}</span>
-                        </div>
+                <!-- Products table -->
+                <div class="flex-1 overflow-hidden">
+                    <DataTable
+                        :value="promotionProducts"
+                        dataKey="id"
+                        :paginator="true"
+                        :rows="15"
+                        :loading="isLoadingPromotionProducts"
+                        scrollable
+                        scrollHeight="flex"
+                        class="h-full"
+                        :rowsPerPageOptions="[15, 25, 50]"
+                        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                        currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} sản phẩm"
+                        stripedRows
+                    >
+                        <Column field="chiTietSanPham.maChiTiet" header="Mã Chi Tiết" style="width: 130px" frozen>
+                            <template #body="slotProps">
+                                <Tag :value="slotProps.data.chiTietSanPham.maChiTiet" severity="warning" />
+                            </template>
+                        </Column>
+                        <Column field="chiTietSanPham.sanPham.tenSanPham" header="Tên Sản Phẩm" style="min-width: 250px">
+                            <template #body="slotProps">
+                                <div class="font-medium">{{ slotProps.data.chiTietSanPham.sanPham?.tenSanPham }}</div>
+                                <small class="text-gray-500">{{ slotProps.data.chiTietSanPham.sanPham?.maSanPham }}</small>
+                            </template>
+                        </Column>
+                        <Column field="chiTietSanPham.sanPham.thuongHieu.tenThuongHieu" header="Thương Hiệu" style="width: 130px" />
+                        <Column field="chiTietSanPham.mauSac.tenMauSac" header="Màu Sắc" style="width: 120px">
+                            <template #body="slotProps">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-block w-4 h-4 rounded-full border" :style="{ backgroundColor: slotProps.data.chiTietSanPham.mauSac?.maMau || '#ccc' }"></span>
+                                    <span>{{ slotProps.data.chiTietSanPham.mauSac?.tenMauSac }}</span>
+                                </div>
+                            </template>
+                        </Column>
+                        <Column field="chiTietSanPham.kichCo.tenKichCo" header="Size" style="width: 80px">
+                            <template #body="slotProps">
+                                <Tag :value="slotProps.data.chiTietSanPham.kichCo?.tenKichCo" severity="info" />
+                            </template>
+                        </Column>
+                        <Column field="chiTietSanPham.soLuong" header="Tồn Kho" style="width: 100px">
+                            <template #body="slotProps">
+                                <Tag :value="slotProps.data.chiTietSanPham.soLuong" :severity="slotProps.data.chiTietSanPham.soLuong > 10 ? 'success' : slotProps.data.chiTietSanPham.soLuong > 0 ? 'warning' : 'danger'" />
+                            </template>
+                        </Column>
+                        <Column field="chiTietSanPham.giaGoc" header="Giá Gốc" style="width: 130px">
+                            <template #body="slotProps">
+                                <span class="font-bold text-blue-600">{{ formatCurrency(slotProps.data.chiTietSanPham.giaGoc) }}</span>
+                            </template>
+                        </Column>
+                        <Column field="chiTietSanPham.giaBan" header="Giá Sau KM" style="width: 130px">
+                            <template #body="slotProps">
+                                <span class="font-bold text-red-600">
+                                    {{ formatCurrency(slotProps.data.chiTietSanPham.giaBan) }}
+                                </span>
+                            </template>
+                        </Column>
+                        <Column header="Tiết Kiệm" style="width: 130px">
+                            <template #body="slotProps">
+                                <span class="font-bold text-green-600">
+                                    {{ formatCurrency(slotProps.data.chiTietSanPham.giaGoc - slotProps.data.chiTietSanPham.giaBan) }}
+                                </span>
+                            </template>
+                        </Column>
+                        <Column header="Ngày Áp Dụng" style="width: 140px">
+                            <template #body="slotProps">
+                                <span class="text-gray-600">{{ formatDateDisplay(slotProps.data.ngayTao) }}</span>
+                            </template>
+                        </Column>
+                        <Column header="Thao Tác" style="width: 100px" frozen alignFrozen="right">
+                            <template #body="slotProps">
+                                <Button icon="pi pi-times" outlined rounded severity="danger" size="small" @click="confirmRemoveProductFromPromotion(slotProps.data)" title="Hủy áp dụng" />
+                            </template>
+                        </Column>
+                        <template #empty>
+                            <div class="text-center p-8">
+                                <i class="pi pi-shopping-bag text-6xl text-gray-400 mb-4"></i>
+                                <h5 class="text-gray-600 mb-2">Chưa có sản phẩm nào được áp dụng</h5>
+                                <p class="text-gray-500 mb-4">Khuyến mãi này chưa được áp dụng cho sản phẩm nào.</p>
+                                <Button label="Áp Dụng Sản Phẩm Ngay" icon="pi pi-plus" @click="openApplyProductsFromView" />
+                            </div>
+                        </template>
+                    </DataTable>
+                </div>
+            </div>
+            <template #footer>
+                <div class="flex justify-between items-center w-full">
+                    <div class="text-sm text-gray-600">
+                        Tổng cộng <strong>{{ promotionProducts.length }}</strong> sản phẩm được áp dụng khuyến mãi
+                    </div>
+                    <div class="flex gap-2">
+                        <Button label="Đóng" icon="pi pi-times" @click="viewProductsDialog = false" />
+                        <Button label="Áp Dụng Thêm Sản Phẩm" icon="pi pi-plus" @click="openApplyProductsFromView" severity="secondary" />
                     </div>
                 </div>
+            </template>
+        </Dialog>
 
-                <!-- Thông tin thời gian -->
-                <div class="border-2 border-gray-200 rounded-lg p-4">
-                    <h5 class="text-lg font-bold mb-4 text-primary">
-                        <i class="pi pi-calendar mr-2"></i>Thông Tin Thời Gian
-                    </h5>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Ngày Tạo:</label>
-                            <span class="text-gray-800">{{ formatDate(selectedDetail.ngayTao) }}</span>
-                        </div>
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Ngày Cập Nhật:</label>
-                            <span class="text-gray-800">{{ formatDate(selectedDetail.ngayCapNhat) }}</span>
-                        </div>
+        <!-- Remove Product from Promotion Dialog -->
+        <Dialog v-model:visible="removeProductDialog" :style="{ width: '450px' }" header="Xác nhận hủy áp dụng" :modal="true">
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle text-3xl text-orange-500" />
+                <div>
+                    <p>Bạn có chắc chắn muốn hủy áp dụng khuyến mãi cho sản phẩm này?</p>
+                    <div class="mt-3 p-3 bg-gray-50 rounded">
+                        <div><strong>Sản phẩm:</strong> {{ selectedProductForRemove?.chiTietSanPham?.sanPham?.tenSanPham }}</div>
+                        <div><strong>Mã chi tiết:</strong> {{ selectedProductForRemove?.chiTietSanPham?.maChiTiet }}</div>
+                        <div><strong>Giá sẽ trở về:</strong> {{ formatCurrency(selectedProductForRemove?.chiTietSanPham?.giaGoc) }}</div>
                     </div>
                 </div>
             </div>
             <template #footer>
-                <Button label="Đóng" icon="pi pi-times" @click="detailDialog = false" />
+                <Button label="Không" icon="pi pi-times" text @click="removeProductDialog = false" />
+                <Button label="Có, hủy áp dụng" icon="pi pi-check" severity="warning" @click="removeProductFromPromotion" />
             </template>
         </Dialog>
 
         <!-- Delete Promotion Dialog -->
         <Dialog v-model:visible="deleteKhuyenMaiDialog" :style="{ width: '450px' }" header="Xác nhận xóa" :modal="true">
             <div class="flex items-center gap-4">
-                <i class="pi pi-exclamation-triangle !text-3xl" />
-                <span v-if="khuyenMai"
-                    >Bạn có chắc chắn muốn xóa <b>{{ khuyenMai.tenKhuyenMai }}</b
-                    >?</span
-                >
+                <i class="pi pi-exclamation-triangle text-3xl text-red-500" />
+                <div>
+                    <span v-if="khuyenMai">
+                        Bạn có chắc chắn muốn xóa khuyến mãi <strong>{{ khuyenMai.tenKhuyenMai }}</strong
+                        >?
+                    </span>
+                    <div class="mt-3 p-3 bg-red-50 rounded text-red-700"><strong>Lưu ý:</strong> Tất cả sản phẩm được áp dụng khuyến mãi này sẽ được khôi phục về giá gốc.</div>
+                </div>
             </div>
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteKhuyenMaiDialog = false" />
-                <Button label="Có" icon="pi pi-check" @click="deleteKhuyenMai" />
+                <Button label="Có, xóa" icon="pi pi-check" severity="danger" @click="deleteKhuyenMai" />
             </template>
         </Dialog>
 
         <!-- Delete Selected Promotions Dialog -->
         <Dialog v-model:visible="deleteKhuyenMaisDialog" :style="{ width: '450px' }" header="Xác nhận xóa" :modal="true">
             <div class="flex items-center gap-4">
-                <i class="pi pi-exclamation-triangle !text-3xl" />
-                <span>Bạn có chắc chắn muốn xóa các khuyến mãi đã chọn?</span>
+                <i class="pi pi-exclamation-triangle text-3xl text-red-500" />
+                <div>
+                    <span
+                        >Bạn có chắc chắn muốn xóa <strong>{{ selectedKhuyenMai?.length || 0 }}</strong> khuyến mãi đã chọn?</span
+                    >
+                    <div class="mt-3 p-3 bg-red-50 rounded text-red-700"><strong>Lưu ý:</strong> Tất cả sản phẩm được áp dụng các khuyến mãi này sẽ được khôi phục về giá gốc.</div>
+                </div>
             </div>
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteKhuyenMaisDialog = false" />
-                <Button label="Có" icon="pi pi-check" text @click="deleteSelectedKhuyenMais" />
+                <Button label="Có, xóa tất cả" icon="pi pi-check" severity="danger" @click="deleteSelectedKhuyenMais" />
             </template>
         </Dialog>
 
@@ -306,11 +457,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
 import { FilterMatchMode } from '@primevue/core/api';
-import { useToast } from 'primevue/usetoast';
 import axios from 'axios';
 import { InputText } from 'primevue';
+import { useToast } from 'primevue/usetoast';
+import { computed, onMounted, ref } from 'vue';
 
 const toast = useToast();
 const dt = ref();
@@ -318,19 +469,44 @@ const khuyenMais = ref([]);
 const khuyenMaiDialog = ref(false);
 const deleteKhuyenMaiDialog = ref(false);
 const deleteKhuyenMaisDialog = ref(false);
-const detailDialog = ref(false);
+const applyProductsDialog = ref(false);
+const viewProductsDialog = ref(false);
+const removeProductDialog = ref(false);
 const khuyenMai = ref({});
 const selectedKhuyenMai = ref();
-const selectedDetail = ref(null);
-const giaTriPercent = ref(0); // Thêm biến để lưu giá trị % hiển thị
+const giaTriPercent = ref(0);
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
 const statusFilter = ref('');
 const submitted = ref(false);
 const isLoading = ref(false);
+const isSaving = ref(false);
+
+// Apply products dialog
+const availableProducts = ref([]);
+const selectedProductsForApply = ref([]);
+const selectedPromotionForApply = ref(null);
+const productSearchKeyword = ref('');
+const isLoadingProducts = ref(false);
+const isApplyingPromotion = ref(false);
+
+// View products dialog
+const promotionProducts = ref([]);
+const selectedPromotionForView = ref(null);
+const isLoadingPromotionProducts = ref(false);
+const selectedProductForRemove = ref(null);
+
+// Search debounce
+let searchTimeout = null;
+
 const statusOptions = ref([
     { label: 'Tất cả trạng thái', value: '' },
+    { label: 'Còn hạn', value: 1 },
+    { label: 'Hết hạn', value: 0 }
+]);
+
+const statusOptionsForForm = ref([
     { label: 'Còn hạn', value: 1 },
     { label: 'Hết hạn', value: 0 }
 ]);
@@ -339,6 +515,40 @@ onMounted(() => {
     fetchData();
 });
 
+// Computed properties
+const filteredKhuyenMai = computed(() => {
+    let filtered = khuyenMais.value;
+
+    if (statusFilter.value !== '') {
+        filtered = filtered.filter((km) => km.trangThai === parseInt(statusFilter.value));
+    }
+
+    return filtered;
+});
+
+const isEndDateBeforeStartDate = computed(() => {
+    if (!khuyenMai.value.ngayBatDau || !khuyenMai.value.ngayKetThuc) return false;
+    return new Date(khuyenMai.value.ngayKetThuc) <= new Date(khuyenMai.value.ngayBatDau);
+});
+
+// Calculate totals based on giaGoc and giaBan
+const totalOriginalValue = computed(() => {
+    return promotionProducts.value.reduce((sum, item) => {
+        return sum + (item.chiTietSanPham?.giaGoc || 0);
+    }, 0);
+});
+
+const totalDiscountedValue = computed(() => {
+    return promotionProducts.value.reduce((sum, item) => {
+        return sum + (item.chiTietSanPham?.giaBan || 0);
+    }, 0);
+});
+
+const totalPromotionValue = computed(() => {
+    return totalOriginalValue.value - totalDiscountedValue.value;
+});
+
+// Main data fetching
 async function fetchData() {
     isLoading.value = true;
     try {
@@ -357,43 +567,206 @@ async function fetchData() {
     }
 }
 
-const filteredKhuyenMai = computed(() => {
-    let filtered = khuyenMais.value;
+// Apply products functions
+async function openApplyProductsDialog(promotion) {
+    selectedPromotionForApply.value = promotion;
+    applyProductsDialog.value = true;
+    await loadAvailableProducts();
+}
 
-    if (statusFilter.value !== '') {
-        filtered = filtered.filter((km) => km.trangThai === parseInt(statusFilter.value));
-    }
-
-    return filtered;
-});
-
-async function viewDetail(km) {
+async function loadAvailableProducts() {
+    isLoadingProducts.value = true;
     try {
-        // Gọi API để lấy chi tiết khuyến mãi
-        const res = await axios.get(`http://localhost:8080/khuyen-mai-chi-tiet/${km.id}`);
-        selectedDetail.value = res.data;
-        detailDialog.value = true;
+        const res = await axios.get('http://localhost:8080/khuyen-mai-chi-tiet/products/available');
+        availableProducts.value = res.data;
+        selectedProductsForApply.value = [];
+        productSearchKeyword.value = '';
     } catch (error) {
-        console.error('Error fetching detail:', error.response?.data || error.message);
+        console.error('Error loading products:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: error.response?.data?.message || 'Có lỗi xảy ra khi tải chi tiết khuyến mãi',
+            detail: 'Không thể tải danh sách sản phẩm',
+            life: 3000
+        });
+    } finally {
+        isLoadingProducts.value = false;
+    }
+}
+
+function debounceSearch() {
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+    searchTimeout = setTimeout(() => {
+        searchProducts();
+    }, 500);
+}
+
+async function searchProducts() {
+    if (!productSearchKeyword.value.trim()) {
+        await loadAvailableProducts();
+        return;
+    }
+
+    isLoadingProducts.value = true;
+    try {
+        const res = await axios.get(`http://localhost:8080/khuyen-mai-chi-tiet/products/search?keyword=${productSearchKeyword.value}`);
+        availableProducts.value = res.data.filter((product) => {
+            return product.trangThai === 1 && product.giaGoc > 0;
+        });
+    } catch (error) {
+        console.error('Error searching products:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể tìm kiếm sản phẩm',
+            life: 3000
+        });
+    } finally {
+        isLoadingProducts.value = false;
+    }
+}
+
+function clearSearch() {
+    productSearchKeyword.value = '';
+    loadAvailableProducts();
+}
+
+function selectAllProducts() {
+    selectedProductsForApply.value = [...availableProducts.value];
+}
+
+function clearSelectedProducts() {
+    selectedProductsForApply.value = [];
+}
+
+async function applyPromotionToProducts() {
+    if (!selectedProductsForApply.value || selectedProductsForApply.value.length === 0) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Vui lòng chọn ít nhất một sản phẩm',
+            life: 3000
+        });
+        return;
+    }
+
+    isApplyingPromotion.value = true;
+    try {
+        const request = {
+            khuyenMaiId: selectedPromotionForApply.value.id,
+            chiTietSanPhamIds: selectedProductsForApply.value.map((p) => p.id)
+        };
+
+        await axios.post('http://localhost:8080/khuyen-mai-chi-tiet/apply', request);
+
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Đã áp dụng khuyến mãi cho ${selectedProductsForApply.value.length} sản phẩm. Giá bán đã được cập nhật tự động.`,
+            life: 5000
+        });
+
+        applyProductsDialog.value = false;
+        await fetchData(); // Refresh promotion list to update product count
+    } catch (error) {
+        console.error('Error applying promotion:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: error.response?.data?.message || 'Có lỗi xảy ra khi áp dụng khuyến mãi',
+            life: 3000
+        });
+    } finally {
+        isApplyingPromotion.value = false;
+    }
+}
+
+// View products functions
+async function viewPromotionProducts(promotion) {
+    selectedPromotionForView.value = promotion;
+    viewProductsDialog.value = true;
+    await loadPromotionProducts(promotion.id);
+}
+
+async function loadPromotionProducts(promotionId) {
+    isLoadingPromotionProducts.value = true;
+    try {
+        const res = await axios.get(`http://localhost:8080/khuyen-mai-chi-tiet/${promotionId}`);
+        promotionProducts.value = res.data;
+    } catch (error) {
+        console.error('Error loading promotion products:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể tải danh sách sản phẩm của khuyến mãi',
+            life: 3000
+        });
+    } finally {
+        isLoadingPromotionProducts.value = false;
+    }
+}
+
+function confirmRemoveProductFromPromotion(promotionDetail) {
+    selectedProductForRemove.value = promotionDetail;
+    removeProductDialog.value = true;
+}
+
+async function removeProductFromPromotion() {
+    try {
+        await axios.delete(`http://localhost:8080/khuyen-mai-chi-tiet/${selectedProductForRemove.value.khuyenMai.id}/product/${selectedProductForRemove.value.chiTietSanPham.id}`);
+
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Đã hủy áp dụng khuyến mãi cho sản phẩm. Giá đã được khôi phục về giá gốc.',
+            life: 3000
+        });
+
+        removeProductDialog.value = false;
+        await loadPromotionProducts(selectedPromotionForView.value.id);
+        await fetchData(); // Refresh promotion list
+    } catch (error) {
+        console.error('Error removing product from promotion:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Có lỗi xảy ra khi hủy áp dụng khuyến mãi',
             life: 3000
         });
     }
 }
 
-function formatDate(dateString) {
+function openApplyProductsFromView() {
+    viewProductsDialog.value = false;
+    openApplyProductsDialog(selectedPromotionForView.value);
+}
+
+// Date and currency formatting
+function formatDateDisplay(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('vi-VN', {
         year: 'numeric',
         month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: '2-digit'
     });
+}
+
+function formatDateForBackend(date) {
+    if (!date) return null;
+    const dateObj = date instanceof Date ? date : new Date(date);
+
+    // Format exactly as "yyyy-MM-dd HH:mm:ss"
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const hours = String(dateObj.getHours()).padStart(2, '0');
+    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+    const seconds = String(dateObj.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 function formatCurrency(amount) {
@@ -403,9 +776,10 @@ function formatCurrency(amount) {
     }).format(amount);
 }
 
+// CRUD operations
 function openNew() {
     khuyenMai.value = { trangThai: 1 };
-    giaTriPercent.value = 0; // Reset giá trị %
+    giaTriPercent.value = 0;
     submitted.value = false;
     khuyenMaiDialog.value = true;
 }
@@ -418,22 +792,28 @@ function hideDialog() {
 async function saveKhuyenMai() {
     submitted.value = true;
 
-    if (khuyenMai.value.tenKhuyenMai?.trim() && giaTriPercent.value != null && khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc) {
+    if (khuyenMai.value.tenKhuyenMai?.trim() && giaTriPercent.value != null && giaTriPercent.value > 0 && khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc && !isEndDateBeforeStartDate.value) {
+        isSaving.value = true;
         try {
-            // Chuyển đổi từ % sang decimal (15% -> 0.15)
             khuyenMai.value.giaTri = giaTriPercent.value / 100;
-            
+
+            const requestData = {
+                ...khuyenMai.value,
+                ngayBatDau: formatDateForBackend(khuyenMai.value.ngayBatDau),
+                ngayKetThuc: formatDateForBackend(khuyenMai.value.ngayKetThuc)
+            };
+
             if (khuyenMai.value.id) {
-                await axios.put(`http://localhost:8080/khuyen-mai/${khuyenMai.value.id}`, khuyenMai.value);
+                await axios.put(`http://localhost:8080/khuyen-mai/${khuyenMai.value.id}`, requestData);
                 toast.add({
                     severity: 'success',
                     summary: 'Thành công',
-                    detail: 'Cập nhật khuyến mãi thành công',
+                    detail: 'Cập nhật khuyến mãi thành công. Giá sản phẩm đã được tính lại tự động.',
                     life: 3000
                 });
             } else {
-                khuyenMai.value.maKhuyenMai = khuyenMai.value.maKhuyenMai || createId();
-                await axios.post('http://localhost:8080/khuyen-mai', khuyenMai.value);
+                requestData.maKhuyenMai = requestData.maKhuyenMai || createId();
+                await axios.post('http://localhost:8080/khuyen-mai', requestData);
                 toast.add({
                     severity: 'success',
                     summary: 'Thành công',
@@ -453,12 +833,14 @@ async function saveKhuyenMai() {
                 detail: error.response?.data?.message || 'Có lỗi xảy ra khi lưu khuyến mãi',
                 life: 3000
             });
+        } finally {
+            isSaving.value = false;
         }
     } else {
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc và kiểm tra tính hợp lệ',
             life: 3000
         });
     }
@@ -466,10 +848,8 @@ async function saveKhuyenMai() {
 
 function editKhuyenMai(km) {
     khuyenMai.value = { ...km };
-    // Chuyển đổi từ decimal sang % để hiển thị (0.15 -> 15)
     giaTriPercent.value = km.giaTri * 100;
-    
-    // Convert date strings to Date objects for Calendar
+
     if (khuyenMai.value.ngayBatDau) {
         khuyenMai.value.ngayBatDau = new Date(khuyenMai.value.ngayBatDau);
     }
@@ -493,7 +873,7 @@ async function deleteKhuyenMai() {
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: 'Xóa khuyến mãi thành công',
+            detail: 'Xóa khuyến mãi thành công. Tất cả sản phẩm đã được khôi phục về giá gốc.',
             life: 3000
         });
     } catch (error) {
@@ -509,16 +889,12 @@ async function deleteKhuyenMai() {
 
 async function changeStatus(km) {
     try {
-        const newStatus = km.trangThai === 1 ? 0 : 1;
-        await axios.put(`http://localhost:8080/khuyen-mai/${km.id}`, {
-            ...km,
-            trangThai: newStatus
-        });
+        await axios.put(`http://localhost:8080/khuyen-mai/${km.id}/change-status`);
         await fetchData();
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: `Đã ${newStatus === 1 ? 'kích hoạt' : 'ngưng'} khuyến mãi`,
+            detail: `Đã ${km.trangThai === 1 ? 'vô hiệu hóa' : 'kích hoạt'} khuyến mãi`,
             life: 3000
         });
     } catch (error) {
@@ -547,7 +923,7 @@ async function deleteSelectedKhuyenMais() {
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: 'Xóa các khuyến mãi thành công',
+            detail: 'Xóa các khuyến mãi thành công. Tất cả sản phẩm đã được khôi phục về giá gốc.',
             life: 3000
         });
     } catch (error) {
@@ -561,12 +937,8 @@ async function deleteSelectedKhuyenMais() {
     }
 }
 
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
 function exportCSV() {
     try {
-        // If no data, show warning
         if (!khuyenMais.value || khuyenMais.value.length === 0) {
             toast.add({
                 severity: 'warn',
@@ -577,48 +949,47 @@ function exportCSV() {
             return;
         }
 
-        // Create CSV headers with Vietnamese labels
-        const headers = ['ID', 'Mã Khuyến Mãi', 'Tên Khuyến Mãi','Ngày Bắt Đầu','Ngày Kết Thúc', 'Trạng Thái'];
-        
-        // Convert data to CSV format
-        const csvData = khuyenMais.value.map(item => {
+        const headers = ['ID', 'Mã Khuyến Mãi', 'Tên Khuyến Mãi', 'Giá Trị Giảm (%)', 'Ngày Bắt Đầu', 'Ngày Kết Thúc', 'Trạng Thái', 'Số Lượng Sản Phẩm'];
+
+        const csvData = khuyenMais.value.map((item) => {
             return [
                 item.id || '',
                 item.maKhuyenMai || '',
                 item.tenKhuyenMai || '',
-                item.ngayBatDau || '',
-                item.ngayKetThuc || '',
-                item.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'
+                item.giaTri ? (item.giaTri * 100).toFixed(1) + '%' : '',
+                formatDateDisplay(item.ngayBatDau),
+                formatDateDisplay(item.ngayKetThuc),
+                item.trangThai === 1 ? 'Còn hạn' : 'Hết hạn',
+                item.soLuongSanPham || 0
             ];
         });
 
-        // Combine headers and data
         const csvContent = [headers, ...csvData]
-            .map(row => row.map(field => {
-                // Handle fields that might contain commas or quotes
-                const stringField = String(field);
-                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                    return `"${stringField.replace(/"/g, '""')}"`;
-                }
-                return stringField;
-            }).join(','))
+            .map((row) =>
+                row
+                    .map((field) => {
+                        const stringField = String(field);
+                        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                            return `"${stringField.replace(/"/g, '""')}"`;
+                        }
+                        return stringField;
+                    })
+                    .join(',')
+            )
             .join('\n');
 
-        // Add BOM for proper UTF-8 encoding in Excel
         const BOM = '\uFEFF';
         const csvWithBOM = BOM + csvContent;
 
-        // Create and download file
         const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        
+
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            
-            // Generate filename with current date
+
             const now = new Date();
-            const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+            const dateStr = now.toISOString().split('T')[0];
             const filename = `KhuyenMai-${dateStr}.csv`;
 
             link.setAttribute('download', filename);
@@ -626,8 +997,7 @@ function exportCSV() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-            // Show success message
+
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
@@ -652,7 +1022,7 @@ function createId() {
     for (let i = 0; i < 5; i++) {
         id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    return id;
+    return 'KM' + id;
 }
 </script>
 
@@ -666,12 +1036,8 @@ function createId() {
     display: grid;
 }
 
-.grid-cols-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.grid-cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+.grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .gap-4 {
@@ -694,6 +1060,10 @@ function createId() {
     padding: 1rem;
 }
 
+.p-3 {
+    padding: 0.75rem;
+}
+
 .mb-4 {
     margin-bottom: 1rem;
 }
@@ -702,8 +1072,32 @@ function createId() {
     margin-bottom: 0.25rem;
 }
 
+.mb-2 {
+    margin-bottom: 0.5rem;
+}
+
+.mb-3 {
+    margin-bottom: 0.75rem;
+}
+
+.mt-3 {
+    margin-top: 0.75rem;
+}
+
 .text-lg {
     font-size: 1.125rem;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+}
+
+.text-sm {
+    font-size: 0.875rem;
+}
+
+.text-3xl {
+    font-size: 1.875rem;
 }
 
 .font-bold {
@@ -718,6 +1112,10 @@ function createId() {
     font-weight: 500;
 }
 
+.text-center {
+    text-align: center;
+}
+
 .text-primary {
     color: var(--primary-color);
 }
@@ -730,23 +1128,68 @@ function createId() {
     color: #1f2937;
 }
 
+.text-gray-600 {
+    color: #4b5563;
+}
+
+.text-gray-500 {
+    color: #6b7280;
+}
+
+.text-gray-400 {
+    color: #9ca3af;
+}
+
 .text-red-600 {
     color: #dc2626;
+}
+
+.text-red-500 {
+    color: #ef4444;
+}
+
+.text-red-700 {
+    color: #b91c1c;
 }
 
 .text-blue-600 {
     color: #2563eb;
 }
 
+.text-blue-800 {
+    color: #1e40af;
+}
+
 .text-green-600 {
     color: #16a34a;
 }
 
-.block {
-    display: block;
+.text-green-800 {
+    color: #166534;
 }
 
-.mr-2 {
-    margin-right: 0.5rem;
+.text-orange-500 {
+    color: #f97316;
+}
+
+.text-orange-600 {
+    color: #ea580c;
+}
+
+.text-orange-800 {
+    color: #9a3412;
+}
+
+.text-purple-600 {
+    color: #7c3aed;
+}
+.text-purple-800 {
+    color: #6d28d9;
+}
+.text-yellow-600 {
+    color: #ca8a04;
+}
+.text-yellow-700 {
+    color: #a16207;
 }
 </style>

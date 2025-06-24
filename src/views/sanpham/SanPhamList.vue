@@ -1,8 +1,8 @@
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
+import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
-import axios from 'axios';
 
 // Cấu hình API base URL
 const API_BASE_URL = 'http://localhost:8080';
@@ -251,7 +251,7 @@ async function saveProduct() {
             thuongHieu: product.value.thuongHieu,
             chatLieu: product.value.chatLieu,
             deGiay: product.value.deGiay,
-            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find(p => p.id === product.value.id)?.ngayTao : new Date().toISOString()) // Giữ hoặc tạo mới
+            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find((p) => p.id === product.value.id)?.ngayTao : new Date().toISOString()) // Giữ hoặc tạo mới
         };
         if (product.value.id) {
             await axios.put(`${API_BASE_URL}/api/san-pham/update/${product.value.id}`, productData);
@@ -444,10 +444,10 @@ function exportCSV() {
         }
 
         // Create CSV headers with Vietnamese labels
-        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
+        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm', 'Số Lượng', 'Danh Mục', 'Thương Hiệu', 'Chất Liệu', 'Đế Giày', 'Trạng Thái', 'Ngày Tạo'];
 
         // Convert data to CSV format
-        const csvData = products.value.map(item => {
+        const csvData = products.value.map((item) => {
             return [
                 item.id || '',
                 item.maSanPham || '',
@@ -464,14 +464,18 @@ function exportCSV() {
 
         // Combine headers and data
         const csvContent = [headers, ...csvData]
-            .map(row => row.map(field => {
-                // Handle fields that might contain commas or quotes
-                const stringField = String(field);
-                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                    return `"${stringField.replace(/"/g, '""')}"`;
-                }
-                return stringField;
-            }).join(','))
+            .map((row) =>
+                row
+                    .map((field) => {
+                        // Handle fields that might contain commas or quotes
+                        const stringField = String(field);
+                        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                            return `"${stringField.replace(/"/g, '""')}"`;
+                        }
+                        return stringField;
+                    })
+                    .join(',')
+            )
             .join('\n');
 
         // Add BOM for proper UTF-8 encoding in Excel
@@ -481,11 +485,11 @@ function exportCSV() {
         // Create and download file
         const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        
+
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            
+
             // Generate filename with current date
             const now = new Date();
             const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
@@ -496,7 +500,7 @@ function exportCSV() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
+
             // Show success message
             toast.add({
                 severity: 'success',
@@ -567,7 +571,7 @@ function collapseAll() {
                 currentPageReportTemplate="Hiển thị {first} đến {last} trong tổng số {totalRecords} sản phẩm"
                 tableStyle="min-width: 60rem"
             >
-                <template #header>
+                <!-- <template #header>
                     <div class="flex flex-wrap gap-2 items-center justify-between">
                         <div class="flex gap-2">
                             <h4 class="m-0">Quản lý Sản phẩm</h4>
@@ -581,7 +585,7 @@ function collapseAll() {
                             <InputText v-model="filters['global'].value" placeholder="Tìm kiếm sản phẩm..." />
                         </IconField>
                     </div>
-                </template>
+             </template> -->
 
                 <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
                 <Column expander style="width: 3rem"></Column>
