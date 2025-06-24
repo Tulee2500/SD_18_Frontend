@@ -329,7 +329,7 @@ function openNewDetail(productId) {
     submitted.value = false;
     detailDialog.value = true;
 }
-
+//  Câp nhập chi tiet sản phẩm 
 function editDetail(detailData, productId) {
     detail.value = {
         id: detailData.id,
@@ -349,7 +349,7 @@ function hideDetailDialog() {
     detailDialog.value = false;
     submitted.value = false;
 }
-
+// Check trống 
 async function saveDetail() {
     submitted.value = true;
     if (!detail.value.maChiTiet?.trim()) {
@@ -427,9 +427,7 @@ function getStockSeverity(product) {
     return 'danger';
 }
 
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
+// Xuất file CSV
 function exportCSV() {
     try {
         // If no data, show warning
