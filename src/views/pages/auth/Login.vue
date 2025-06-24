@@ -1,7 +1,7 @@
 <script setup>
 import FloatingConfigurator from '@/components/FloatingConfigurator.vue';
 import { ref } from 'vue';
-import { useAuthStore } from '@/store/auth'; // Import Pinia store
+// import { useAuthStore } from '@/store/auth'; // Import Pinia store
 import { useRouter } from 'vue-router';
 
 const email = ref('');
@@ -10,24 +10,43 @@ const checked = ref(false);
 const errorMessage = ref(''); // Thêm biến để lưu thông báo lỗi
 const isLoading = ref(false); // Biến để quản lý trạng thái loading
 
-const authStore = useAuthStore();
+// const authStore = useAuthStore();
 const router = useRouter();
 
+// const login = async () => {
+//     try {
+//         isLoading.value = true; // Bật trạng thái loading
+//         errorMessage.value = ''; // Reset thông báo lỗi
+
+//         // Gọi action login từ store
+//         await authStore.login(email.value, password.value);
+
+//         // Nếu đăng nhập thành công, chuyển hướng
+//         router.push(authStore.returnUrl || '/san-pham');
+//     } catch (error) {
+//         // Xử lý lỗi: hiển thị thông báo
+//         errorMessage.value = typeof error === 'string' ? error : 'Đăng nhập thất bại. Vui lòng thử lại.';
+//     } finally {
+//         isLoading.value = false; // Tắt trạng thái loading
+//     }
+// };
 const login = async () => {
     try {
-        isLoading.value = true; // Bật trạng thái loading
-        errorMessage.value = ''; // Reset thông báo lỗi
+        isLoading.value = true;
+        errorMessage.value = '';
 
-        // Gọi action login từ store
-        await authStore.login(email.value, password.value);
+        // Mock login đơn giản
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Nếu đăng nhập thành công, chuyển hướng
-        router.push(authStore.returnUrl || '/san-pham');
+        if (email.value && password.value) {
+            router.push('/admin');
+        } else {
+            throw new Error('Vui lòng nhập email và password');
+        }
     } catch (error) {
-        // Xử lý lỗi: hiển thị thông báo
-        errorMessage.value = typeof error === 'string' ? error : 'Đăng nhập thất bại. Vui lòng thử lại.';
+        errorMessage.value = error.message || 'Đăng nhập thất bại. Vui lòng thử lại.';
     } finally {
-        isLoading.value = false; // Tắt trạng thái loading
+        isLoading.value = false;
     }
 };
 </script>
