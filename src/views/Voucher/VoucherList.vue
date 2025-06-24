@@ -264,7 +264,7 @@ function hideDialog() {
 async function saveVoucher() {
   submitted.value = true;
 
-  // Kiểm tra các trường bắt buộc
+  // Check trống các trường dữ liệu bắt buộc
   if (!voucher.value.maVoucher?.trim()) {
     toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Mã voucher là bắt buộc', life: 3000 });
     return;

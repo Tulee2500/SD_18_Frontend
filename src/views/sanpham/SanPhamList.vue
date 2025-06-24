@@ -1,8 +1,8 @@
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
-import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
+import axios from 'axios';
 
 // Cấu hình API base URL
 const API_BASE_URL = 'http://localhost:8080';
@@ -202,7 +202,7 @@ function openNew() {
     product.value = {
         tenSanPham: '',
         maSanPham: createProductId(),
-        soLuong: 0,
+        soLuong: 0, // Giá trị mặc định là 0 (hợp lệ)
         trangThai: 1,
         danhMuc: null,
         thuongHieu: null,
@@ -223,7 +223,7 @@ function editProduct(prod) {
         id: prod.id,
         tenSanPham: prod.tenSanPham,
         maSanPham: prod.maSanPham,
-        soLuong: prod.soLuong,
+        soLuong: Math.max(0, prod.soLuong || 0), // Đảm bảo không âm, nếu giá trị hiện tại âm thì đặt về 0
         trangThai: prod.trangThai,
         danhMuc: prod.danhMuc,
         thuongHieu: prod.thuongHieu,
@@ -231,42 +231,125 @@ function editProduct(prod) {
         deGiay: prod.deGiay,
         ngayTao: prod.ngayTao
     };
+    
+    // Reset validation state
+    submitted.value = false;
     productDialog.value = true;
 }
 
 async function saveProduct() {
     submitted.value = true;
+    
+    // Validate tên sản phẩm
     if (!product.value.tenSanPham?.trim()) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Tên sản phẩm là bắt buộc', life: 3000 });
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Tên sản phẩm là bắt buộc', 
+            life: 3000 
+        });
         return;
     }
+    
+    // Validate số lượng - phải là số không âm
+    if (product.value.soLuong == null || product.value.soLuong === '' || product.value.soLuong <= 0) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Số lượng phải là số không âm', 
+            life: 3000 
+        });
+        return;
+    }
+    
+    // Validate danh mục
+    if (!product.value.danhMuc) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Danh mục là bắt buộc', 
+            life: 3000 
+        });
+        return;
+    }
+    
+    // Validate thương hiệu
+    if (!product.value.thuongHieu) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Thương hiệu là bắt buộc', 
+            life: 3000 
+        });
+        return;
+    }
+    
+    // Validate chất liệu
+    if (!product.value.chatLieu) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Chất liệu là bắt buộc', 
+            life: 3000 
+        });
+        return;
+    }
+    
+    // Validate đế giày
+    if (!product.value.deGiay) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Đế giày là bắt buộc', 
+            life: 3000 
+        });
+        return;
+    }
+    
     try {
         loading.value = true;
         const productData = {
             tenSanPham: product.value.tenSanPham,
             maSanPham: product.value.maSanPham,
-            soLuong: product.value.soLuong || 0,
+            soLuong: Math.max(0, product.value.soLuong || 0), // Đảm bảo không âm
             trangThai: product.value.trangThai,
             danhMuc: product.value.danhMuc,
             thuongHieu: product.value.thuongHieu,
             chatLieu: product.value.chatLieu,
             deGiay: product.value.deGiay,
-            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find((p) => p.id === product.value.id)?.ngayTao : new Date().toISOString()) // Giữ hoặc tạo mới
+            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find(p => p.id === product.value.id)?.ngayTao : new Date().toISOString())
         };
+        
         if (product.value.id) {
             await axios.put(`${API_BASE_URL}/api/san-pham/update/${product.value.id}`, productData);
-            toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã cập nhật sản phẩm "${product.value.tenSanPham}"`, life: 3000 });
+            toast.add({ 
+                severity: 'success', 
+                summary: 'Thành công', 
+                detail: `Đã cập nhật sản phẩm "${product.value.tenSanPham}"`, 
+                life: 3000 
+            });
         } else {
             await axios.post(`${API_BASE_URL}/api/san-pham/save`, productData);
-            toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã thêm sản phẩm "${product.value.tenSanPham}"`, life: 3000 });
+            toast.add({ 
+                severity: 'success', 
+                summary: 'Thành công', 
+                detail: `Đã thêm sản phẩm "${product.value.tenSanPham}"`, 
+                life: 3000 
+            });
         }
+        
         await loadProducts();
         productDialog.value = false;
         product.value = {};
         submitted.value = false;
     } catch (error) {
         console.error('Lỗi khi lưu sản phẩm:', error.response?.status, error.response?.data);
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: `Không thể lưu sản phẩm: ${error.response?.data?.message || error.message}`, life: 3000 });
+        toast.add({ 
+            severity: 'error', 
+            summary: 'Lỗi', 
+            detail: `Không thể lưu sản phẩm: ${error.response?.data?.message || error.message}`, 
+            life: 3000 
+        });
     } finally {
         loading.value = false;
     }
@@ -329,67 +412,141 @@ function openNewDetail(productId) {
     submitted.value = false;
     detailDialog.value = true;
 }
-
+//  Câp nhập chi tiet sản phẩm 
 function editDetail(detailData, productId) {
     detail.value = {
         id: detailData.id,
         maChiTiet: detailData.maChiTiet,
-        soLuong: detailData.soLuong,
-        giaNhap: detailData.giaNhap || 0.0,
-        giaBan: detailData.giaBan || 0.0,
+        soLuong: Math.max(0, detailData.soLuong || 0), // Đảm bảo không âm
+        giaNhap: Math.max(0, detailData.giaNhap || 0), // Đảm bảo không âm
+        giaBan: Math.max(0, detailData.giaBan || 0), // Đảm bảo không âm
         trangThai: detailData.trangThai,
         mauSac: detailData.mauSac,
         kichCo: detailData.kichCo,
         sanPham: { id: productId }
     };
+    
+    // Reset validation state
+    submitted.value = false;
     detailDialog.value = true;
-}
-
+    }
 function hideDetailDialog() {
     detailDialog.value = false;
     submitted.value = false;
 }
-
+// Check trống 
 async function saveDetail() {
     submitted.value = true;
+    
+    // Validate mã chi tiết
     if (!detail.value.maChiTiet?.trim()) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Mã chi tiết là bắt buộc', life: 3000 });
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Mã chi tiết là bắt buộc', 
+            life: 3000 
+        });
         return;
     }
-    if (detail.value.giaBan == null || detail.value.giaBan < 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá bán phải là số không âm', life: 3000 });
+    
+    // Validate số lượng - phải là số không âm
+    if (detail.value.soLuong == null || detail.value.soLuong === '' || detail.value.soLuong <= 0) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Số lượng phải là số không âm', 
+            life: 3000 
+        });
         return;
     }
-    if (detail.value.giaNhap == null || detail.value.giaNhap < 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá nhập phải là số không âm', life: 3000 });
+    
+    // Validate giá bán
+    if (detail.value.giaBan == null || detail.value.giaBan === '' || detail.value.giaBan < 0) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Giá bán phải là số không âm', 
+            life: 3000 
+        });
         return;
     }
+    
+    // Validate giá nhập
+    if (detail.value.giaNhap == null || detail.value.giaNhap === '' || detail.value.giaNhap < 0) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Giá nhập phải là số không âm', 
+            life: 3000 
+        });
+        return;
+    }
+    
+    // Validate màu sắc
+    if (!detail.value.mauSac) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Màu sắc là bắt buộc', 
+            life: 3000 
+        });
+        return;
+    }
+    
+    // Validate kích cỡ
+    if (!detail.value.kichCo) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Kích cỡ là bắt buộc', 
+            life: 3000 
+        });
+        return;
+    }
+    
     try {
         loading.value = true;
         const detailData = {
             maChiTiet: detail.value.maChiTiet,
-            soLuong: detail.value.soLuong || 0,
-            giaNhap: detail.value.giaNhap,
-            giaBan: detail.value.giaBan,
+            soLuong: Math.max(0, detail.value.soLuong || 0), // Đảm bảo không âm
+            giaNhap: Math.max(0, detail.value.giaNhap || 0), // Đảm bảo không âm
+            giaBan: Math.max(0, detail.value.giaBan || 0), // Đảm bảo không âm
             trangThai: detail.value.trangThai,
             mauSac: detail.value.mauSac,
             kichCo: detail.value.kichCo,
             sanPham: detail.value.sanPham
         };
+        
         if (detail.value.id) {
             await axios.put(`${API_BASE_URL}/san-pham-chi-tiet/update/${detail.value.id}`, detailData);
-            toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã cập nhật chi tiết sản phẩm "${detail.value.maChiTiet}"`, life: 3000 });
+            toast.add({ 
+                severity: 'success', 
+                summary: 'Thành công', 
+                detail: `Đã cập nhật chi tiết sản phẩm "${detail.value.maChiTiet}"`, 
+                life: 3000 
+            });
         } else {
             await axios.post(`${API_BASE_URL}/san-pham-chi-tiet/save`, detailData);
-            toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã thêm chi tiết sản phẩm "${detail.value.maChiTiet}"`, life: 3000 });
+            toast.add({ 
+                severity: 'success', 
+                summary: 'Thành công', 
+                detail: `Đã thêm chi tiết sản phẩm "${detail.value.maChiTiet}"`, 
+                life: 3000 
+            });
         }
+        
         await loadProductDetails(detail.value.sanPham.id);
         detailDialog.value = false;
         detail.value = {};
         submitted.value = false;
     } catch (error) {
         console.error('Lỗi khi lưu chi tiết sản phẩm:', error.response?.status, error.response?.data);
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: `Không thể lưu chi tiết sản phẩm: ${error.response?.data?.message || error.message}`, life: 3000 });
+        toast.add({ 
+            severity: 'error', 
+            summary: 'Lỗi', 
+            detail: `Không thể lưu chi tiết sản phẩm: ${error.response?.data?.message || error.message}`, 
+            life: 3000 
+        });
     } finally {
         loading.value = false;
     }
@@ -427,9 +584,7 @@ function getStockSeverity(product) {
     return 'danger';
 }
 
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
+// Xuất file CSV
 function exportCSV() {
     try {
         // If no data, show warning
@@ -444,10 +599,10 @@ function exportCSV() {
         }
 
         // Create CSV headers with Vietnamese labels
-        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm', 'Số Lượng', 'Danh Mục', 'Thương Hiệu', 'Chất Liệu', 'Đế Giày', 'Trạng Thái', 'Ngày Tạo'];
+        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
 
         // Convert data to CSV format
-        const csvData = products.value.map((item) => {
+        const csvData = products.value.map(item => {
             return [
                 item.id || '',
                 item.maSanPham || '',
@@ -464,18 +619,14 @@ function exportCSV() {
 
         // Combine headers and data
         const csvContent = [headers, ...csvData]
-            .map((row) =>
-                row
-                    .map((field) => {
-                        // Handle fields that might contain commas or quotes
-                        const stringField = String(field);
-                        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                            return `"${stringField.replace(/"/g, '""')}"`;
-                        }
-                        return stringField;
-                    })
-                    .join(',')
-            )
+            .map(row => row.map(field => {
+                // Handle fields that might contain commas or quotes
+                const stringField = String(field);
+                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                    return `"${stringField.replace(/"/g, '""')}"`;
+                }
+                return stringField;
+            }).join(','))
             .join('\n');
 
         // Add BOM for proper UTF-8 encoding in Excel
@@ -485,11 +636,11 @@ function exportCSV() {
         // Create and download file
         const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-
+        
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-
+            
             // Generate filename with current date
             const now = new Date();
             const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
@@ -500,7 +651,7 @@ function exportCSV() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-
+            
             // Show success message
             toast.add({
                 severity: 'success',
@@ -571,7 +722,7 @@ function collapseAll() {
                 currentPageReportTemplate="Hiển thị {first} đến {last} trong tổng số {totalRecords} sản phẩm"
                 tableStyle="min-width: 60rem"
             >
-                <!-- <template #header>
+                <template #header>
                     <div class="flex flex-wrap gap-2 items-center justify-between">
                         <div class="flex gap-2">
                             <h4 class="m-0">Quản lý Sản phẩm</h4>
@@ -585,7 +736,7 @@ function collapseAll() {
                             <InputText v-model="filters['global'].value" placeholder="Tìm kiếm sản phẩm..." />
                         </IconField>
                     </div>
-             </template> -->
+                </template>
 
                 <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
                 <Column expander style="width: 3rem"></Column>
@@ -710,10 +861,19 @@ function collapseAll() {
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
                         <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="product.soLuong" integeronly fluid placeholder="0" :min="0" />
+                        <small v-if="submitted && (product.soLuong == null || product.soLuong <= 0)" class="text-red-500">Số lượng không hợp lệ.</small>
+                         <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500">
+                            Số lượng là bắt buộc.
+                        </small>
+                        <small v-else-if="submitted && product.soLuong < 0" class="text-red-500">
+                            Số lượng không được âm.
+                        </small>
+            
                     </div>
                     <div class="col-span-4">
                         <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
                         <Select id="trangThai" v-model="product.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
+                        
                     </div>
                 </div>
 
@@ -721,10 +881,12 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="danhMuc" class="block font-bold mb-3">Danh mục</label>
                         <Select id="danhMuc" v-model="product.danhMuc" :options="danhMucs" optionLabel="tenDanhMuc" placeholder="Chọn danh mục" fluid />
+                        <small v-if="submitted && !product.danhMuc" class="text-red-500">Danh mục là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="thuongHieu" class="block font-bold mb-3">Thương hiệu</label>
                         <Select id="thuongHieu" v-model="product.thuongHieu" :options="thuongHieus" optionLabel="tenThuongHieu" placeholder="Chọn thương hiệu" fluid />
+                        <small v-if="submitted && !product.thuongHieu" class="text-red-500">Thương hiệu là bắt buộc.</small>
                     </div>
                 </div>
 
@@ -732,17 +894,19 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="chatLieu" class="block font-bold mb-3">Chất liệu</label>
                         <Select id="chatLieu" v-model="product.chatLieu" :options="chatLieus" optionLabel="tenChatLieu" placeholder="Chọn chất liệu" fluid />
+                        <small v-if="submitted && !product.chatLieu" class="text-red-500">Chất liệu là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="deGiay" class="block font-bold mb-3">Đế giày</label>
                         <Select id="deGiay" v-model="product.deGiay" :options="deGiays" optionLabel="tenDeGiay" placeholder="Chọn đế giày" fluid />
+                        <small v-if="submitted && !product.deGiay" class="text-red-500">Đế giày là bắt buộc.</small>
                     </div>
                 </div>
             </div>
 
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
-                <Button label="Lưu lại" icon="pi pi-check" @click="saveProduct" :loading="loading || submitted" />
+                <Button label="Lưu lại" icon="pi pi-check" @click="saveProduct"  />
             </template>
         </Dialog>
 
@@ -759,18 +923,28 @@ function collapseAll() {
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
                         <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
+                        <small v-if="submitted && (detail.soLuong == null || detail.soLuong < 0)" class="text-red-500">Số lượng không hợp lệ.</small>
+                        <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500">
+                            Số lượng là bắt buộc.
+                        </small>
+                        <small v-else-if="submitted && product.soLuong < 0" class="text-red-500">
+                            Số lượng không được âm.
+                        </small>
+                        <small v-else class="text-gray-500">
+                            Nhập số nguyên không âm
+                        </small>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
                         <label for="giaNhap" class="block font-bold mb-3">Giá nhập *</label>
-                        <InputNumber id="giaNhap" v-model="detail.giaNhap" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaNhap == null || detail.giaNhap < 0)" />
+                        <InputText id="giaNhap" v-model.number="detail.giaNhap" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaNhap == null || detail.giaNhap < 0)" />
                         <small v-if="submitted && (detail.giaNhap == null || detail.giaNhap < 0)" class="text-red-500">Giá nhập phải là số không âm.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="giaBan" class="block font-bold mb-3">Giá bán *</label>
-                        <InputNumber id="giaBan" v-model="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan < 0)" />
+                        <InputText id="giaBan" v-model.numberx="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan < 0)" />
                         <small v-if="submitted && (detail.giaBan == null || detail.giaBan < 0)" class="text-red-500">Giá bán phải là số không âm.</small>
                     </div>
                 </div>
@@ -779,10 +953,12 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="mauSac" class="block font-bold mb-3">Màu sắc</label>
                         <Select id="mauSac" v-model="detail.mauSac" :options="mauSacs" optionLabel="tenMauSac" placeholder="Chọn màu sắc" fluid />
+                        <small v-if="submitted && !detail.mauSac" class="text-red-500">Màu sắc là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="kichCo" class="block font-bold mb-3">Kích cỡ</label>
                         <Select id="kichCo" v-model="detail.kichCo" :options="kichCos" optionLabel="tenKichCo" placeholder="Chọn kích cỡ" fluid />
+                        <small v-if="submitted && !detail.kichCo" class="text-red-500">Kích cỡ là bắt buộc.</small>
                     </div>
                 </div>
 
@@ -790,13 +966,14 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
                         <Select id="trangThai" v-model="detail.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
+                        <small v-if="submitted && !detail.trangThai" class="text-red-500">Trạng thái là bắt buộc.</small>
                     </div>
                 </div>
             </div>
 
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDetailDialog" :disabled="loading" />
-                <Button label="Lưu lại" icon="pi pi-check" @click="saveDetail" :loading="loading || submitted" />
+                <Button label="Lưu lại" icon="pi pi-check" @click="saveDetail" />
             </template>
         </Dialog>
 
