@@ -4,12 +4,21 @@ import { createRouter, createWebHistory } from 'vue-router';
 const router = createRouter({
     history: createWebHistory(),
     routes: [
+        // ROUTE USER - Trang chủ người dùng (KHÔNG CẦN ĐĂNG NHẬP)
         {
             path: '/',
+            name: 'user-home',
+            component: () => import('@/views/user/UserHome.vue')
+        },
+
+        // ADMIN ROUTES - CẦN ĐĂNG NHẬP VÀ LÀ ADMIN/NHÂN VIÊN
+        {
+            path: '/admin',
             component: AppLayout,
+            meta: { requiresAuth: true, roles: ['admin', 'nhanvien'] },
             children: [
                 {
-                    path: '/',
+                    path: '',
                     name: 'dashboard',
                     component: () => import('@/views/Dashboard.vue')
                 },
@@ -48,7 +57,6 @@ const router = createRouter({
                     name: 'panel',
                     component: () => import('@/views/uikit/PanelsDoc.vue')
                 },
-
                 {
                     path: '/uikit/overlay',
                     name: 'overlay',
@@ -181,6 +189,8 @@ const router = createRouter({
                 }
             ]
         },
+
+        // CÁC ROUTE KHÁC - Giữ nguyên
         {
             path: '/landing',
             name: 'landing',
@@ -191,7 +201,23 @@ const router = createRouter({
             name: 'notfound',
             component: () => import('@/views/pages/NotFound.vue')
         },
+        {
+            path: '/auth/login',
+            name: 'login',
+            component: () => import('@/views/pages/auth/Login.vue')
+        },
+        {
+            path: '/auth/access',
+            name: 'accessDenied',
+            component: () => import('@/views/pages/auth/Access.vue')
+        },
+        {
+            path: '/auth/error',
+            name: 'error',
+            component: () => import('@/views/pages/auth/Error.vue')
+        },
 
+        // AUTH ROUTES
         {
             path: '/auth/login',
             name: 'login',
@@ -209,5 +235,43 @@ const router = createRouter({
         }
     ]
 });
+
+
+// // ROUTE GUARDS - Kiểm tra quyền truy cập
+// router.beforeEach((to, from, next) => {
+//     // Lấy thông tin user từ localStorage hoặc store
+//     const token = localStorage.getItem('token');
+//     const userRole = localStorage.getItem('role'); // 'admin', 'nhanvien', 'khachhang'
+
+//     // Nếu route cần đăng nhập
+//     if (to.meta.requiresAuth) {
+//         if (!token) {
+//             // Chưa đăng nhập -> chuyển đến login
+//             next('/auth/login');
+//             return;
+//         }
+
+//         // Đã đăng nhập, kiểm tra role
+//         if (to.meta.roles && !to.meta.roles.includes(userRole)) {
+//             // Không có quyền truy cập
+//             next('/auth/access');
+//             return;
+//         }
+//     }
+
+//     // Nếu đã đăng nhập và là admin/nhân viên, chuyển hướng từ login về admin
+//     if (to.name === 'login' && token && ['admin', 'nhanvien'].includes(userRole)) {
+//         next('/admin');
+//         return;
+//     }
+
+//     // Nếu đã đăng nhập và là khách hàng, chuyển hướng từ login về trang chủ
+//     if (to.name === 'login' && token && userRole === 'khachhang') {
+//         next('/');
+//         return;
+//     }
+
+//     next();
+// });
 
 export default router;
