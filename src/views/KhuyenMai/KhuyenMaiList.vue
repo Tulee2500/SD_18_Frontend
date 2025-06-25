@@ -758,7 +758,7 @@ function formatDateForBackend(date) {
     if (!date) return null;
     const dateObj = date instanceof Date ? date : new Date(date);
 
-    // Format exactly as "yyyy-MM-dd HH:mm:ss"
+    // Format as "yyyy-MM-dd HH:mm:ss"
     const year = dateObj.getFullYear();
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
     const day = String(dateObj.getDate()).padStart(2, '0');
@@ -1181,15 +1181,233 @@ function createId() {
 }
 
 .text-purple-600 {
-    color: #7c3aed;
+    color: #9333ea;
 }
+
 .text-purple-800 {
-    color: #6d28d9;
+    color: #6b21a8;
 }
-.text-yellow-600 {
-    color: #ca8a04;
+
+.bg-blue-50 {
+    background-color: #eff6ff;
 }
-.text-yellow-700 {
-    color: #a16207;
+
+.bg-green-50 {
+    background-color: #f0fdf4;
+}
+
+.bg-red-50 {
+    background-color: #fef2f2;
+}
+
+.bg-gray-50 {
+    background-color: #f9fafb;
+}
+
+.bg-orange-50 {
+    background-color: #fff7ed;
+}
+
+.bg-purple-50 {
+    background-color: #faf5ff;
+}
+
+.block {
+    display: block;
+}
+
+.flex {
+    display: flex;
+}
+
+.flex-1 {
+    flex: 1 1 0%;
+}
+
+.flex-wrap {
+    flex-wrap: wrap;
+}
+
+.flex-col {
+    flex-direction: column;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.gap-2 {
+    gap: 0.5rem;
+}
+
+.gap-4 {
+    gap: 1rem;
+}
+
+.mr-1 {
+    margin-right: 0.25rem;
+}
+
+.mr-2 {
+    margin-right: 0.5rem;
+}
+
+.w-4 {
+    width: 1rem;
+}
+
+.h-4 {
+    height: 1rem;
+}
+
+.h-full {
+    height: 100%;
+}
+
+.min-w-64 {
+    min-width: 16rem;
+}
+
+.overflow-hidden {
+    overflow: hidden;
+}
+
+.rounded-full {
+    border-radius: 9999px;
+}
+
+.border {
+    border-width: 1px;
+}
+
+.inline-block {
+    display: inline-block;
+}
+
+/* Custom styles for dialogs */
+.apply-products-dialog .p-dialog-content {
+    padding: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .grid-cols-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .flex-wrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .min-w-64 {
+        min-width: 100%;
+    }
+}
+
+/* Loading spinner */
+.p-datatable-loading-overlay {
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Custom tag colors for better visibility */
+.p-tag.p-tag-success {
+    background-color: #10b981;
+}
+
+.p-tag.p-tag-warning {
+    background-color: #f59e0b;
+}
+
+.p-tag.p-tag-danger {
+    background-color: #ef4444;
+}
+
+.p-tag.p-tag-info {
+    background-color: #3b82f6;
+}
+
+.p-tag.p-tag-secondary {
+    background-color: #6b7280;
+}
+
+/* Hover effects */
+.p-button:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+}
+
+/* Table row hover */
+.p-datatable .p-datatable-tbody > tr:hover {
+    background-color: #f8fafc;
+}
+
+/* Scrollbar styling */
+.p-datatable .p-datatable-scrollable-body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.p-datatable .p-datatable-scrollable-body::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.p-datatable .p-datatable-scrollable-body::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.p-datatable .p-datatable-scrollable-body::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Dialog animations */
+.p-dialog {
+    transition: all 0.3s ease;
+}
+
+/* Input focus styles */
+.p-inputtext:focus {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    border-color: #3b82f6;
+}
+
+/* Calendar styling */
+.p-calendar .p-inputtext {
+    width: 100%;
+}
+
+/* Number input styling */
+.p-inputnumber .p-inputtext {
+    text-align: right;
+}
+
+/* Success message styling */
+.p-toast .p-toast-message.p-toast-message-success {
+    background-color: #10b981;
+    border: 1px solid #059669;
+}
+
+/* Error message styling */
+.p-toast .p-toast-message.p-toast-message-error {
+    background-color: #ef4444;
+    border: 1px solid #dc2626;
+}
+
+/* Warning message styling */
+.p-toast .p-toast-message.p-toast-message-warn {
+    background-color: #f59e0b;
+    border: 1px solid #d97706;
+}
+
+/* Info message styling */
+.p-toast .p-toast-message.p-toast-message-info {
+    background-color: #3b82f6;
+    border: 1px solid #2563eb;
 }
 </style>
