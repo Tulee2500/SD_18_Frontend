@@ -236,6 +236,7 @@ const router = createRouter({
     ]
 });
 
+
 // // ROUTE GUARDS - Kiểm tra quyền truy cập
 // router.beforeEach((to, from, next) => {
 //     // Lấy thông tin user từ localStorage hoặc store
