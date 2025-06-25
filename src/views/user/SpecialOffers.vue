@@ -1,6 +1,6 @@
 <script setup>
 import { offer } from "@/assets/images";
-import Button from "@/components/user/Button.vue";
+import UserButton from "@/components/user/UserButton.vue";
 import { arrowRight } from "@/assets/icons";
 import { shoesCards } from "@/constants/index";
 import { Swiper, SwiperSlide } from "swiper/vue";
@@ -60,7 +60,7 @@ import { Keyboard, Pagination, EffectCards } from "swiper/modules";
           exceptional.
         </p>
         <div class="flex gap-4">
-          <Button>View details</Button>
+            <UserButton>View details</UserButton>
           <button
             class="px-7 py-4 rounded-full flex items-center justify-center gap-2 leading-none border-slate-500 text-gray-500 border font-montserrat font-medium hover:bg-slate-500 hover:text-white transition-all duration-200"
           >

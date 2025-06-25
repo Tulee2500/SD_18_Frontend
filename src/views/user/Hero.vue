@@ -1,5 +1,5 @@
 <script setup>
-import Button from "@/components/user/Button.vue";
+import UserButton from "@/components/user/UserButton.vue";
 import arrowRight from "@/assets/icons/arrow-right.svg";
 import { statistics, shoesCards } from "@/constants/index";
 import { Swiper, SwiperSlide } from "swiper/vue";
@@ -7,6 +7,7 @@ import { ref } from "vue";
 import "swiper/css";
 import { Keyboard } from "swiper/modules";
 import Card from "@/components/user/Card.vue";
+
 const bigImageUrl = ref(shoesCards[0].imgUrl);
 
 const changeHeroImg = (imgUrl) => {
@@ -30,7 +31,10 @@ const changeHeroImg = (imgUrl) => {
         Discover stylish Nike arrivals, quality <br />
         comfort, and innovation for your active life.
       </p>
-      <Button :iconUrl="arrowRight">Shop now</Button>
+
+      <!-- Sửa từ <Button> thành <UserButton> -->
+      <UserButton :iconUrl="arrowRight">Shop now</UserButton>
+
       <div class="flex justify-start flex-wrap items-start md:gap-16 gap-6 w-full mt-10">
         <div v-for="stat in statistics" :key="stat.label">
           <span class="md:text-4xl font-bold font-palanquin text-3xl">{{
@@ -62,8 +66,7 @@ const changeHeroImg = (imgUrl) => {
               slidesPerView: 3,
               spaceBetween: 20,
             },
-
-            '768': {
+             '768': {
               slidesPerView: 4,
               spaceBetween: 40,
             },
@@ -76,30 +79,31 @@ const changeHeroImg = (imgUrl) => {
           :keyboard="true"
           :modules="[Keyboard]"
         >
-          ><SwiperSlide v-for="shoe in shoesCards" :key="shoe.imgUrl">
+          <SwiperSlide v-for="shoe in shoesCards" :key="shoe.imgUrl">
             <Card
               :key="shoe.imgUrl"
               :imgUrl="shoe.imgUrl"
               :width="'140'"
               :isActive="bigImageUrl == shoe.imgUrl"
               @change-hero-img="changeHeroImg"
-            /> </SwiperSlide
-        ></Swiper>
+            />
+          </SwiperSlide>
+        </Swiper>
       </div>
     </div>
   </section>
 </template>
+
 <style lang="scss" scoped>
-.fade-enter-active,
-.fade-leave-active {
+.fade-enter-active, .fade-leave-active {
   transition: all 1s ease;
   rotate: 20deg;
 }
 
-.fade-enter-from,
-.fade-leave-to {
+.fade-enter-from, .fade-leave-to {
   transform: translateX(800px);
 }
+
 .swiper {
   width: 90%;
   height: 100%;
