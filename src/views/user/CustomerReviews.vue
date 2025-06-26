@@ -5,11 +5,12 @@ import Customer from "@/components/user/Customer.vue";
 <template>
   <div class="max-container">
     <h2 class="heading text-center">
-      What Our <span class="text-coral-red">Customers</span> Say?
+      <span class="text-coral-red">Khách Hàng</span> nói gì về chúng tôi?
     </h2>
     <p class="description text-center mx-auto">
-      Hear genuine stories from our satisfied customers about their exceptional
-      experiences with us.
+        Hãy lắng nghe những câu chuyện chân thực từ khách hàng hài lòng về trải nghiệm tuyệt vời của họ khi hợp tác với chúng tôi.
+
+
     </p>
     <div
       class="flex flex-wrap justify-evenly gap-10 flex-1 mt-24"
