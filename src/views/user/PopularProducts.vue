@@ -16,11 +16,10 @@ window.addEventListener("resize", () => {
   <section class="flex flex-col max-container">
     <div class="flex flex-col gap-5 justify-start">
       <h2 class="text-4xl font-bold font-montserrat">
-        Our <span class="text-coral-red">Popular</span> Products
+        Sản Phẩm <span class="text-coral-red">Phổ Biến</span>
       </h2>
       <p class="text-slate-gray text-lg max-w-lg">
-        Experience top-notch quality and style with our sought-after selections. Discover
-        a world of comfort, design, and value
+        Trải nghiệm chất lượng và phong cách hàng đầu với những lựa chọn được săn đón của chúng tôi. Khám phá thế giới của sự thoải mái, thiết kế và giá trị
       </p>
     </div>
     <div

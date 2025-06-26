@@ -29,6 +29,11 @@ const goToLogin = () => {
   router.push('/auth/login');
 };
 
+// Hàm chuyển đến trang giỏ hàng
+const goToCart = () => {
+  router.push('/cart');
+};
+
 onMounted(() => {
   // Khởi tạo trạng thái ban đầu
   handleResize();
@@ -66,11 +71,14 @@ onUnmounted(() => {
         </ul>
 
         <!-- Cart and Login Section -->
-        <div class="flex items-center gap-4 max-lg:absolute max-lg:top-4 max-lg:right-16">
-          <!-- Shopping Cart -->
-          <div class="relative cursor-pointer group">
+        <div class="flex items-center gap-6 max-lg:absolute max-lg:top-4 max-lg:right-16">
+          <!-- Shopping Cart Icon -->
+          <div
+            class="relative cursor-pointer group p-2 hover:bg-slate-100 rounded-lg transition-colors duration-300"
+            @click="goToCart"
+          >
             <svg
-              class="w-6 h-6 text-slate-600 hover:text-slate-800 transition-colors"
+              class="w-6 h-6 text-slate-600 group-hover:text-slate-800 transition-colors"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -86,19 +94,32 @@ onUnmounted(() => {
             <!-- Cart Badge -->
             <span
               v-if="cartItemCount > 0"
-              class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold"
+              class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-md"
             >
               {{ cartItemCount }}
             </span>
           </div>
 
-          <!-- Login Button -->
-          <button
-            class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 font-montserrat text-sm font-medium"
+          <!-- Login Icon -->
+          <div
+            class="cursor-pointer group p-2 hover:bg-slate-100 rounded-lg transition-colors duration-300"
             @click="goToLogin"
           >
-            Đăng nhập
-          </button>
+            <svg
+              class="w-6 h-6 text-slate-600 group-hover:text-slate-800 transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
+          </div>
         </div>
       </div>
 
@@ -134,7 +155,7 @@ onUnmounted(() => {
 </template>
 
 <style lang="css" scoped>
-/* Custom styles nếu cần */
+/* Custom styles */
 .padding-x {
   padding-left: 1rem;
   padding-right: 1rem;

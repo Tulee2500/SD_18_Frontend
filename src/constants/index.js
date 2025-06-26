@@ -13,16 +13,16 @@ import bigShoe12 from "../assets/images/hero.png";
 import { facebook, instagram, shieldTick as shieldTickIcon, support as supportIcon, truckFast as truckFastIcon, twitter } from "../assets/icons";
 import { customer1, customer2 } from "../assets/images";
 export const navLinks = [
-    { href: "#home", label: "Home" },
-    { href: "#about-us", label: "About Us" },
-    { href: "#products", label: "Products" },
-    { href: "#contact-us", label: "Contact Us" },
+    { href: "#home", label: "Trang Chủ" },
+    { href: "#about-us", label: "Giới Thiệu" },
+    { href: "#products", label: "Sản Phẩm" },
+    { href: "#contact-us", label: "Liên Hệ" },
 ];
 
 export const statistics = [
-    { value: "1K+", label: "Brands" },
-    { value: "250+", label: "Shops" },
-    { value: "250K+", label: "Customers" }
+    { value: "1K+", label: "Thương hiệu" },
+    { value: "250+", label: "Cửa hàng" },
+    { value: "250K+", label: "Khách hàng" }
 ]
 export const shoesCards = [
     { imgUrl: bigShoe5 },
@@ -51,13 +51,13 @@ export const products = [
 
 
 export const offers = [
-    { iconUrl: truckFastIcon, label: "Free shipping", desc: "Enjoy seamless shopping with our complimentary shipping service." },
-    { iconUrl: shieldTickIcon, label: "Secure Payment", desc: "Experience worry-free transactions with our secure payment options." },
-    { iconUrl: supportIcon, label: "Love to help you", desc: "Our dedicated team is here to assist you every step of the way." },
+    { iconUrl: truckFastIcon, label: "Miễn phí vận chuyển", desc: "Tận hưởng trải nghiệm mua sắm dễ dàng với dịch vụ vận chuyển miễn phí của chúng tôi." },
+    { iconUrl: shieldTickIcon, label: "Thanh toán an toàn", desc: "Trải nghiệm giao dịch không phải lo lắng với các tùy chọn thanh toán an toàn của chúng tôi." },
+    { iconUrl: supportIcon, label: "Rất vui được giúp đỡ bạn", desc: "Đội ngũ tận tâm của chúng tôi luôn sẵn sàng hỗ trợ bạn trong từng bước thực hiện." },
 ]
 export const customers = [
-    { profileImg: customer1, name: "Morich Brown", rating: '4.5', comment: "The attention to detail and the quality of the product exceeded my expectations. Highly recommended!" },
-    { profileImg: customer2, name: "Mohammed El idrissi", rating: '4.8', comment: "The product not only met but exceeded my expectations. I'll definitely be a returning customer!" },
+    { profileImg: customer1, name: "Nguyễn Văn Ngọc", rating: '4.5', comment: "Sự chú ý đến từng chi tiết và chất lượng sản phẩm vượt quá mong đợi của tôi. Rất đáng để giới thiệu!" },
+    { profileImg: customer2, name: "Trần Đức Hiếu", rating: '4.8', comment: "Sản phẩm không chỉ đáp ứng mà còn vượt quá mong đợi của tôi. Tôi chắc chắn sẽ là khách hàng quay lại!" },
 ]
 export const socialMedia = [
     { src: facebook, alt: "facebook logo" },
@@ -77,17 +77,15 @@ export const footerLinks = [
         ],
     },
     {
-        title: "Help",
+        title: "Giúp đỡ",
         links: [
-            { name: "About us", link: "/" },
+            { name: "Về chúng tôi", link: "/" },
             { name: "FAQs", link: "/" },
-            { name: "How it works", link: "/" },
-            { name: "Privacy policy", link: "/" },
-            { name: "Payment policy", link: "/" },
+            { name: "Hướng dẫn mua hàng", link: "/" },
         ],
     },
     {
-        title: "Get in touch",
+        title: "Liên hệ",
         links: [
             { name: "customer@nike.com", link: "mailto:customer@nike.com" },
             { name: "+92554862354", link: "tel:+92554862354" },

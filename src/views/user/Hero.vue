@@ -20,20 +20,20 @@ const changeHeroImg = (imgUrl) => {
     <div
       class="relative xl:w-2/5 flex flex-col pt-28 flex-start justify-center items-start gap-8 lg:mb-28 padding-l"
     >
-      <p class="text-xl font-montserrat text-coral-red">Our Summer collections</p>
+      <p class="text-xl font-montserrat text-coral-red">Bộ Sưu Tập Giày Của Chúng Tôi</p>
       <h1
         class="text-8xl font-palanquin font-bold max-sm:text-4xl xl:whitespace-nowrap z-10"
       >
-        <span class="">The New Arrival</span><br />
-        <span class="text-coral-red mt-3">Nike</span> Shoes
+        <span class="">Giày</span><br />
+        <span class="text-coral-red mt-3">Nike</span> Mới Ra Mắt
       </h1>
       <p class="text-lg text-slate-gray font-montserrat leading-8">
-        Discover stylish Nike arrivals, quality <br />
-        comfort, and innovation for your active life.
+        Khám phá những mẫu giày Nike thời trang, chất lượng <br />
+        thoải mái và sự đổi mới cho cuộc sống năng động của bạn.
       </p>
 
       <!-- Sửa từ <Button> thành <UserButton> -->
-      <UserButton :iconUrl="arrowRight">Shop now</UserButton>
+      <UserButton :iconUrl="arrowRight">Mua ngay</UserButton>
 
       <div class="flex justify-start flex-wrap items-start md:gap-16 gap-6 w-full mt-10">
         <div v-for="stat in statistics" :key="stat.label">

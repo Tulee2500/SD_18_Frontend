@@ -19,17 +19,15 @@ import Image from "@/assets/images/shoe8.svg";
   >
     <div class="space-y-12 max-w-lg">
       <h2 class="heading">
-        We Provide You <span class="text-coral-red">Super Quality </span>Shoes
+        Giày Chất Lượng <span class="text-coral-red">Dành Cho Bạn.</span>
       </h2>
       <p class="description">
-        Ensuring premium comfort and style, our meticulously crafted footwear is designed
-        to elevate your experience, providing you with unmatched quality, innovation, and
-        a touch of elegance.
+        Đảm bảo sự thoải mái và phong cách cao cấp, những đôi giày được chế tác tỉ mỉ của chúng tôi được thiết kế để nâng cao trải nghiệm của bạn, mang đến cho bạn chất lượng vô song, sự đổi mới và một chút thanh lịch.
       </p>
       <p class="description">
-        Our dedication to detail and excellence ensures your satisfaction
+        Sự tận tâm của chúng tôi đến từng chi tiết và sự xuất sắc đảm bảo sự hài lòng của bạn
       </p>
-      <UserButton :icon-url="arrowRight">Shop now</UserButton>
+      <UserButton :icon-url="arrowRight">Mua ngay</UserButton>
     </div>
     <div class=" ">
       <img
