@@ -1,5 +1,5 @@
 <script setup>
-import Button from "@/components/user/Button.vue";
+import UserButton from "@/components/user/UserButton.vue";
 import { arrowRight } from "@/assets/icons";
 import Image from "@/assets/images/shoe8.svg";
 
@@ -29,7 +29,7 @@ import Image from "@/assets/images/shoe8.svg";
       <p class="description">
         Our dedication to detail and excellence ensures your satisfaction
       </p>
-      <Button :icon-url="arrowRight">Shop now</Button>
+      <UserButton :icon-url="arrowRight">Shop now</UserButton>
     </div>
     <div class=" ">
       <img
