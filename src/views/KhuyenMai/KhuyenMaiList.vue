@@ -26,7 +26,7 @@
             :loading="isLoading"
         >
             <template #header>
-                <div class="flex flex-wrap gap-2 items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
                     <h4 class="m-0">Quản Lý Khuyến Mãi</h4>
                     <IconField>
                         <InputIcon>
@@ -52,7 +52,7 @@
             <Column field="tenKhuyenMai" header="Tên Khuyến Mãi" sortable style="min-width: 16rem" />
             <Column field="giaTri" header="Giá Trị Giảm" sortable style="width: 12rem">
                 <template #body="slotProps">
-                    <span class="text-red-600 font-bold">{{ (slotProps.data.giaTri * 100).toFixed(0) }}%</span>
+                    <span class="font-bold text-red-600">{{ slotProps.data.giaTri.toFixed(0) }}%</span>
                 </template>
             </Column>
             <Column field="soLuongSanPham" header="Sản Phẩm" sortable style="width: 10rem">
@@ -93,8 +93,8 @@
                 </template>
             </Column>
             <template #empty>
-                <div class="text-center p-5">
-                    <i class="pi pi-tags text-5xl text-muted mb-3"></i>
+                <div class="p-5 text-center">
+                    <i class="pi pi-tags text-muted mb-3 text-5xl"></i>
                     <h5 class="text-muted">Không tìm thấy khuyến mãi</h5>
                     <p class="text-muted">Thử thay đổi bộ lọc hoặc thêm khuyến mãi mới.</p>
                 </div>
@@ -105,34 +105,34 @@
         <Dialog v-model:visible="khuyenMaiDialog" :style="{ width: '500px' }" :header="khuyenMai.id ? 'Cập nhật khuyến mãi' : 'Thêm khuyến mãi'" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
-                    <label for="tenKhuyenMai" class="block font-bold mb-3">Tên Khuyến Mãi</label>
+                    <label for="tenKhuyenMai" class="mb-3 block font-bold">Tên Khuyến Mãi</label>
                     <InputText id="tenKhuyenMai" v-model.trim="khuyenMai.tenKhuyenMai" required="true" autofocus :invalid="submitted && !khuyenMai.tenKhuyenMai" fluid />
                     <small v-if="submitted && !khuyenMai.tenKhuyenMai" class="text-red-500">Tên khuyến mãi là bắt buộc.</small>
                 </div>
                 <div>
-                    <label for="maKhuyenMai" class="block font-bold mb-3">Mã Khuyến Mãi</label>
+                    <label for="maKhuyenMai" class="mb-3 block font-bold">Mã Khuyến Mãi</label>
                     <InputText id="maKhuyenMai" v-model="khuyenMai.maKhuyenMai" fluid />
                     <small class="text-gray-500">Để trống để tự động tạo mã</small>
                 </div>
                 <div>
-                    <label for="giaTri" class="block font-bold mb-3">Giá Trị Giảm (%)</label>
-                    <InputNumber id="giaTri" v-model="giaTriPercent" :min="0" :max="100" suffix="%" fluid :invalid="submitted && (giaTriPercent == null || giaTriPercent <= 0)" />
-                    <small v-if="submitted && (giaTriPercent == null || giaTriPercent <= 0)" class="text-red-500">Giá trị giảm phải lớn hơn 0.</small>
+                    <label for="giaTri" class="mb-3 block font-bold">Giá Trị Giảm (%)</label>
+                    <InputNumber id="giaTri" v-model="khuyenMai.giaTri" :min="0" :max="100" suffix="%" fluid :invalid="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" />
+                    <small v-if="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" class="text-red-500">Giá trị giảm phải lớn hơn 0.</small>
                     <small class="text-gray-500">Nhập số từ 1-100 (ví dụ: 15 = 15%)</small>
                 </div>
                 <div>
-                    <label for="ngayBatDau" class="block font-bold mb-3">Ngày Bắt Đầu</label>
+                    <label for="ngayBatDau" class="mb-3 block font-bold">Ngày Bắt Đầu</label>
                     <Calendar id="ngayBatDau" v-model="khuyenMai.ngayBatDau" dateFormat="dd/mm/yy" showTime hourFormat="24" fluid :invalid="submitted && !khuyenMai.ngayBatDau" />
                     <small v-if="submitted && !khuyenMai.ngayBatDau" class="text-red-500">Ngày bắt đầu là bắt buộc.</small>
                 </div>
                 <div>
-                    <label for="ngayKetThuc" class="block font-bold mb-3">Ngày Kết Thúc</label>
+                    <label for="ngayKetThuc" class="mb-3 block font-bold">Ngày Kết Thúc</label>
                     <Calendar id="ngayKetThuc" v-model="khuyenMai.ngayKetThuc" dateFormat="dd/mm/yy" showTime hourFormat="24" fluid :invalid="submitted && (!khuyenMai.ngayKetThuc || isEndDateBeforeStartDate)" />
                     <small v-if="submitted && !khuyenMai.ngayKetThuc" class="text-red-500">Ngày kết thúc là bắt buộc.</small>
                     <small v-if="submitted && isEndDateBeforeStartDate" class="text-red-500">Ngày kết thúc phải sau ngày bắt đầu.</small>
                 </div>
                 <div>
-                    <label for="trangThai" class="block font-bold mb-3">Trạng Thái</label>
+                    <label for="trangThai" class="mb-3 block font-bold">Trạng Thái</label>
                     <Select id="trangThai" v-model="khuyenMai.trangThai" :options="statusOptionsForForm" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
                 </div>
             </div>
@@ -144,21 +144,21 @@
 
         <!-- Apply Products Dialog -->
         <Dialog v-model:visible="applyProductsDialog" :style="{ width: '95vw', height: '85vh' }" header="Áp Dụng Sản Phẩm Cho Khuyến Mãi" :modal="true" class="apply-products-dialog">
-            <div class="h-full flex flex-col">
+            <div class="flex h-full flex-col">
                 <!-- Promotion info -->
-                <div class="bg-blue-50 p-4 rounded-lg mb-4">
-                    <h6 class="font-bold text-blue-800 mb-2"><i class="pi pi-tag mr-2"></i>Khuyến mãi được chọn:</h6>
-                    <div class="flex items-center gap-4 flex-wrap">
+                <div class="mb-4 rounded-lg bg-blue-50 p-4">
+                    <h6 class="mb-2 font-bold text-blue-800"><i class="pi pi-tag mr-2"></i>Khuyến mãi được chọn:</h6>
+                    <div class="flex flex-wrap items-center gap-4">
                         <Tag :value="selectedPromotionForApply?.maKhuyenMai" severity="secondary" />
                         <span class="font-medium">{{ selectedPromotionForApply?.tenKhuyenMai }}</span>
-                        <span class="text-red-600 font-bold"> Giảm {{ selectedPromotionForApply ? (selectedPromotionForApply.giaTri * 100).toFixed(0) : 0 }}% </span>
+                        <span class="font-bold text-red-600"> Giảm {{ selectedPromotionForApply ? selectedPromotionForApply.giaTri.toFixed(0) : 0 }}% </span>
                         <Tag :value="`${selectedProductsForApply?.length || 0} sản phẩm đã chọn`" severity="success" />
                     </div>
                 </div>
 
                 <!-- Search and filter -->
-                <div class="mb-4 flex gap-4 items-center flex-wrap">
-                    <IconField class="flex-1 min-w-64">
+                <div class="mb-4 flex flex-wrap items-center gap-4">
+                    <IconField class="min-w-64 flex-1">
                         <InputIcon>
                             <i class="pi pi-search" />
                         </InputIcon>
@@ -203,7 +203,7 @@
                         <Column field="mauSac.tenMauSac" header="Màu Sắc" style="width: 120px">
                             <template #body="slotProps">
                                 <div class="flex items-center gap-2">
-                                    <span class="inline-block w-4 h-4 rounded-full border" :style="{ backgroundColor: slotProps.data.mauSac?.maMau || '#ccc' }"></span>
+                                    <span class="inline-block h-4 w-4 rounded-full border" :style="{ backgroundColor: slotProps.data.mauSac?.maMau || '#ccc' }"></span>
                                     <span>{{ slotProps.data.mauSac?.tenMauSac }}</span>
                                 </div>
                             </template>
@@ -226,21 +226,21 @@
                         <Column header="Giá Sau KM" style="width: 130px">
                             <template #body="slotProps">
                                 <span class="font-bold text-red-600">
-                                    {{ formatCurrency(slotProps.data.giaGoc * (1 - (selectedPromotionForApply?.giaTri || 0))) }}
+                                    {{ formatCurrency(slotProps.data.giaGoc * (1 - (selectedPromotionForApply?.giaTri || 0) / 100)) }}
                                 </span>
                             </template>
                         </Column>
                         <Column header="Tiết Kiệm" style="width: 130px">
                             <template #body="slotProps">
                                 <span class="font-bold text-green-600">
-                                    {{ formatCurrency(slotProps.data.giaGoc * (selectedPromotionForApply?.giaTri || 0)) }}
+                                    {{ formatCurrency((slotProps.data.giaGoc * (selectedPromotionForApply?.giaTri || 0)) / 100) }}
                                 </span>
                             </template>
                         </Column>
                         <template #empty>
-                            <div class="text-center p-8">
-                                <i class="pi pi-shopping-bag text-6xl text-gray-400 mb-4"></i>
-                                <h5 class="text-gray-600 mb-2">Không có sản phẩm khả dụng</h5>
+                            <div class="p-8 text-center">
+                                <i class="pi pi-shopping-bag mb-4 text-6xl text-gray-400"></i>
+                                <h5 class="mb-2 text-gray-600">Không có sản phẩm khả dụng</h5>
                                 <p class="text-gray-500">
                                     {{ productSearchKeyword ? 'Không tìm thấy sản phẩm phù hợp' : 'Tất cả sản phẩm đã được áp dụng khuyến mãi hoặc hết hàng' }}
                                 </p>
@@ -251,7 +251,7 @@
                 </div>
             </div>
             <template #footer>
-                <div class="flex justify-between items-center w-full">
+                <div class="flex w-full items-center justify-between">
                     <span class="font-medium text-gray-600">
                         Đã chọn: <strong class="text-blue-600">{{ selectedProductsForApply?.length || 0 }}</strong> sản phẩm
                     </span>
@@ -265,34 +265,34 @@
 
         <!-- View Promotion Products Dialog -->
         <Dialog v-model:visible="viewProductsDialog" :style="{ width: '95vw', height: '85vh' }" header="Sản Phẩm Được Áp Dụng Khuyến Mãi" :modal="true">
-            <div class="h-full flex flex-col">
+            <div class="flex h-full flex-col">
                 <!-- Promotion info -->
-                <div class="bg-green-50 p-4 rounded-lg mb-4">
-                    <h6 class="font-bold text-green-800 mb-2"><i class="pi pi-info-circle mr-2"></i>Thông tin khuyến mãi:</h6>
-                    <div class="flex items-center gap-4 flex-wrap">
+                <div class="mb-4 rounded-lg bg-green-50 p-4">
+                    <h6 class="mb-2 font-bold text-green-800"><i class="pi pi-info-circle mr-2"></i>Thông tin khuyến mãi:</h6>
+                    <div class="flex flex-wrap items-center gap-4">
                         <Tag :value="selectedPromotionForView?.maKhuyenMai" severity="secondary" />
                         <span class="font-medium">{{ selectedPromotionForView?.tenKhuyenMai }}</span>
-                        <span class="text-red-600 font-bold"> Giảm {{ selectedPromotionForView ? (selectedPromotionForView.giaTri * 100).toFixed(0) : 0 }}% </span>
+                        <span class="font-bold text-red-600"> Giảm {{ selectedPromotionForView ? selectedPromotionForView.giaTri.toFixed(0) : 0 }}% </span>
                         <Tag :value="`${promotionProducts.length} sản phẩm`" severity="info" />
                         <Tag :value="selectedPromotionForView?.trangThai === 1 ? 'Đang hoạt động' : 'Đã dừng'" :severity="selectedPromotionForView?.trangThai === 1 ? 'success' : 'danger'" />
                     </div>
                 </div>
 
                 <!-- Summary stats -->
-                <div class="grid grid-cols-4 gap-4 mb-4">
-                    <div class="bg-blue-50 p-3 rounded-lg text-center">
+                <div class="mb-4 grid grid-cols-4 gap-4">
+                    <div class="rounded-lg bg-blue-50 p-3 text-center">
                         <div class="text-2xl font-bold text-blue-600">{{ promotionProducts.length }}</div>
                         <div class="text-sm text-blue-800">Sản phẩm</div>
                     </div>
-                    <div class="bg-green-50 p-3 rounded-lg text-center">
+                    <div class="rounded-lg bg-green-50 p-3 text-center">
                         <div class="text-2xl font-bold text-green-600">{{ formatCurrency(totalPromotionValue) }}</div>
                         <div class="text-sm text-green-800">Tổng tiết kiệm</div>
                     </div>
-                    <div class="bg-orange-50 p-3 rounded-lg text-center">
+                    <div class="rounded-lg bg-orange-50 p-3 text-center">
                         <div class="text-2xl font-bold text-orange-600">{{ formatCurrency(totalOriginalValue) }}</div>
                         <div class="text-sm text-orange-800">Tổng giá gốc</div>
                     </div>
-                    <div class="bg-purple-50 p-3 rounded-lg text-center">
+                    <div class="rounded-lg bg-purple-50 p-3 text-center">
                         <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(totalDiscountedValue) }}</div>
                         <div class="text-sm text-purple-800">Tổng sau KM</div>
                     </div>
@@ -329,7 +329,7 @@
                         <Column field="chiTietSanPham.mauSac.tenMauSac" header="Màu Sắc" style="width: 120px">
                             <template #body="slotProps">
                                 <div class="flex items-center gap-2">
-                                    <span class="inline-block w-4 h-4 rounded-full border" :style="{ backgroundColor: slotProps.data.chiTietSanPham.mauSac?.maMau || '#ccc' }"></span>
+                                    <span class="inline-block h-4 w-4 rounded-full border" :style="{ backgroundColor: slotProps.data.chiTietSanPham.mauSac?.maMau || '#ccc' }"></span>
                                     <span>{{ slotProps.data.chiTietSanPham.mauSac?.tenMauSac }}</span>
                                 </div>
                             </template>
@@ -374,10 +374,10 @@
                             </template>
                         </Column>
                         <template #empty>
-                            <div class="text-center p-8">
-                                <i class="pi pi-shopping-bag text-6xl text-gray-400 mb-4"></i>
-                                <h5 class="text-gray-600 mb-2">Chưa có sản phẩm nào được áp dụng</h5>
-                                <p class="text-gray-500 mb-4">Khuyến mãi này chưa được áp dụng cho sản phẩm nào.</p>
+                            <div class="p-8 text-center">
+                                <i class="pi pi-shopping-bag mb-4 text-6xl text-gray-400"></i>
+                                <h5 class="mb-2 text-gray-600">Chưa có sản phẩm nào được áp dụng</h5>
+                                <p class="mb-4 text-gray-500">Khuyến mãi này chưa được áp dụng cho sản phẩm nào.</p>
                                 <Button label="Áp Dụng Sản Phẩm Ngay" icon="pi pi-plus" @click="openApplyProductsFromView" />
                             </div>
                         </template>
@@ -385,7 +385,7 @@
                 </div>
             </div>
             <template #footer>
-                <div class="flex justify-between items-center w-full">
+                <div class="flex w-full items-center justify-between">
                     <div class="text-sm text-gray-600">
                         Tổng cộng <strong>{{ promotionProducts.length }}</strong> sản phẩm được áp dụng khuyến mãi
                     </div>
@@ -403,7 +403,7 @@
                 <i class="pi pi-exclamation-triangle text-3xl text-orange-500" />
                 <div>
                     <p>Bạn có chắc chắn muốn hủy áp dụng khuyến mãi cho sản phẩm này?</p>
-                    <div class="mt-3 p-3 bg-gray-50 rounded">
+                    <div class="mt-3 rounded bg-gray-50 p-3">
                         <div><strong>Sản phẩm:</strong> {{ selectedProductForRemove?.chiTietSanPham?.sanPham?.tenSanPham }}</div>
                         <div><strong>Mã chi tiết:</strong> {{ selectedProductForRemove?.chiTietSanPham?.maChiTiet }}</div>
                         <div><strong>Giá sẽ trở về:</strong> {{ formatCurrency(selectedProductForRemove?.chiTietSanPham?.giaGoc) }}</div>
@@ -425,7 +425,7 @@
                         Bạn có chắc chắn muốn xóa khuyến mãi <strong>{{ khuyenMai.tenKhuyenMai }}</strong
                         >?
                     </span>
-                    <div class="mt-3 p-3 bg-red-50 rounded text-red-700"><strong>Lưu ý:</strong> Tất cả sản phẩm được áp dụng khuyến mãi này sẽ được khôi phục về giá gốc.</div>
+                    <div class="mt-3 rounded bg-red-50 p-3 text-red-700"><strong>Lưu ý:</strong> Tất cả sản phẩm được áp dụng khuyến mãi này sẽ được khôi phục về giá gốc.</div>
                 </div>
             </div>
             <template #footer>
@@ -442,7 +442,7 @@
                     <span
                         >Bạn có chắc chắn muốn xóa <strong>{{ selectedKhuyenMai?.length || 0 }}</strong> khuyến mãi đã chọn?</span
                     >
-                    <div class="mt-3 p-3 bg-red-50 rounded text-red-700"><strong>Lưu ý:</strong> Tất cả sản phẩm được áp dụng các khuyến mãi này sẽ được khôi phục về giá gốc.</div>
+                    <div class="mt-3 rounded bg-red-50 p-3 text-red-700"><strong>Lưu ý:</strong> Tất cả sản phẩm được áp dụng các khuyến mãi này sẽ được khôi phục về giá gốc.</div>
                 </div>
             </div>
             <template #footer>
@@ -474,7 +474,6 @@ const viewProductsDialog = ref(false);
 const removeProductDialog = ref(false);
 const khuyenMai = ref({});
 const selectedKhuyenMai = ref();
-const giaTriPercent = ref(0);
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
@@ -779,7 +778,6 @@ function formatCurrency(amount) {
 // CRUD operations
 function openNew() {
     khuyenMai.value = { trangThai: 1 };
-    giaTriPercent.value = 0;
     submitted.value = false;
     khuyenMaiDialog.value = true;
 }
@@ -792,11 +790,9 @@ function hideDialog() {
 async function saveKhuyenMai() {
     submitted.value = true;
 
-    if (khuyenMai.value.tenKhuyenMai?.trim() && giaTriPercent.value != null && giaTriPercent.value > 0 && khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc && !isEndDateBeforeStartDate.value) {
+    if (khuyenMai.value.tenKhuyenMai?.trim() && khuyenMai.value.giaTri != null && khuyenMai.value.giaTri > 0 && khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc && !isEndDateBeforeStartDate.value) {
         isSaving.value = true;
         try {
-            khuyenMai.value.giaTri = giaTriPercent.value / 100;
-
             const requestData = {
                 ...khuyenMai.value,
                 ngayBatDau: formatDateForBackend(khuyenMai.value.ngayBatDau),
@@ -824,7 +820,6 @@ async function saveKhuyenMai() {
             await fetchData();
             khuyenMaiDialog.value = false;
             khuyenMai.value = {};
-            giaTriPercent.value = 0;
         } catch (error) {
             console.error('Error saving promotion:', error.response?.data || error.message);
             toast.add({
@@ -848,7 +843,6 @@ async function saveKhuyenMai() {
 
 function editKhuyenMai(km) {
     khuyenMai.value = { ...km };
-    giaTriPercent.value = km.giaTri * 100;
 
     if (khuyenMai.value.ngayBatDau) {
         khuyenMai.value.ngayBatDau = new Date(khuyenMai.value.ngayBatDau);
@@ -956,7 +950,7 @@ function exportCSV() {
                 item.id || '',
                 item.maKhuyenMai || '',
                 item.tenKhuyenMai || '',
-                item.giaTri ? (item.giaTri * 100).toFixed(1) + '%' : '',
+                item.giaTri ? item.giaTri.toFixed(1) + '%' : '',
                 formatDateDisplay(item.ngayBatDau),
                 formatDateDisplay(item.ngayKetThuc),
                 item.trangThai === 1 ? 'Còn hạn' : 'Hết hạn',
