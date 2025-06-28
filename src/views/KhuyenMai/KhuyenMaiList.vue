@@ -112,11 +112,11 @@
                     <div>
                         <label for="maKhuyenMai" class="mb-3 block font-bold">Mã Khuyến Mãi</label>
                         <InputText id="maKhuyenMai" v-model="khuyenMai.maKhuyenMai" fluid />
-                        <small class="text-gray-500">Để trống để tự động tạo mã</small>
+                        
                     </div>
                     <div>
                         <label for="giaTri" class="mb-3 block font-bold">Giá Trị Giảm (%)</label>
-                        <InputNumber id="giaTri" v-model="khuyenMai.giaTri" :min="0" :max="100" suffix="%" fluid :invalid="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" />
+                        <InputText id="giaTri" v-model.number="khuyenMai.giaTri" :min="0" :max="100" suffix="%" fluid :invalid="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" />
                         <small v-if="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" class="text-red-500">Giá trị giảm phải lớn hơn 0.</small>
                         <small class="text-gray-500">Nhập số từ 1-100 (ví dụ: 15 = 15%)</small>
                     </div>
@@ -777,7 +777,14 @@
 
     // CRUD operations
     function openNew() {
-        khuyenMai.value = { trangThai: 1 };
+        khuyenMai.value = { 
+            tenKhuyenMai: '', 
+            maKhuyenMai: createId(),
+            giaTri : null,
+            ngayBatDau: null,
+            ngayKetThuc: null,
+            trangThai: 1 
+        };
         submitted.value = false;
         khuyenMaiDialog.value = true;
     }
@@ -1013,7 +1020,7 @@
     function createId() {
         let id = '';
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 8; i++) {
             id += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         return 'KM' + id;

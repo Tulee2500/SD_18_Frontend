@@ -147,8 +147,21 @@ async function fetchData() {
     }
 }
 
+function createId() {
+        let id = '';
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 8; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return 'TH' + id;
+    }
+
 function openNew() {
-    thuongHieu.value = { trangThai: 1 };
+    thuongHieu.value = { 
+        maThuongHieu: createId(),
+        tenThuongHieu: '',
+        trangThai: 1 
+    };
     submitted.value = false;
     thuongHieuDialog.value = true;
 }
@@ -172,6 +185,7 @@ async function saveThuongHieu() {
                     life: 3000
                 });
             } else {
+                requestData.maKhuyenMai = requestData.maKhuyenMai || createId();
                 await axios.post('http://localhost:8080/thuong-hieu', thuongHieu.value);
                 toast.add({
                     severity: 'success',

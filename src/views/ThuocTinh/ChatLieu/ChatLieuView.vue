@@ -146,9 +146,22 @@ async function fetchData() {
         });
     }
 }
+function createId() {
+        let id = '';
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 8; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return 'CL' + id;
+    }
 
+    // Mã tự động
 function openNew() {
-    chatLieu.value = { trangThai: 1 };
+    chatLieu.value = { 
+        maChatLieu: createId(),
+        tenChatLieu: '',
+        trangThai: 1 
+    };
     submitted.value = false;
     chatLieuDialog.value = true;
 }
@@ -172,6 +185,7 @@ async function saveChatLieu() {
                     life: 3000
                 });
             } else {
+                chatLieu.value.maChatLieu = chatLieu.value.maChatLieu || createId();
                 await axios.post('http://localhost:8080/chat-lieu', chatLieu.value);
                 toast.add({
                     severity: 'success',
@@ -372,6 +386,7 @@ function exportCSV() {
             life: 3000
         });
     }
+    
 }
 </script>
 

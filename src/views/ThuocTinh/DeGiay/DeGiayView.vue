@@ -147,8 +147,21 @@ async function fetchData() {
     }
 }
 
+function createId() {
+        let id = '';
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 8; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return 'DG' + id;
+    }
+
 function openNew() {
-    deGiay.value = { trangThai: 1 };
+    deGiay.value = { 
+        maDeGiay: createId(),
+        tenDeGiay: '',
+        trangThai: 1 
+    };
     submitted.value = false;
     deGiayDialog.value = true;
 }
@@ -172,6 +185,7 @@ async function saveDeGiay() {
                     life: 3000
                 });
             } else {
+                deGiay.value.maDeGiay = deGiay.value.maDeGiay || createId();
                 await axios.post('http://localhost:8080/de-giay', deGiay.value);
                 toast.add({
                     severity: 'success',
