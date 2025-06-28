@@ -18,7 +18,7 @@ const router = createRouter({
             meta: { requiresAuth: true, roles: ['admin', 'nhanvien'] },
             children: [
                 {
-                    path: '',
+                    path: '/dashboard',
                     name: 'dashboard',
                     component: () => import('@/views/Dashboard.vue')
                 },
@@ -235,7 +235,6 @@ const router = createRouter({
         }
     ]
 });
-
 
 // // ROUTE GUARDS - Kiểm tra quyền truy cập
 // router.beforeEach((to, from, next) => {

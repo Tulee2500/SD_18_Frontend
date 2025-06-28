@@ -26,7 +26,7 @@
             :loading="isLoading"
         >
             <template #header>
-                <div class="flex flex-wrap gap-2 items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
                     <h4 class="m-0">Quản Lý Tài Khoản</h4>
                     <div class="flex gap-2">
                         <IconField>
@@ -55,7 +55,7 @@
             <Column field="email" header="Email" sortable style="min-width: 16rem">
                 <template #body="slotProps">
                     <div class="flex items-center">
-                        <i class="pi pi-envelope mr-2 text-muted"></i>
+                        <i class="pi pi-envelope text-muted mr-2"></i>
                         <span>{{ slotProps.data.email }}</span>
                     </div>
                 </template>
@@ -66,16 +66,6 @@
                         <i :class="slotProps.data.vaiTro ? 'pi pi-user-edit' : 'pi pi-user'" class="mr-1"></i>
                         {{ getRoleLabel(slotProps.data.vaiTro) }}
                     </Tag>
-                </template>
-            </Column>
-            <Column header="Thông tin chi tiết" style="min-width: 18rem">
-                <template #body="slotProps">
-                    <div v-if="slotProps.data.detailInfo" class="flex flex-col">
-                        <span class="font-semibold">{{ slotProps.data.detailInfo.hoTen }}</span>
-                        <span class="text-sm text-muted">{{ slotProps.data.detailInfo.sdt || 'Chưa cập nhật' }}</span>
-                        <span class="text-sm text-muted">{{ formatAddress(slotProps.data.detailInfo.diaChi) }}</span>
-                    </div>
-                    <span v-else class="text-muted">Chưa có thông tin</span>
                 </template>
             </Column>
             <Column field="trangThai" header="Trạng thái" sortable style="width: 12rem">
@@ -102,42 +92,42 @@
                 </template>
             </Column>
             <template #empty>
-                <div class="text-center p-5">
-                    <i class="pi pi-users text-5xl text-muted mb-3"></i>
+                <div class="p-5 text-center">
+                    <i class="pi pi-users text-muted mb-3 text-5xl"></i>
                     <h5 class="text-muted">Không tìm thấy tài khoản</h5>
                     <p class="text-muted">Thử thay đổi bộ lọc hoặc thêm tài khoản mới.</p>
                 </div>
             </template>
         </DataTable>
 
-        <!-- Add/Edit Account Dialog -->
-        <Dialog v-model:visible="accountDialog" :style="{ width: '900px' }" :header="account.id ? 'Cập nhật tài khoản' : 'Thêm tài khoản'" :modal="true">
+        <!-- Add Account Dialog -->
+        <Dialog v-model:visible="addDialog" :style="{ width: '900px' }" header="Thêm tài khoản mới" :modal="true">
             <div class="flex flex-col gap-6">
                 <!-- Thông tin tài khoản -->
                 <div class="border-bottom pb-4">
                     <h5 class="mb-3">Thông tin đăng nhập</h5>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label for="maTaiKhoan" class="block font-bold mb-3">Mã tài khoản</label>
-                            <InputText id="maTaiKhoan" v-model="account.maTaiKhoan" disabled fluid />
+                            <label for="maTaiKhoan" class="mb-3 block font-bold">Mã tài khoản</label>
+                            <InputText id="maTaiKhoan" v-model="newAccount.maTaiKhoan" placeholder="Để trống để tự tạo" fluid />
                         </div>
                         <div>
-                            <label for="email" class="block font-bold mb-3">Email *</label>
-                            <InputText id="email" v-model.trim="account.email" required="true" :invalid="submitted && !account.email" fluid />
-                            <small v-if="submitted && !account.email" class="text-red-500">Email là bắt buộc.</small>
+                            <label for="email" class="mb-3 block font-bold">Email *</label>
+                            <InputText id="email" v-model.trim="newAccount.email" required="true" :invalid="submitted && !newAccount.email" fluid />
+                            <small v-if="submitted && !newAccount.email" class="text-red-500">Email là bắt buộc.</small>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div class="mt-4 grid grid-cols-2 gap-4">
                         <div>
-                            <label for="matKhau" class="block font-bold mb-3">Mật khẩu {{ account.id ? '' : '*' }}</label>
-                            <Password id="matKhau" v-model="account.matKhau" :required="!account.id" :invalid="submitted && !account.id && !account.matKhau" toggleMask fluid>
+                            <label for="matKhau" class="mb-3 block font-bold">Mật khẩu *</label>
+                            <Password id="matKhau" v-model="newAccount.matKhau" required="true" :invalid="submitted && !newAccount.matKhau" toggleMask fluid>
                                 <template #header>
                                     <h6>Nhập mật khẩu</h6>
                                 </template>
                                 <template #footer>
                                     <Divider />
                                     <p class="mt-2">Yêu cầu</p>
-                                    <ul class="pl-2 ml-2 mt-0" style="line-height: 1.5">
+                                    <ul class="ml-2 mt-0 pl-2" style="line-height: 1.5">
                                         <li>Ít nhất một chữ thường</li>
                                         <li>Ít nhất một chữ hoa</li>
                                         <li>Ít nhất một số</li>
@@ -145,64 +135,112 @@
                                     </ul>
                                 </template>
                             </Password>
-                            <small v-if="submitted && !account.id && !account.matKhau" class="text-red-500">Mật khẩu là bắt buộc khi thêm mới.</small>
+                            <small v-if="submitted && !newAccount.matKhau" class="text-red-500">Mật khẩu là bắt buộc.</small>
                         </div>
                         <div>
-                            <label for="vaiTro" class="block font-bold mb-3">Vai trò *</label>
-                            <Select id="vaiTro" v-model="account.vaiTro" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Chọn vai trò" :invalid="submitted && account.vaiTro === undefined" fluid />
-                            <small v-if="submitted && account.vaiTro === undefined" class="text-red-500">Vai trò là bắt buộc.</small>
+                            <label for="vaiTro" class="mb-3 block font-bold">Vai trò *</label>
+                            <Select id="vaiTro" v-model="newAccount.vaiTro" :options="roleOptionsForForm" optionLabel="label" optionValue="value" placeholder="Chọn vai trò" :invalid="submitted && newAccount.vaiTro === undefined" fluid />
+                            <small v-if="submitted && newAccount.vaiTro === undefined" class="text-red-500">Vai trò là bắt buộc.</small>
                         </div>
                     </div>
                     <div class="mt-4">
-                        <label for="trangThai" class="block font-bold mb-3">Trạng thái *</label>
-                        <Select id="trangThai" v-model="account.trangThai" :options="statusOptions.slice(1)" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" :invalid="submitted && account.trangThai === undefined" fluid />
-                        <small v-if="submitted && account.trangThai === undefined" class="text-red-500">Trạng thái là bắt buộc.</small>
+                        <label for="trangThai" class="mb-3 block font-bold">Trạng thái *</label>
+                        <Select id="trangThai" v-model="newAccount.trangThai" :options="statusOptionsForForm" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" :invalid="submitted && newAccount.trangThai === undefined" fluid />
+                        <small v-if="submitted && newAccount.trangThai === undefined" class="text-red-500">Trạng thái là bắt buộc.</small>
                     </div>
                 </div>
 
                 <!-- Thông tin chi tiết -->
-                <div v-if="account.vaiTro !== undefined" class="border-bottom pb-4">
+                <div class="border-bottom pb-4">
                     <h5 class="mb-3">Thông tin chi tiết</h5>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label for="hoTen" class="block font-bold mb-3">Họ Tên *</label>
-                            <InputText id="hoTen" v-model.trim="account.detailInfo.hoTen" required="true" :invalid="submitted && !account.detailInfo.hoTen" fluid />
-                            <small v-if="submitted && !account.detailInfo.hoTen" class="text-red-500">Họ tên là bắt buộc.</small>
+                            <label for="hoTen" class="mb-3 block font-bold">Họ Tên *</label>
+                            <InputText id="hoTen" v-model.trim="newAccount.hoTen" required="true" :invalid="submitted && !newAccount.hoTen" fluid />
+                            <small v-if="submitted && !newAccount.hoTen" class="text-red-500">Họ tên là bắt buộc.</small>
                         </div>
                         <div>
-                            <label for="sdt" class="block font-bold mb-3">Số điện thoại *</label>
-                            <InputText id="sdt" v-model="account.detailInfo.sdt" required="true" :invalid="submitted && !account.detailInfo.sdt" fluid />
-                            <small v-if="submitted && !account.detailInfo.sdt" class="text-red-500">Số điện thoại là bắt buộc.</small>
+                            <label for="sdt" class="mb-3 block font-bold">Số điện thoại *</label>
+                            <InputText id="sdt" v-model="newAccount.sdt" required="true" :invalid="submitted && !newAccount.sdt" fluid />
+                            <small v-if="submitted && !newAccount.sdt" class="text-red-500">Số điện thoại là bắt buộc.</small>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 gap-4 mt-4">
+                </div>
+
+                <!-- Thông tin địa chỉ -->
+                <div>
+                    <h5 class="mb-3">Thông tin địa chỉ</h5>
+                    <div class="grid grid-cols-1 gap-4">
                         <div>
-                            <label for="tenKhachHang" class="block font-bold mb-3">Tên trong địa chỉ</label>
-                            <InputText id="tenKhachHang" v-model="account.detailInfo.diaChi.tenKhachHang" placeholder="Tên trong địa chỉ..." fluid />
+                            <label for="tenKhachHang" class="mb-3 block font-bold">Tên trong địa chỉ</label>
+                            <InputText id="tenKhachHang" v-model="newAccount.diaChi.tenKhachHang" placeholder="Để trống sẽ dùng họ tên" fluid />
                         </div>
                         <div class="grid grid-cols-3 gap-4">
                             <div>
-                                <label for="tenPhuong" class="block font-bold mb-3">Phường/Xã *</label>
-                                <InputText id="tenPhuong" v-model="account.detailInfo.diaChi.tenPhuong" placeholder="Tên phường/xã" :invalid="submitted && !account.detailInfo.diaChi.tenPhuong" fluid />
-                                <small v-if="submitted && !account.detailInfo.diaChi.tenPhuong" class="text-red-500">Phường/xã là bắt buộc.</small>
+                                <label for="tenPhuong" class="mb-3 block font-bold">Phường/Xã *</label>
+                                <InputText id="tenPhuong" v-model="newAccount.diaChi.tenPhuong" placeholder="Tên phường/xã" :invalid="submitted && !newAccount.diaChi.tenPhuong" fluid />
+                                <small v-if="submitted && !newAccount.diaChi.tenPhuong" class="text-red-500">Phường/xã là bắt buộc.</small>
                             </div>
                             <div>
-                                <label for="tenHuyen" class="block font-bold mb-3">Quận/Huyện *</label>
-                                <InputText id="tenHuyen" v-model="account.detailInfo.diaChi.tenHuyen" placeholder="Tên quận/huyện" :invalid="submitted && !account.detailInfo.diaChi.tenHuyen" fluid />
-                                <small v-if="submitted && !account.detailInfo.diaChi.tenHuyen" class="text-red-500">Quận/huyện là bắt buộc.</small>
+                                <label for="tenHuyen" class="mb-3 block font-bold">Quận/Huyện *</label>
+                                <InputText id="tenHuyen" v-model="newAccount.diaChi.tenHuyen" placeholder="Tên quận/huyện" :invalid="submitted && !newAccount.diaChi.tenHuyen" fluid />
+                                <small v-if="submitted && !newAccount.diaChi.tenHuyen" class="text-red-500">Quận/huyện là bắt buộc.</small>
                             </div>
                             <div>
-                                <label for="tenTinh" class="block font-bold mb-3">Tỉnh/Thành phố *</label>
-                                <InputText id="tenTinh" v-model="account.detailInfo.diaChi.tenTinh" placeholder="Tên tỉnh/thành phố" :invalid="submitted && !account.detailInfo.diaChi.tenTinh" fluid />
-                                <small v-if="submitted && !account.detailInfo.diaChi.tenTinh" class="text-red-500">Tỉnh/thành phố là bắt buộc.</small>
+                                <label for="tenTinh" class="mb-3 block font-bold">Tỉnh/Thành phố *</label>
+                                <InputText id="tenTinh" v-model="newAccount.diaChi.tenTinh" placeholder="Tên tỉnh/thành phố" :invalid="submitted && !newAccount.diaChi.tenTinh" fluid />
+                                <small v-if="submitted && !newAccount.diaChi.tenTinh" class="text-red-500">Tỉnh/thành phố là bắt buộc.</small>
                             </div>
+                        </div>
+                        <div>
+                            <label for="diaChiChiTiet" class="mb-3 block font-bold">Địa chỉ chi tiết</label>
+                            <InputText id="diaChiChiTiet" v-model="newAccount.diaChi.diaChiChiTiet" placeholder="Số nhà, tên đường..." fluid />
                         </div>
                     </div>
                 </div>
             </div>
             <template #footer>
-                <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveAccount" />
+                <Button label="Hủy" icon="pi pi-times" text @click="hideAddDialog" />
+                <Button label="Lưu" icon="pi pi-check" @click="saveNewAccount" />
+            </template>
+        </Dialog>
+
+        <!-- Edit Account Dialog -->
+        <Dialog v-model:visible="editDialog" :style="{ width: '600px' }" header="Cập nhật tài khoản" :modal="true">
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label for="editEmail" class="mb-3 block font-bold">Email *</label>
+                    <InputText id="editEmail" v-model.trim="editAccountData.email" required="true" :invalid="submitted && !editAccountData.email" fluid />
+                    <small v-if="submitted && !editAccountData.email" class="text-red-500">Email là bắt buộc.</small>
+                </div>
+                <div>
+                    <label for="editMatKhau" class="mb-3 block font-bold">Mật khẩu mới</label>
+                    <Password id="editMatKhau" v-model="editAccountData.matKhau" placeholder="Để trống nếu không đổi" toggleMask fluid />
+                    <small class="text-muted">Để trống nếu không muốn thay đổi mật khẩu</small>
+                </div>
+                <div>
+                    <label for="editVaiTro" class="mb-3 block font-bold">Vai trò *</label>
+                    <Select id="editVaiTro" v-model="editAccountData.vaiTro" :options="roleOptionsForForm" optionLabel="label" optionValue="value" placeholder="Chọn vai trò" :invalid="submitted && editAccountData.vaiTro === undefined" fluid />
+                    <small v-if="submitted && editAccountData.vaiTro === undefined" class="text-red-500">Vai trò là bắt buộc.</small>
+                </div>
+                <div>
+                    <label for="editTrangThai" class="mb-3 block font-bold">Trạng thái *</label>
+                    <Select
+                        id="editTrangThai"
+                        v-model="editAccountData.trangThai"
+                        :options="statusOptionsForForm"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Chọn trạng thái"
+                        :invalid="submitted && editAccountData.trangThai === undefined"
+                        fluid
+                    />
+                    <small v-if="submitted && editAccountData.trangThai === undefined" class="text-red-500">Trạng thái là bắt buộc.</small>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy" icon="pi pi-times" text @click="hideEditDialog" />
+                <Button label="Cập nhật" icon="pi pi-check" @click="updateAccount" />
             </template>
         </Dialog>
 
@@ -210,8 +248,8 @@
         <Dialog v-model:visible="viewDialog" :style="{ width: '700px' }" :header="`Chi tiết tài khoản - ${viewingAccount?.email || 'Tài khoản'}`" :modal="true">
             <div v-if="viewingAccount" class="flex flex-col gap-4">
                 <!-- Thông tin tài khoản -->
-                <div class="bg-blue-50 p-4 rounded-lg">
-                    <h6 class="font-semibold text-blue-700 mb-3">Thông tin tài khoản:</h6>
+                <div class="rounded-lg bg-blue-50 p-4">
+                    <h6 class="mb-3 font-semibold text-blue-700">Thông tin tài khoản:</h6>
                     <div class="grid grid-cols-2 gap-3 text-sm">
                         <div><strong>ID:</strong> #{{ viewingAccount.id }}</div>
                         <div><strong>Mã TK:</strong> {{ viewingAccount.maTaiKhoan }}</div>
@@ -221,21 +259,15 @@
                             <Tag :value="getRoleLabel(viewingAccount.vaiTro)" :severity="viewingAccount.vaiTro ? 'success' : 'primary'" />
                         </div>
                         <div>
+                            <strong>Mật khẩu:</strong>
+                            <span class="rounded bg-gray-100 px-2 py-1 font-mono">{{ viewingAccount.matKhau || 'N/A' }}</span>
+                        </div>
+                        <div>
                             <strong>Trạng thái:</strong>
                             <Tag :value="viewingAccount.trangThai === 1 ? 'Hoạt động' : 'Ngưng'" :severity="viewingAccount.trangThai === 1 ? 'success' : 'danger'" />
                         </div>
                         <div><strong>Ngày tạo:</strong> {{ formatDate(viewingAccount.ngayTao) }}</div>
                         <div><strong>Cập nhật:</strong> {{ formatDate(viewingAccount.ngayCapNhat) }}</div>
-                    </div>
-                </div>
-
-                <!-- Thông tin chi tiết -->
-                <div v-if="viewingAccount.detailInfo" class="bg-gray-50 p-4 rounded-lg">
-                    <h6 class="font-semibold text-gray-700 mb-3">Thông tin chi tiết:</h6>
-                    <div class="grid grid-cols-2 gap-3 text-sm">
-                        <div><strong>Họ tên:</strong> {{ viewingAccount.detailInfo.hoTen }}</div>
-                        <div><strong>SĐT:</strong> {{ viewingAccount.detailInfo.sdt || 'Chưa cập nhật' }}</div>
-                        <div class="col-span-2"><strong>Địa chỉ:</strong> {{ formatAddress(viewingAccount.detailInfo.diaChi) }}</div>
                     </div>
                 </div>
             </div>
@@ -249,8 +281,8 @@
         <Dialog v-model:visible="deleteAccountDialog" :style="{ width: '450px' }" header="Xác nhận xóa" :modal="true">
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle !text-3xl" />
-                <span v-if="account"
-                    >Bạn có chắc chắn muốn xóa tài khoản <b>{{ account.email }}</b
+                <span v-if="selectedAccountForDelete"
+                    >Bạn có chắc chắn muốn xóa tài khoản <b>{{ selectedAccountForDelete.email }}</b
                     >?</span
                 >
             </div>
@@ -284,11 +316,12 @@ import { computed, onMounted, ref } from 'vue';
 const toast = useToast();
 const dt = ref();
 const accounts = ref([]);
-const accountDialog = ref(false);
+const addDialog = ref(false);
+const editDialog = ref(false);
 const viewDialog = ref(false);
 const deleteAccountDialog = ref(false);
 const deleteAccountsDialog = ref(false);
-const account = ref({});
+const selectedAccountForDelete = ref(null);
 const viewingAccount = ref(null);
 const selectedAccounts = ref();
 const filters = ref({
@@ -299,8 +332,41 @@ const statusFilter = ref('');
 const submitted = ref(false);
 const isLoading = ref(false);
 
+const newAccount = ref({
+    maTaiKhoan: '',
+    email: '',
+    matKhau: '',
+    vaiTro: undefined,
+    trangThai: 1,
+    hoTen: '',
+    sdt: '',
+    diaChi: {
+        maTinh: '',
+        maHuyen: '',
+        maPhuong: '',
+        tenTinh: '',
+        tenHuyen: '',
+        tenPhuong: '',
+        tenKhachHang: '',
+        diaChiChiTiet: ''
+    }
+});
+
+const editAccountData = ref({
+    id: null,
+    email: '',
+    matKhau: '',
+    vaiTro: undefined,
+    trangThai: undefined
+});
+
 const roleOptions = ref([
     { label: 'Tất cả vai trò', value: '' },
+    { label: 'Nhân viên', value: true },
+    { label: 'Khách hàng', value: false }
+]);
+
+const roleOptionsForForm = ref([
     { label: 'Nhân viên', value: true },
     { label: 'Khách hàng', value: false }
 ]);
@@ -311,41 +377,10 @@ const statusOptions = ref([
     { label: 'Ngưng hoạt động', value: 0 }
 ]);
 
-async function generateAccountCode() {
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
-    let suffix = 1;
-    let newCode = `TK-${dateStr}-${String(suffix).padStart(3, '0')}`;
-
-    try {
-        while (true) {
-            const res = await axios.get(`http://localhost:8080/tai-khoan/check-code?code=${newCode}`);
-            if (res.data.available) break;
-            suffix++;
-            newCode = `TK-${dateStr}-${String(suffix).padStart(3, '0')}`;
-        }
-        return newCode;
-    } catch (error) {
-        console.error('Error generating account code:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Không thể tạo mã tài khoản',
-            life: 3000
-        });
-        return null;
-    }
-}
-
-async function checkEmailExists(email) {
-    try {
-        const res = await axios.get(`http://localhost:8080/tai-khoan/check-email?email=${email}`);
-        return res.data.exists;
-    } catch (error) {
-        console.error('Error checking email:', error);
-        return false;
-    }
-}
+const statusOptionsForForm = ref([
+    { label: 'Hoạt động', value: 1 },
+    { label: 'Ngưng hoạt động', value: 0 }
+]);
 
 onMounted(() => {
     fetchData();
@@ -355,14 +390,7 @@ async function fetchData() {
     isLoading.value = true;
     try {
         const res = await axios.get('http://localhost:8080/tai-khoan');
-        accounts.value = res.data.map((acc) => ({
-            ...acc,
-            detailInfo: acc.detailInfo || {
-                hoTen: '',
-                sdt: '',
-                diaChi: { tenKhachHang: '', tenPhuong: '', tenHuyen: '', tenTinh: '' }
-            }
-        }));
+        accounts.value = res.data;
     } catch (error) {
         console.error('Error fetching data:', error);
         toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Có lỗi xảy ra khi tải dữ liệu tài khoản', life: 3000 });
@@ -383,22 +411,27 @@ const filteredAccounts = computed(() => {
 });
 
 function openNew() {
-    account.value = {
+    newAccount.value = {
+        maTaiKhoan: '',
+        email: '',
+        matKhau: '',
         vaiTro: undefined,
         trangThai: 1,
-        detailInfo: {
-            hoTen: '',
-            sdt: '',
-            diaChi: {
-                tenKhachHang: '',
-                tenPhuong: '',
-                tenHuyen: '',
-                tenTinh: ''
-            }
+        hoTen: '',
+        sdt: '',
+        diaChi: {
+            maTinh: '',
+            maHuyen: '',
+            maPhuong: '',
+            tenTinh: '',
+            tenHuyen: '',
+            tenPhuong: '',
+            tenKhachHang: '',
+            diaChiChiTiet: ''
         }
     };
     submitted.value = false;
-    accountDialog.value = true;
+    addDialog.value = true;
 }
 
 function viewAccount(acc) {
@@ -407,59 +440,51 @@ function viewAccount(acc) {
 }
 
 function editFromView() {
-    account.value = { ...viewingAccount.value, trangThai: viewingAccount.value.trangThai ?? 1 };
-    if (!account.value.detailInfo) {
-        account.value.detailInfo = {
-            hoTen: '',
-            sdt: '',
-            diaChi: {
-                tenKhachHang: '',
-                tenPhuong: '',
-                tenHuyen: '',
-                tenTinh: ''
-            }
-        };
-    }
+    editAccountData.value = {
+        id: viewingAccount.value.id,
+        email: viewingAccount.value.email,
+        matKhau: '',
+        vaiTro: viewingAccount.value.vaiTro,
+        trangThai: viewingAccount.value.trangThai
+    };
     viewDialog.value = false;
-    accountDialog.value = true;
+    editDialog.value = true;
 }
 
-async function editAccount(acc) {
-    account.value = { ...acc, trangThai: acc.trangThai ?? 1 };
-    if (!account.value.detailInfo) {
-        account.value.detailInfo = {
-            hoTen: '',
-            sdt: '',
-            diaChi: {
-                tenKhachHang: '',
-                tenPhuong: '',
-                tenHuyen: '',
-                tenTinh: ''
-            }
-        };
-    }
-    accountDialog.value = true;
+function editAccount(acc) {
+    editAccountData.value = {
+        id: acc.id,
+        email: acc.email,
+        matKhau: '',
+        vaiTro: acc.vaiTro,
+        trangThai: acc.trangThai
+    };
+    editDialog.value = true;
 }
 
-function hideDialog() {
-    accountDialog.value = false;
+function hideAddDialog() {
+    addDialog.value = false;
     submitted.value = false;
-    account.value = {};
 }
 
-async function saveAccount() {
+function hideEditDialog() {
+    editDialog.value = false;
+    submitted.value = false;
+}
+
+async function saveNewAccount() {
     submitted.value = true;
 
     if (
-        !account.value.email?.trim() ||
-        (!account.value.id && !account.value.matKhau?.trim()) ||
-        account.value.vaiTro === undefined ||
-        account.value.trangThai === undefined ||
-        !account.value.detailInfo?.hoTen?.trim() ||
-        !account.value.detailInfo?.sdt?.trim() ||
-        !account.value.detailInfo?.diaChi?.tenPhuong?.trim() ||
-        !account.value.detailInfo?.diaChi?.tenHuyen?.trim() ||
-        !account.value.detailInfo?.diaChi?.tenTinh?.trim()
+        !newAccount.value.email?.trim() ||
+        !newAccount.value.matKhau?.trim() ||
+        newAccount.value.vaiTro === undefined ||
+        newAccount.value.trangThai === undefined ||
+        !newAccount.value.hoTen?.trim() ||
+        !newAccount.value.sdt?.trim() ||
+        !newAccount.value.diaChi?.tenTinh?.trim() ||
+        !newAccount.value.diaChi?.tenHuyen?.trim() ||
+        !newAccount.value.diaChi?.tenPhuong?.trim()
     ) {
         toast.add({
             severity: 'warn',
@@ -471,124 +496,100 @@ async function saveAccount() {
     }
 
     try {
-        // Kiểm tra email trùng lặp
-        if (!account.value.id) {
-            const emailExists = await checkEmailExists(account.value.email);
-            if (emailExists) {
-                toast.add({
-                    severity: 'error',
-                    summary: 'Lỗi',
-                    detail: 'Email đã tồn tại trong hệ thống',
-                    life: 3000
-                });
-                return;
-            }
-        }
+        await axios.post('http://localhost:8080/tai-khoan', newAccount.value);
 
-        // Tạo mã tài khoản nếu là thêm mới
-        if (!account.value.maTaiKhoan) {
-            const newCode = await generateAccountCode();
-            if (!newCode) return;
-            account.value.maTaiKhoan = newCode;
-        }
-
-        // Lưu địa chỉ
-        let addressId = account.value.detailInfo.diaChi.id;
-        if (!addressId) {
-            const addressRes = await axios.post('http://localhost:8080/api/dia-chi', account.value.detailInfo.diaChi);
-            addressId = addressRes.data.id;
-        } else {
-            await axios.put(`http://localhost:8080/api/dia-chi/${addressId}`, account.value.detailInfo.diaChi);
-        }
-
-        // Chuẩn bị dữ liệu tài khoản
-        const accountData = {
-            ...account.value,
-            detailInfo: {
-                ...account.value.detailInfo,
-                diaChi: addressId
-            }
-        };
-
-        // Lưu tài khoản
-        let accountId;
-        if (account.value.id) {
-            await axios.put(`http://localhost:8080/tai-khoan/${account.value.id}`, accountData);
-            accountId = account.value.id;
-            toast.add({ severity: 'success', summary: 'Thành công', detail: 'Cập nhật tài khoản thành công', life: 3000 });
-        } else {
-            const accountRes = await axios.post('http://localhost:8080/tai-khoan', accountData);
-            accountId = accountRes.data.id;
-            toast.add({ severity: 'success', summary: 'Thành công', detail: 'Thêm tài khoản thành công', life: 3000 });
-        }
-
-        // Đồng bộ với NhanVien hoặc KhachHang
-        if (account.value.vaiTro === true) {
-            // Nhân viên
-            const employeeData = {
-                hoTen: account.value.detailInfo.hoTen,
-                email: account.value.email,
-                sdt: account.value.detailInfo.sdt,
-                diaChi: addressId,
-                taiKhoan: accountId,
-                trangThai: account.value.trangThai,
-                maNhanVien: account.value.maTaiKhoan.replace('TK', 'NV')
-            };
-            if (account.value.detailInfo.id) {
-                await axios.put(`http://localhost:8080/nhan-vien/${account.value.detailInfo.id}`, employeeData);
-            } else {
-                await axios.post('http://localhost:8080/nhan-vien', employeeData);
-            }
-        } else if (account.value.vaiTro === false) {
-            // Khách hàng
-            const viDiemRes = await axios.post('http://localhost:8080/api/vi-diem', {
-                diemHienTai: 0,
-                tongDiemDaDung: 0,
-                tongDiemTichLuy: 0,
-                trangThai: 1
-            });
-            const customerData = {
-                hoTen: account.value.detailInfo.hoTen,
-                email: account.value.email,
-                sdt: account.value.detailInfo.sdt,
-                diaChi: addressId,
-                taiKhoan: accountId,
-                viDiem: viDiemRes.data.id,
-                trangThai: account.value.trangThai,
-                maKhachHang: account.value.maTaiKhoan.replace('TK', 'KH')
-            };
-            if (account.value.detailInfo.id) {
-                await axios.put(`http://localhost:8080/khach-hang/${account.value.detailInfo.id}`, customerData);
-            } else {
-                await axios.post('http://localhost:8080/khach-hang', customerData);
-            }
-        }
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Thêm tài khoản thành công',
+            life: 3000
+        });
 
         await fetchData();
-        accountDialog.value = false;
-        account.value = {};
+        hideAddDialog();
     } catch (error) {
         console.error('Error saving account:', error);
+
+        if (error.response?.status === 409) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Email đã tồn tại trong hệ thống',
+                life: 3000
+            });
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Có lỗi xảy ra khi thêm tài khoản',
+                life: 3000
+            });
+        }
+    }
+}
+
+async function updateAccount() {
+    submitted.value = true;
+
+    if (!editAccountData.value.email?.trim() || editAccountData.value.vaiTro === undefined || editAccountData.value.trangThai === undefined) {
         toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: `Có lỗi xảy ra khi lưu tài khoản: ${error.response?.data?.message || error.message}`,
-            life: 5000
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Vui lòng điền đầy đủ thông tin bắt buộc',
+            life: 3000
         });
+        return;
+    }
+
+    try {
+        await axios.put(`http://localhost:8080/tai-khoan/${editAccountData.value.id}`, {
+            email: editAccountData.value.email,
+            matKhau: editAccountData.value.matKhau || undefined,
+            vaiTro: editAccountData.value.vaiTro,
+            trangThai: editAccountData.value.trangThai
+        });
+
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Cập nhật tài khoản thành công',
+            life: 3000
+        });
+
+        await fetchData();
+        hideEditDialog();
+    } catch (error) {
+        console.error('Error updating account:', error);
+
+        if (error.response?.status === 409) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Email đã tồn tại trong hệ thống',
+                life: 3000
+            });
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Có lỗi xảy ra khi cập nhật tài khoản',
+                life: 3000
+            });
+        }
     }
 }
 
 function confirmDeleteAccount(acc) {
-    account.value = acc;
+    selectedAccountForDelete.value = acc;
     deleteAccountDialog.value = true;
 }
 
 async function deleteAccount() {
     try {
-        await axios.delete(`http://localhost:8080/tai-khoan/${account.value.id}`);
+        await axios.delete(`http://localhost:8080/tai-khoan/${selectedAccountForDelete.value.id}`);
         await fetchData();
         deleteAccountDialog.value = false;
-        account.value = {};
+        selectedAccountForDelete.value = null;
         toast.add({
             severity: 'success',
             summary: 'Thành công',
@@ -610,7 +611,8 @@ async function changeStatus(acc) {
     try {
         const newStatus = acc.trangThai === 1 ? 0 : 1;
         await axios.put(`http://localhost:8080/tai-khoan/${acc.id}`, {
-            ...acc,
+            email: acc.email,
+            vaiTro: acc.vaiTro,
             trangThai: newStatus
         });
         await fetchData();
@@ -672,19 +674,9 @@ function exportCSV() {
             return;
         }
 
-        const headers = ['ID', 'Mã Tài Khoản', 'Email', 'Vai Trò', 'Họ Tên', 'SĐT', 'Địa Chỉ', 'Trạng Thái', 'Ngày Tạo'];
+        const headers = ['ID', 'Mã Tài Khoản', 'Email', 'Vai Trò', 'Trạng Thái', 'Ngày Tạo'];
 
-        const csvData = accounts.value.map((item) => [
-            item.id || '',
-            item.maTaiKhoan || '',
-            item.email || '',
-            getRoleLabel(item.vaiTro),
-            item.detailInfo?.hoTen || '',
-            item.detailInfo?.sdt || '',
-            formatAddress(item.detailInfo?.diaChi) || '',
-            item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động',
-            formatDate(item.ngayTao)
-        ]);
+        const csvData = accounts.value.map((item) => [item.id || '', item.maTaiKhoan || '', item.email || '', getRoleLabel(item.vaiTro), item.trangThai === 1 ? 'Hoạt động' : 'Ngưng hoạt động', formatDate(item.ngayTao)]);
 
         const csvContent = [headers, ...csvData].map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
 
@@ -720,12 +712,6 @@ function exportCSV() {
 
 function getRoleLabel(vaiTro) {
     return vaiTro ? 'Nhân viên' : vaiTro === false ? 'Khách hàng' : 'Không xác định';
-}
-
-function formatAddress(diaChi) {
-    if (!diaChi) return 'Chưa cập nhật địa chỉ';
-    const parts = [diaChi.tenPhuong, diaChi.tenHuyen, diaChi.tenTinh].filter((part) => part && part.trim() !== '');
-    return parts.length > 0 ? parts.join(', ') : 'Chưa cập nhật thông tin';
 }
 
 function formatDate(date) {

@@ -3,7 +3,6 @@
         <!-- Toolbar -->
         <Toolbar class="mb-6">
             <template #start>
-                <!-- <Button label="Thêm nhân viên" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" /> -->
                 <Button label="Xóa đã chọn" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedEmployees || !selectedEmployees.length" />
             </template>
             <template #end>
@@ -27,7 +26,7 @@
             :loading="isLoading"
         >
             <template #header>
-                <div class="flex flex-wrap gap-2 items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
                     <h4 class="m-0">Quản Lý Nhân Viên</h4>
                     <div class="flex gap-2">
                         <IconField>
@@ -55,12 +54,12 @@
             <Column field="hoTen" header="Thông tin" sortable style="min-width: 18rem">
                 <template #body="slotProps">
                     <div class="flex items-center">
-                        <span class="rounded-circle w-2rem h-2rem flex items-center justify-center text-white font-bold mr-3" :style="{ background: 'linear-gradient(45deg, #28a745, #20c997)' }">
+                        <span class="rounded-circle w-2rem h-2rem mr-3 flex items-center justify-center font-bold text-white" :style="{ background: 'linear-gradient(45deg, #28a745, #20c997)' }">
                             {{ getInitials(slotProps.data.hoTen) }}
                         </span>
                         <div class="flex flex-col">
                             <span class="font-semibold">{{ slotProps.data.hoTen }}</span>
-                            <span class="text-sm text-muted">{{ slotProps.data.email }}</span>
+                            <span class="text-muted text-sm">{{ slotProps.data.email }}</span>
                         </div>
                     </div>
                 </template>
@@ -69,22 +68,8 @@
                 <template #body="slotProps">
                     <div class="flex flex-col">
                         <span class="mb-1">
-                            <i class="pi pi-phone mr-1 text-muted"></i>
+                            <i class="pi pi-phone text-muted mr-1"></i>
                             {{ slotProps.data.sdt }}
-                        </span>
-                        <span class="text-sm text-muted">
-                            <i class="pi pi-user mr-1 text-muted"></i>
-                            {{ slotProps.data.taiKhoan?.email || 'Chưa có tài khoản' }}
-                        </span>
-                    </div>
-                </template>
-            </Column>
-            <Column header="Địa chỉ" style="min-width: 18rem">
-                <template #body="slotProps">
-                    <div class="flex flex-col">
-                        <span class="text-sm text-muted">
-                            <i class="pi pi-map-marker mr-1 text-muted"></i>
-                            {{ formatFullAddress(slotProps.data.diaChi) }}
                         </span>
                     </div>
                 </template>
@@ -113,10 +98,10 @@
                 </template>
             </Column>
             <template #empty>
-                <div class="text-center p-5">
-                    <i class="pi pi-users text-5xl text-muted mb-3"></i>
+                <div class="p-5 text-center">
+                    <i class="pi pi-users text-muted mb-3 text-5xl"></i>
                     <h5 class="text-muted">Không tìm thấy nhân viên</h5>
-                    <p class="text-muted">Thử thay đổi bộ lọc hoặc thêm nhân viên mới.</p>
+                    <p class="text-muted">Thử thay đổi bộ lọc hoặc thêm nhân viên mới từ quản lý tài khoản.</p>
                 </div>
             </template>
         </DataTable>
@@ -125,8 +110,8 @@
         <Dialog v-model:visible="viewDialog" :style="{ width: '700px' }" :header="`Chi tiết nhân viên - ${viewingEmployee?.hoTen || 'N/A'}`" :modal="true">
             <div v-if="viewingEmployee" class="flex flex-col gap-4">
                 <!-- Thông tin cơ bản -->
-                <div class="bg-green-50 p-4 rounded-lg">
-                    <h6 class="font-semibold text-green-700 mb-3">Thông tin nhân viên:</h6>
+                <div class="rounded-lg bg-green-50 p-4">
+                    <h6 class="mb-3 font-semibold text-green-700">Thông tin nhân viên:</h6>
                     <div class="grid grid-cols-2 gap-3 text-sm">
                         <div><strong>ID:</strong> #{{ viewingEmployee.id }}</div>
                         <div><strong>Mã NV:</strong> {{ viewingEmployee.maNhanVien }}</div>
@@ -141,29 +126,6 @@
                         <div><strong>Cập nhật:</strong> {{ formatDate(viewingEmployee.ngayCapNhat) }}</div>
                     </div>
                 </div>
-
-                <!-- Thông tin tài khoản -->
-                <div v-if="viewingEmployee.taiKhoan" class="bg-blue-50 p-4 rounded-lg">
-                    <h6 class="font-semibold text-blue-700 mb-3">Thông tin tài khoản:</h6>
-                    <div class="grid grid-cols-2 gap-3 text-sm">
-                        <div><strong>Mã TK:</strong> {{ viewingEmployee.taiKhoan.maTaiKhoan }}</div>
-                        <div><strong>Email TK:</strong> {{ viewingEmployee.taiKhoan.email }}</div>
-                        <div><strong>Vai trò:</strong> Nhân viên</div>
-                        <div>
-                            <strong>Trạng thái TK:</strong>
-                            <Tag :value="viewingEmployee.taiKhoan.trangThai === 1 ? 'Hoạt động' : 'Ngưng'" :severity="viewingEmployee.taiKhoan.trangThai === 1 ? 'success' : 'danger'" />
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Thông tin địa chỉ -->
-                <div v-if="viewingEmployee.diaChi" class="bg-gray-50 p-4 rounded-lg">
-                    <h6 class="font-semibold text-gray-700 mb-3">Thông tin địa chỉ:</h6>
-                    <div class="text-sm">
-                        <div><strong>Tên:</strong> {{ viewingEmployee.diaChi.tenKhachHang || 'N/A' }}</div>
-                        <div><strong>Địa chỉ:</strong> {{ formatFullAddress(viewingEmployee.diaChi) }}</div>
-                    </div>
-                </div>
             </div>
             <template #footer>
                 <Button label="Đóng" icon="pi pi-times" text @click="viewDialog = false" />
@@ -172,70 +134,32 @@
         </Dialog>
 
         <!-- Edit Employee Dialog -->
-        <Dialog v-model:visible="employeeDialog" :style="{ width: '700px' }" :header="`Cập nhật nhân viên - ${employee.hoTen || 'Nhân viên'}`" :modal="true">
-            <div class="flex flex-col gap-6">
-                <!-- Thông tin cơ bản -->
-                <div class="border-bottom pb-4">
-                    <h5 class="mb-3">Thông tin cơ bản</h5>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="hoTen" class="block font-bold mb-3">Họ Tên *</label>
-                            <InputText id="hoTen" v-model.trim="employee.hoTen" required="true" :invalid="submitted && !employee.hoTen" fluid />
-                            <small v-if="submitted && !employee.hoTen" class="text-red-500">Họ tên là bắt buộc.</small>
-                        </div>
-                        <div>
-                            <label for="maNhanVien" class="block font-bold mb-3">Mã nhân viên</label>
-                            <InputText id="maNhanVien" v-model="employee.maNhanVien" disabled fluid />
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4 mt-4">
-                        <div>
-                            <label for="email" class="block font-bold mb-3">Email *</label>
-                            <InputText id="email" v-model="employee.email" required="true" :invalid="submitted && (!employee.email || !isValidEmail(employee.email))" fluid />
-                            <small v-if="submitted && !employee.email" class="text-red-500">Email là bắt buộc.</small>
-                            <small v-if="submitted && employee.email && !isValidEmail(employee.email)" class="text-red-500">Email không hợp lệ.</small>
-                        </div>
-                        <div>
-                            <label for="sdt" class="block font-bold mb-3">Số điện thoại *</label>
-                            <InputText id="sdt" v-model="employee.sdt" required="true" :invalid="submitted && (!employee.sdt || !isValidPhone(employee.sdt))" fluid />
-                            <small v-if="submitted && !employee.sdt" class="text-red-500">Số điện thoại là bắt buộc.</small>
-                            <small v-if="submitted && employee.sdt && !isValidPhone(employee.sdt)" class="text-red-500">Số điện thoại không hợp lệ.</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Thông tin địa chỉ -->
-                <div class="border-bottom pb-4">
-                    <h5 class="mb-3">Thông tin địa chỉ</h5>
-                    <div class="grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="tenKhachHang" class="block font-bold mb-3">Tên trong địa chỉ</label>
-                            <InputText id="tenKhachHang" v-model="employee.diaChi.tenKhachHang" placeholder="Tên trong địa chỉ..." fluid />
-                        </div>
-                        <div class="grid grid-cols-3 gap-4">
-                            <div>
-                                <label for="tenPhuong" class="block font-bold mb-3">Phường/Xã *</label>
-                                <InputText id="tenPhuong" v-model="employee.diaChi.tenPhuong" placeholder="Tên phường/xã" :invalid="submitted && !employee.diaChi.tenPhuong" fluid />
-                                <small v-if="submitted && !employee.diaChi.tenPhuong" class="text-red-500">Phường/xã là bắt buộc.</small>
-                            </div>
-                            <div>
-                                <label for="tenHuyen" class="block font-bold mb-3">Quận/Huyện *</label>
-                                <InputText id="tenHuyen" v-model="employee.diaChi.tenHuyen" placeholder="Tên quận/huyện" :invalid="submitted && !employee.diaChi.tenHuyen" fluid />
-                                <small v-if="submitted && !employee.diaChi.tenHuyen" class="text-red-500">Quận/huyện là bắt buộc.</small>
-                            </div>
-                            <div>
-                                <label for="tenTinh" class="block font-bold mb-3">Tỉnh/Thành phố *</label>
-                                <InputText id="tenTinh" v-model="employee.diaChi.tenTinh" placeholder="Tên tỉnh/thành phố" :invalid="submitted && !employee.diaChi.tenTinh" fluid />
-                                <small v-if="submitted && !employee.diaChi.tenTinh" class="text-red-500">Tỉnh/thành phố là bắt buộc.</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Trạng thái -->
+        <Dialog v-model:visible="employeeDialog" :style="{ width: '600px' }" :header="`Cập nhật nhân viên - ${employee.hoTen || 'Nhân viên'}`" :modal="true">
+            <div class="flex flex-col gap-4">
                 <div>
-                    <label for="trangThai" class="block font-bold mb-3">Trạng thái *</label>
-                    <Select id="trangThai" v-model="employee.trangThai" :options="statusOptions.slice(1)" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" :invalid="submitted && employee.trangThai === undefined" fluid />
+                    <label for="maNhanVien" class="mb-3 block font-bold">Mã nhân viên</label>
+                    <InputText id="maNhanVien" v-model="employee.maNhanVien" disabled fluid />
+                </div>
+                <div>
+                    <label for="hoTen" class="mb-3 block font-bold">Họ Tên *</label>
+                    <InputText id="hoTen" v-model.trim="employee.hoTen" required="true" :invalid="submitted && !employee.hoTen" fluid />
+                    <small v-if="submitted && !employee.hoTen" class="text-red-500">Họ tên là bắt buộc.</small>
+                </div>
+                <div>
+                    <label for="email" class="mb-3 block font-bold">Email *</label>
+                    <InputText id="email" v-model="employee.email" required="true" :invalid="submitted && (!employee.email || !isValidEmail(employee.email))" fluid />
+                    <small v-if="submitted && !employee.email" class="text-red-500">Email là bắt buộc.</small>
+                    <small v-if="submitted && employee.email && !isValidEmail(employee.email)" class="text-red-500">Email không hợp lệ.</small>
+                </div>
+                <div>
+                    <label for="sdt" class="mb-3 block font-bold">Số điện thoại *</label>
+                    <InputText id="sdt" v-model="employee.sdt" required="true" :invalid="submitted && (!employee.sdt || !isValidPhone(employee.sdt))" fluid />
+                    <small v-if="submitted && !employee.sdt" class="text-red-500">Số điện thoại là bắt buộc.</small>
+                    <small v-if="submitted && employee.sdt && !isValidPhone(employee.sdt)" class="text-red-500">Số điện thoại không hợp lệ (10 số).</small>
+                </div>
+                <div>
+                    <label for="trangThai" class="mb-3 block font-bold">Trạng thái *</label>
+                    <Select id="trangThai" v-model="employee.trangThai" :options="statusOptionsForForm" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" :invalid="submitted && employee.trangThai === undefined" fluid />
                     <small v-if="submitted && employee.trangThai === undefined" class="text-red-500">Trạng thái là bắt buộc.</small>
                 </div>
             </div>
@@ -309,29 +233,13 @@ const statusOptions = ref([
     { label: 'Ngưng hoạt động', value: 0 }
 ]);
 
+const statusOptionsForForm = ref([
+    { label: 'Hoạt động', value: 1 },
+    { label: 'Ngưng hoạt động', value: 0 }
+]);
+
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidPhone = (phone) => /^[0-9]{10}$/.test(phone);
-
-async function generateEmployeeCode() {
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
-    let suffix = 1;
-    let newCode = `NV-${dateStr}-${String(suffix).padStart(3, '0')}`;
-
-    try {
-        while (true) {
-            const res = await axios.get(`http://localhost:8080/nhan-vien/check-code?code=${newCode}`, { timeout: 5000 });
-            if (res.data.available) break;
-            suffix++;
-            newCode = `NV-${dateStr}-${String(suffix).padStart(3, '0')}`;
-        }
-        return newCode;
-    } catch (error) {
-        console.error('Error generating employee code:', error);
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tạo mã nhân viên', life: 3000 });
-        return null;
-    }
-}
 
 onMounted(() => {
     fetchData();
@@ -340,14 +248,16 @@ onMounted(() => {
 async function fetchData() {
     isLoading.value = true;
     try {
-        const res = await axios.get('http://localhost:8080/nhan-vien', { timeout: 10000 });
-        employees.value = res.data.map((emp) => ({
-            ...emp,
-            diaChi: emp.diaChi || { tenKhachHang: '', tenPhuong: '', tenHuyen: '', tenTinh: '' }
-        }));
+        const res = await axios.get('http://localhost:8080/nhan-vien');
+        employees.value = res.data || [];
     } catch (error) {
         console.error('Error fetching data:', error);
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Có lỗi xảy ra khi tải dữ liệu nhân viên', life: 3000 });
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Có lỗi xảy ra khi tải dữ liệu nhân viên',
+            life: 3000
+        });
     } finally {
         isLoading.value = false;
     }
@@ -361,33 +271,37 @@ const filteredEmployees = computed(() => {
     return filtered;
 });
 
-function openNew() {
-    employee.value = {
-        trangThai: 1,
-        diaChi: {
-            tenKhachHang: '',
-            tenTinh: '',
-            tenHuyen: '',
-            tenPhuong: ''
-        }
-    };
-    submitted.value = false;
-    employeeDialog.value = true;
-}
-
 function viewEmployee(emp) {
-    viewingEmployee.value = { ...emp, diaChi: emp.diaChi || { tenKhachHang: '', tenTinh: '', tenHuyen: '', tenPhuong: '' } };
+    viewingEmployee.value = { ...emp };
     viewDialog.value = true;
 }
 
 function editFromView() {
-    employee.value = { ...viewingEmployee.value, trangThai: viewingEmployee.value.trangThai ?? 1 };
+    employee.value = {
+        id: viewingEmployee.value.id,
+        maNhanVien: viewingEmployee.value.maNhanVien,
+        hoTen: viewingEmployee.value.hoTen,
+        email: viewingEmployee.value.email,
+        sdt: viewingEmployee.value.sdt,
+        trangThai: viewingEmployee.value.trangThai,
+        taiKhoan: viewingEmployee.value.taiKhoan,
+        diaChi: viewingEmployee.value.diaChi
+    };
     viewDialog.value = false;
     employeeDialog.value = true;
 }
 
-async function editEmployee(emp) {
-    employee.value = { ...emp, trangThai: emp.trangThai ?? 1, diaChi: emp.diaChi || { tenKhachHang: '', tenTinh: '', tenHuyen: '', tenPhuong: '' } };
+function editEmployee(emp) {
+    employee.value = {
+        id: emp.id,
+        maNhanVien: emp.maNhanVien,
+        hoTen: emp.hoTen,
+        email: emp.email,
+        sdt: emp.sdt,
+        trangThai: emp.trangThai,
+        taiKhoan: emp.taiKhoan,
+        diaChi: emp.diaChi
+    };
     employeeDialog.value = true;
 }
 
@@ -401,61 +315,57 @@ async function saveEmployee() {
     submitted.value = true;
     saving.value = true;
 
-    if (
-        !employee.value.hoTen?.trim() ||
-        !employee.value.email?.trim() ||
-        !isValidEmail(employee.value.email) ||
-        !employee.value.sdt?.trim() ||
-        !isValidPhone(employee.value.sdt) ||
-        !employee.value.diaChi?.tenPhuong?.trim() ||
-        !employee.value.diaChi?.tenHuyen?.trim() ||
-        !employee.value.diaChi?.tenTinh?.trim() ||
-        employee.value.trangThai === undefined
-    ) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Vui lòng điền đầy đủ và đúng định dạng thông tin bắt buộc', life: 3000 });
+    if (!employee.value.hoTen?.trim() || !employee.value.email?.trim() || !isValidEmail(employee.value.email) || !employee.value.sdt?.trim() || !isValidPhone(employee.value.sdt) || employee.value.trangThai === undefined) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Vui lòng điền đầy đủ và đúng định dạng thông tin bắt buộc',
+            life: 3000
+        });
         saving.value = false;
         return;
     }
 
     try {
-        if (!employee.value.maNhanVien) {
-            const newCode = await generateEmployeeCode();
-            if (!newCode) {
-                saving.value = false;
-                return;
-            }
-            employee.value.maNhanVien = newCode;
-        }
-
-        let addressId = employee.value.diaChi.id;
-        if (!addressId) {
-            const addressRes = await axios.post('http://localhost:8080/api/dia-chi', employee.value.diaChi, { timeout: 5000 });
-            addressId = addressRes.data.id;
-        } else {
-            await axios.put(`http://localhost:8080/api/dia-chi/${addressId}`, employee.value.diaChi, { timeout: 5000 });
-        }
-
+        // Chuẩn bị dữ liệu theo format DTO
         const employeeData = {
-            ...employee.value,
-            diaChi: addressId
+            id: employee.value.id,
+            maNhanVien: employee.value.maNhanVien,
+            hoTen: employee.value.hoTen,
+            email: employee.value.email,
+            sdt: employee.value.sdt,
+            trangThai: employee.value.trangThai,
+            idTaiKhoan: employee.value.taiKhoan,
+            idDiaChi: employee.value.diaChi
         };
 
-        if (employee.value.id) {
-            await axios.put(`http://localhost:8080/nhan-vien/${employee.value.id}`, employeeData, { timeout: 5000 });
-            toast.add({ severity: 'success', summary: 'Thành công', detail: 'Cập nhật nhân viên thành công', life: 3000 });
-        } else {
-            await axios.post('http://localhost:8080/nhan-vien', employeeData, { timeout: 5000 });
-            toast.add({ severity: 'success', summary: 'Thành công', detail: 'Thêm nhân viên thành công', life: 3000 });
-        }
+        await axios.put(`http://localhost:8080/nhan-vien/${employee.value.id}`, employeeData);
+
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Cập nhật nhân viên thành công',
+            life: 3000
+        });
 
         await fetchData();
         hideDialog();
     } catch (error) {
         console.error('Error saving employee:', error);
         if (error.response?.status === 409) {
-            toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Email hoặc mã nhân viên đã tồn tại', life: 3000 });
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Email đã tồn tại trong hệ thống',
+                life: 3000
+            });
         } else {
-            toast.add({ severity: 'error', summary: 'Lỗi', detail: `Lưu nhân viên thất bại: ${error.message}`, life: 5000 });
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: `Cập nhật nhân viên thất bại: ${error.response?.data?.message || error.message}`,
+                life: 5000
+            });
         }
     } finally {
         saving.value = false;
@@ -470,14 +380,24 @@ function confirmDeleteEmployee(emp) {
 async function deleteEmployee() {
     deleting.value = true;
     try {
-        await axios.delete(`http://localhost:8080/nhan-vien/${employee.value.id}`, { timeout: 5000 });
+        await axios.delete(`http://localhost:8080/nhan-vien/${employee.value.id}`);
         await fetchData();
         deleteEmployeeDialog.value = false;
         employee.value = {};
-        toast.add({ severity: 'success', summary: 'Thành công', detail: 'Xóa nhân viên thành công', life: 3000 });
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Xóa nhân viên thành công',
+            life: 3000
+        });
     } catch (error) {
         console.error('Error deleting employee:', error);
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Xóa nhân viên thất bại', life: 3000 });
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Xóa nhân viên thất bại',
+            life: 3000
+        });
     } finally {
         deleting.value = false;
     }
@@ -486,12 +406,33 @@ async function deleteEmployee() {
 async function changeStatus(emp) {
     try {
         const newStatus = emp.trangThai === 1 ? 0 : 1;
-        await axios.put(`http://localhost:8080/nhan-vien/${emp.id}`, { ...emp, trangThai: newStatus }, { timeout: 5000 });
+        const updateData = {
+            id: emp.id,
+            maNhanVien: emp.maNhanVien,
+            hoTen: emp.hoTen,
+            email: emp.email,
+            sdt: emp.sdt,
+            trangThai: newStatus,
+            idTaiKhoan: emp.taiKhoan,
+            idDiaChi: emp.diaChi
+        };
+
+        await axios.put(`http://localhost:8080/nhan-vien/${emp.id}`, updateData);
         await fetchData();
-        toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã ${newStatus === 1 ? 'kích hoạt' : 'ngưng'} nhân viên`, life: 3000 });
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Đã ${newStatus === 1 ? 'kích hoạt' : 'ngưng'} nhân viên`,
+            life: 3000
+        });
     } catch (error) {
         console.error('Error changing status:', error);
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Thay đổi trạng thái thất bại', life: 3000 });
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Thay đổi trạng thái thất bại',
+            life: 3000
+        });
     }
 }
 
@@ -503,15 +444,25 @@ async function deleteSelectedEmployees() {
     deleting.value = true;
     try {
         for (const emp of selectedEmployees.value) {
-            await axios.delete(`http://localhost:8080/nhan-vien/${emp.id}`, { timeout: 5000 });
+            await axios.delete(`http://localhost:8080/nhan-vien/${emp.id}`);
         }
         await fetchData();
         deleteEmployeesDialog.value = false;
         selectedEmployees.value = null;
-        toast.add({ severity: 'success', summary: 'Thành công', detail: 'Xóa các nhân viên thành công', life: 3000 });
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Xóa các nhân viên thành công',
+            life: 3000
+        });
     } catch (error) {
         console.error('Error deleting employees:', error);
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Xóa nhân viên thất bại', life: 3000 });
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Xóa nhân viên thất bại',
+            life: 3000
+        });
     } finally {
         deleting.value = false;
     }
@@ -521,21 +472,17 @@ async function exportCSV() {
     exporting.value = true;
     try {
         if (!employees.value.length) {
-            toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Không có dữ liệu để xuất', life: 3000 });
+            toast.add({
+                severity: 'warn',
+                summary: 'Cảnh báo',
+                detail: 'Không có dữ liệu để xuất',
+                life: 3000
+            });
             return;
         }
 
-        const headers = ['ID', 'Mã Nhân Viên', 'Họ Tên', 'Email', 'SĐT', 'Địa Chỉ', 'Trạng Thái', 'Ngày Tạo'];
-        const csvData = employees.value.map((item) => [
-            item.id || '',
-            item.maNhanVien || '',
-            item.hoTen || '',
-            item.email || '',
-            item.sdt || '',
-            formatFullAddress(item.diaChi) || '',
-            item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động',
-            formatDate(item.ngayTao)
-        ]);
+        const headers = ['ID', 'Mã Nhân Viên', 'Họ Tên', 'Email', 'SĐT', 'Trạng Thái', 'Ngày Tạo'];
+        const csvData = employees.value.map((item) => [item.id || '', item.maNhanVien || '', item.hoTen || '', item.email || '', item.sdt || '', item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động', formatDate(item.ngayTao)]);
 
         const csvContent = [headers, ...csvData].map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
 
@@ -549,10 +496,20 @@ async function exportCSV() {
         link.click();
         document.body.removeChild(link);
 
-        toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã xuất ${employees.value.length} bản ghi`, life: 3000 });
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Đã xuất ${employees.value.length} bản ghi`,
+            life: 3000
+        });
     } catch (error) {
         console.error('Error exporting CSV:', error);
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Xuất CSV thất bại', life: 3000 });
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Xuất CSV thất bại',
+            life: 3000
+        });
     } finally {
         exporting.value = false;
     }
@@ -560,11 +517,6 @@ async function exportCSV() {
 
 function goToAccountManagement() {
     router.push('/tai-khoan');
-}
-
-function formatFullAddress(diaChi) {
-    if (!diaChi || (!diaChi.tenPhuong && !diaChi.tenHuyen && !diaChi.tenTinh)) return 'Chưa cập nhật địa chỉ';
-    return [diaChi.tenPhuong, diaChi.tenHuyen, diaChi.tenTinh].filter((part) => part?.trim()).join(', ');
 }
 
 function formatDate(date) {
@@ -587,8 +539,5 @@ function getInitials(name) {
 .card {
     border: none;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-}
-.border-bottom {
-    border-bottom: 1px solid #e9ecef;
 }
 </style>
