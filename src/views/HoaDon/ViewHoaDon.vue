@@ -50,19 +50,19 @@
             <div class="stat-card bg-purple-50 border-l-4 border-purple-500 p-4 rounded-lg">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-purple-600 text-sm font-medium">Sản phẩm</p>
-                        <p class="text-2xl font-bold text-purple-800">{{ totalProducts }}</p>
+                        <p class="text-purple-600 text-sm font-medium">Hoàn thành</p>
+                        <p class="text-2xl font-bold text-purple-800">{{ completedInvoices }}</p>
                     </div>
-                    <i class="pi pi-shopping-cart text-purple-500 text-2xl"></i>
+                    <i class="pi pi-check-circle text-purple-500 text-2xl"></i>
                 </div>
             </div>
             <div class="stat-card bg-orange-50 border-l-4 border-orange-500 p-4 rounded-lg">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-orange-600 text-sm font-medium">Hoàn thành</p>
-                        <p class="text-2xl font-bold text-orange-800">{{ completedInvoices }}</p>
+                        <p class="text-orange-600 text-sm font-medium">Chờ xử lý</p>
+                        <p class="text-2xl font-bold text-orange-800">{{ pendingInvoices }}</p>
                     </div>
-                    <i class="pi pi-check-circle text-orange-500 text-2xl"></i>
+                    <i class="pi pi-clock text-orange-500 text-2xl"></i>
                 </div>
             </div>
         </div>
@@ -85,10 +85,12 @@
                     class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                     <option value="">Tất cả trạng thái</option>
-                    <option value="Hoàn thành">Hoàn thành</option>
-                    <option value="Đang giao">Đang giao</option>
-                    <option value="Chờ xác nhận">Chờ xác nhận</option>
-                    <option value="Đã hủy">Đã hủy</option>
+                    <option value="COMPLETED">Hoàn thành</option>
+                    <option value="PENDING">Chờ xử lý</option>
+                    <option value="SHIPPED">Đang giao</option>
+                    <option value="CANCELLED">Đã hủy</option>
+                    <option value="CONFIRMED">Đã xác nhận</option>
+                    <option value="PROCESSING">Đang xử lý</option>
                 </select>
                 <input 
                     type="date" 
@@ -239,7 +241,7 @@
 
         <!-- Dialog chi tiết hóa đơn -->
         <div v-if="showChiTietDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden">
                 <!-- Dialog Header -->
                 <div class="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-blue-500 to-purple-600 text-white">
                     <div>
@@ -258,7 +260,7 @@
                 <div class="p-6 overflow-y-auto max-h-[calc(95vh-180px)]">
                     <div v-if="selectedHoaDon" class="space-y-6">
                         <!-- Thông tin hóa đơn và khách hàng -->
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <!-- Thông tin hóa đơn -->
                             <div class="bg-blue-50 p-6 rounded-xl border border-blue-200">
                                 <h6 class="font-bold text-blue-800 mb-4 text-lg flex items-center">
@@ -277,6 +279,15 @@
                                     <div class="flex justify-between items-center">
                                         <span class="text-blue-600 font-medium">Tổng tiền:</span>
                                         <span class="font-bold text-green-600 text-lg">{{ formatCurrency(selectedHoaDon.tongTien) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-blue-600 font-medium">Trạng thái:</span>
+                                        <span 
+                                            class="px-2 py-1 rounded-full text-xs font-medium"
+                                            :class="getStatusClass(selectedHoaDon.trangThaiHoaDon)"
+                                        >
+                                            {{ getStatusLabel(selectedHoaDon.trangThaiHoaDon) }}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -300,49 +311,26 @@
                                         <span class="text-green-600 font-medium">Email:</span>
                                         <span class="font-medium">{{ selectedHoaDon.email }}</span>
                                     </div>
-                                </div>
-                            </div>
-
-                            <!-- Thống kê chi tiết -->
-                            <div class="bg-purple-50 p-6 rounded-xl border border-purple-200">
-                                <h6 class="font-bold text-purple-800 mb-4 text-lg flex items-center">
-                                    <i class="pi pi-chart-bar mr-2 text-purple-600"></i>
-                                    Thống kê
-                                </h6>
-                                <div class="space-y-3">
                                     <div class="flex justify-between items-center">
-                                        <span class="text-purple-600 font-medium">Số sản phẩm:</span>
-                                        <span class="font-bold text-purple-800">{{ hoaDonChiTiets.length }}</span>
-                                    </div>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-purple-600 font-medium">Tổng SL:</span>
-                                        <span class="font-bold text-purple-800">{{ getTotalQuantity() }}</span>
-                                    </div>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-purple-600 font-medium">Trạng thái:</span>
-                                        <span 
-                                            class="px-2 py-1 rounded-full text-xs font-medium"
-                                            :class="getStatusClass(selectedHoaDon.trangThaiHoaDon)"
-                                        >
-                                            {{ getStatusLabel(selectedHoaDon.trangThaiHoaDon) }}
-                                        </span>
+                                        <span class="text-green-600 font-medium">Loại HĐ:</span>
+                                        <span class="font-medium">{{ selectedHoaDon.loaiHoaDon || 'N/A' }}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Chi tiết hóa đơn -->
+                        <!-- Chi tiết hóa đơn theo DTO -->
                         <div class="bg-gray-50 p-6 rounded-xl">
                             <div class="flex justify-between items-center mb-6">
                                 <h6 class="font-bold text-gray-800 text-xl flex items-center">
                                     <i class="pi pi-list mr-2 text-gray-600"></i>
-                                    Chi tiết hóa đơn ({{ hoaDonChiTiets.length }} mục)
+                                    Chi tiết hóa đơn ({{ hoaDonChiTiets.length }} sản phẩm)
                                 </h6>
                                 <div class="relative">
                                     <i class="pi pi-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                                     <input 
                                         v-model="searchChiTietKeyword" 
-                                        placeholder="Tìm kiếm chi tiết..." 
+                                        placeholder="Tìm kiếm sản phẩm..." 
                                         class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
                                 </div>
@@ -354,18 +342,19 @@
                                 <p class="text-gray-600">Đang tải chi tiết hóa đơn...</p>
                             </div>
 
-                            <!-- Chi Tiết Table -->
+                            <!-- Chi Tiết Table theo DTO -->
                             <div v-else class="overflow-x-auto bg-white rounded-lg border shadow-sm">
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-gray-50">
                                         <tr>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Giá</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên sản phẩm</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Giá bán</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số lượng</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thành tiền</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
                                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày tạo</th>
-                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cập nhật</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày cập nhật</th>
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
@@ -373,21 +362,24 @@
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <span class="font-mono text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">#{{ chiTiet.id }}</span>
                                             </td>
+                                            <td class="px-4 py-3">
+                                                <div class="font-medium text-gray-900">{{ chiTiet.tenSanPham || 'N/A' }}</div>
+                                            </td>
                                             <td class="px-4 py-3 whitespace-nowrap">
-                                                <span class="font-bold text-green-600 text-lg">{{ formatCurrency(chiTiet.gia) }}</span>
+                                                <span class="font-bold text-green-600">{{ formatCurrency(chiTiet.giaBan) }}</span>
                                             </td>
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">{{ chiTiet.soLuong }}</span>
                                             </td>
                                             <td class="px-4 py-3 whitespace-nowrap">
-                                                <span class="font-bold text-blue-600 text-lg">{{ formatCurrency(chiTiet.gia * chiTiet.soLuong) }}</span>
+                                                <span class="font-bold text-blue-600">{{ formatCurrency(chiTiet.giaBan * chiTiet.soLuong) }}</span>
                                             </td>
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <span 
                                                     class="px-2 py-1 rounded-full text-xs font-medium"
                                                     :class="getChiTietStatusClass(chiTiet.trangThaiHoaDon)"
                                                 >
-                                                    {{ chiTiet.trangThaiHoaDon }}
+                                                    {{ getChiTietStatusLabel(chiTiet.trangThaiHoaDon) }}
                                                 </span>
                                             </td>
                                             <td class="px-4 py-3 whitespace-nowrap">
@@ -409,92 +401,12 @@
                             </div>
                         </div>
 
-                        <!-- Danh sách sản phẩm -->
-                        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                            <div class="flex justify-between items-center mb-6">
-                                <h6 class="font-bold text-gray-800 text-xl flex items-center">
-                                    <i class="pi pi-shopping-cart mr-2 text-orange-500"></i>
-                                    Danh sách sản phẩm ({{ sanPhams.length }} sản phẩm)
-                                </h6>
-                                <div class="relative">
-                                    <i class="pi pi-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                                    <input 
-                                        v-model="searchSanPhamKeyword" 
-                                        placeholder="Tìm kiếm sản phẩm..." 
-                                        class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                </div>
-                            </div>
-                            
-                            <!-- Loading Sản Phẩm -->
-                            <div v-if="isLoadingSanPham" class="text-center py-8">
-                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-4"></div>
-                                <p class="text-gray-600">Đang tải danh sách sản phẩm...</p>
-                            </div>
-
-                            <!-- Sản Phẩm Grid -->
-                            <div v-else-if="filteredSanPhams.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div v-for="sanPham in filteredSanPhams" :key="sanPham.id" class="bg-gradient-to-br from-white to-gray-50 p-6 rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-300">
-                                    <div class="flex items-start justify-between mb-4">
-                                        <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">
-                                            {{ getProductInitials(sanPham.tenSanPham) }}
-                                        </div>
-                                        <span 
-                                            class="px-2 py-1 rounded-full text-xs font-medium"
-                                            :class="sanPham.trangThai === 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                                        >
-                                            <i :class="sanPham.trangThai === 1 ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i>
-                                            {{ sanPham.trangThai === 1 ? 'Hoạt động' : 'Ngừng bán' }}
-                                        </span>
-                                    </div>
-                                    
-                                    <h4 class="font-bold text-gray-900 text-lg mb-2">{{ sanPham.tenSanPham }}</h4>
-                                    <p class="text-gray-600 text-sm mb-3">{{ sanPham.maSanPham }}</p>
-                                    
-                                    <div class="space-y-2 mb-4">
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-500 text-sm">Số lượng:</span>
-                                            <span class="font-semibold text-blue-600">{{ sanPham.soLuong }}</span>
-                                        </div>
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-500 text-sm">Thương hiệu:</span>
-                                            <span class="font-medium text-gray-800">{{ sanPham.thuongHieu?.tenThuongHieu || 'N/A' }}</span>
-                                        </div>
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-500 text-sm">Danh mục:</span>
-                                            <span class="font-medium text-gray-800">{{ sanPham.danhMuc?.tenDanhMuc || 'N/A' }}</span>
-                                        </div>
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-500 text-sm">Chất liệu:</span>
-                                            <span class="font-medium text-gray-800">{{ sanPham.chatLieu?.tenChatLieu || 'N/A' }}</span>
-                                        </div>
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-500 text-sm">Đế giày:</span>
-                                            <span class="font-medium text-gray-800">{{ sanPham.deGiay?.tenDeGiay || 'N/A' }}</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="border-t border-gray-200 pt-3">
-                                        <div class="text-xs text-gray-500 mb-1">Ngày tạo: {{ formatDate(sanPham.ngayTao) }}</div>
-                                        <div class="text-xs text-gray-500">Cập nhật: {{ formatDate(sanPham.ngayCapNhat) }}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Empty Sản Phẩm -->
-                            <div v-else class="text-center py-12">
-                                <i class="pi pi-shopping-cart text-6xl text-gray-400 mb-4"></i>
-                                <h4 class="text-gray-600 font-semibold text-xl mb-2">Không có sản phẩm nào</h4>
-                                <p class="text-gray-500">Hóa đơn này chưa có sản phẩm hoặc không tìm thấy sản phẩm phù hợp.</p>
-                            </div>
-                        </div>
-
                         <!-- Tổng kết -->
                         <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-200">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div class="text-center">
                                     <div class="text-2xl font-bold text-blue-600 mb-1">{{ hoaDonChiTiets.length }}</div>
-                                    <div class="text-blue-800 font-medium">Chi tiết hóa đơn</div>
+                                    <div class="text-blue-800 font-medium">Số mặt hàng</div>
                                 </div>
                                 <div class="text-center">
                                     <div class="text-2xl font-bold text-purple-600 mb-1">{{ getTotalQuantity() }}</div>
@@ -517,20 +429,6 @@
                     >
                         <i class="pi pi-times"></i>
                         Đóng
-                    </button>
-                    <button 
-                        @click="exportChiTietPDF"
-                        class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                    >
-                        <i class="pi pi-file-pdf"></i>
-                        Xuất PDF
-                    </button>
-                    <button 
-                        @click="printInvoice"
-                        class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                    >
-                        <i class="pi pi-print"></i>
-                        In hóa đơn
                     </button>
                 </div>
             </div>
@@ -582,23 +480,20 @@ const itemsPerPage = ref(10)
 const showChiTietDialog = ref(false)
 const selectedHoaDon = ref(null)
 const hoaDonChiTiets = ref([])
-const sanPhams = ref([])
 const isLoadingChiTiet = ref(false)
-const isLoadingSanPham = ref(false)
 const searchChiTietKeyword = ref('')
-const searchSanPhamKeyword = ref('')
 
 // Toast
 const toastMessage = ref('')
 const toastSummary = ref('')
 const toastSeverity = ref('info')
 
-// API URLs
+// API URLs - Khớp với Controller của bạn
 const API_BASE_URL = 'http://localhost:8080'
 const API_ENDPOINTS = {
-    hoaDon: `${API_BASE_URL}/hoa-don`,
-    hoaDonChiTiet: `${API_BASE_URL}/hoa-don-chi-tiet`,
-    sanPham: `${API_BASE_URL}/san-pham`
+    hoaDon: `${API_BASE_URL}/hoa-don`,                    // GET /hoa-don
+    hoaDonSearch: `${API_BASE_URL}/hoa-don/search`,       // GET /hoa-don/search?keyword=
+    hoaDonChiTiet: `${API_BASE_URL}/hoa-don-chi-tiet`,    // GET /hoa-don-chi-tiet/by-hoa-don/{id}
 }
 
 onMounted(() => {
@@ -674,39 +569,32 @@ const filteredChiTiets = computed(() => {
     const keyword = searchChiTietKeyword.value.toLowerCase()
     return hoaDonChiTiets.value.filter(item => 
         item.id.toString().includes(keyword) ||
-        item.trangThaiHoaDon?.toLowerCase().includes(keyword) ||
-        item.gia.toString().includes(keyword) ||
-        item.soLuong.toString().includes(keyword)
-    )
-})
-
-const filteredSanPhams = computed(() => {
-    if (!searchSanPhamKeyword.value.trim()) {
-        return sanPhams.value
-    }
-    
-    const keyword = searchSanPhamKeyword.value.toLowerCase()
-    return sanPhams.value.filter(item => 
-        item.id.toString().includes(keyword) ||
-        item.maSanPham?.toLowerCase().includes(keyword) ||
         item.tenSanPham?.toLowerCase().includes(keyword) ||
-        item.thuongHieu?.tenThuongHieu?.toLowerCase().includes(keyword) ||
-        item.danhMuc?.tenDanhMuc?.toLowerCase().includes(keyword) ||
-        item.chatLieu?.tenChatLieu?.toLowerCase().includes(keyword)
+        item.trangThaiHoaDon?.toLowerCase().includes(keyword) ||
+        item.giaBan.toString().includes(keyword) ||
+        item.soLuong.toString().includes(keyword)
     )
 })
 
 // Statistics
 const totalRevenue = computed(() => {
-    return hoaDons.value.reduce((sum, hd) => sum + (hd.tongTien || 0), 0)
-})
-
-const totalProducts = computed(() => {
-    return sanPhams.value.length
+    return hoaDons.value
+        .filter(hd => hd.trangThaiHoaDon === 'COMPLETED')
+        .reduce((sum, hd) => sum + (hd.tongTien || 0), 0)
 })
 
 const completedInvoices = computed(() => {
-    return hoaDons.value.filter(hd => hd.trangThaiHoaDon === 'Hoàn thành').length
+    return hoaDons.value.filter(hd => 
+        hd.trangThaiHoaDon === 'COMPLETED' || 
+        hd.trangThaiHoaDon?.toLowerCase().includes('hoàn thành')
+    ).length
+})
+
+const pendingInvoices = computed(() => {
+    return hoaDons.value.filter(hd => 
+        hd.trangThaiHoaDon === 'PENDING' || 
+        hd.trangThaiHoaDon?.toLowerCase().includes('chờ')
+    ).length
 })
 
 // Watch for filter changes
@@ -744,47 +632,142 @@ async function fetchAllData() {
     
     try {
         loadingMessage.value = 'Đang tải danh sách hóa đơn...'
+        
+        // Gọi API theo endpoint chính xác
+        console.log(`Gọi API: ${API_ENDPOINTS.hoaDon}`)
         const data = await fetchWithErrorHandling(API_ENDPOINTS.hoaDon)
+        
         hoaDons.value = data
+        console.log('Dữ liệu hóa đơn nhận được:', data)
         
         showToast('success', 'Thành công', `Đã tải ${data.length} hóa đơn từ API`)
+        
     } catch (error) {
+        console.error('Lỗi khi gọi API:', error)
         hasError.value = true
         errorMessage.value = `Không thể kết nối đến API: ${error.message}`
         showToast('error', 'Lỗi kết nối', 'Không thể tải dữ liệu từ server')
+        
+        // Fallback to sample data để test UI
+        hoaDons.value = createSampleData()
+        showToast('info', 'Dữ liệu mẫu', 'Hiển thị dữ liệu mẫu để demo')
     } finally {
         isLoading.value = false
         loadingMessage.value = ''
     }
 }
 
+// Tạo dữ liệu mẫu để test
+function createSampleData() {
+    return [
+        {
+            id: 1,
+            maHoaDon: 'HD001',
+            tenKhachHang: 'Nguyễn Văn A',
+            sdt: '0912345671',
+            email: 'user1@example.com',
+            tongTien: 2400000,
+            trangThaiHoaDon: 'COMPLETED',
+            ngayTao: '2025-06-27T11:10:00.000Z',
+            loaiHoaDon: 'ONLINE'
+        },
+        {
+            id: 2,
+            maHoaDon: 'HD002',
+            tenKhachHang: 'Trần Văn B',
+            sdt: '0912345672',
+            email: 'user2@example.com',
+            tongTien: 900000,
+            trangThaiHoaDon: 'PENDING',
+            ngayTao: '2025-06-27T11:10:00.000Z',
+            loaiHoaDon: 'ONLINE'
+        },
+        {
+            id: 3,
+            maHoaDon: 'HD003',
+            tenKhachHang: 'Lê Văn C',
+            sdt: '0912345673',
+            email: 'user3@example.com',
+            tongTien: 2100000,
+            trangThaiHoaDon: 'SHIPPED',
+            ngayTao: '2025-06-27T11:10:00.000Z',
+            loaiHoaDon: 'ONLINE'
+        },
+        {
+            id: 4,
+            maHoaDon: 'HD004',
+            tenKhachHang: 'Phạm Văn D',
+            sdt: '0912345674',
+            email: 'user4@example.com',
+            tongTien: 1200000,
+            trangThaiHoaDon: 'COMPLETED',
+            ngayTao: '2025-06-27T11:10:00.000Z',
+            loaiHoaDon: 'OFFLINE'
+        },
+        {
+            id: 5,
+            maHoaDon: 'HD005',
+            tenKhachHang: 'Ngô Văn E',
+            sdt: '0912345675',
+            email: 'user5@example.com',
+            tongTien: 800000,
+            trangThaiHoaDon: 'PENDING',
+            ngayTao: '2025-06-27T11:10:00.000Z',
+            loaiHoaDon: 'ONLINE'
+        }
+    ]
+}
+
+// Fetch chi tiết hóa đơn theo Controller của bạn
 async function fetchChiTietHoaDon(hoaDonId) {
     isLoadingChiTiet.value = true
     try {
-        const data = await fetchWithErrorHandling(`${API_ENDPOINTS.hoaDonChiTiet}/hoa-don/${hoaDonId}`)
+        // API endpoint chính xác: /hoa-don-chi-tiet/by-hoa-don/{hoaDonId}
+        const endpoint = `${API_ENDPOINTS.hoaDonChiTiet}/by-hoa-don/${hoaDonId}`
+        console.log(`Gọi API chi tiết: ${endpoint}`)
+        
+        const data = await fetchWithErrorHandling(endpoint)
         hoaDonChiTiets.value = data
+        console.log('Chi tiết hóa đơn nhận được:', data)
+        
+        if (data.length === 0) {
+            showToast('info', 'Thông báo', 'Hóa đơn này không có chi tiết sản phẩm')
+        }
+        
     } catch (error) {
         console.error('Error fetching chi tiet:', error)
-        hoaDonChiTiets.value = []
-        showToast('error', 'Lỗi', 'Không thể tải chi tiết hóa đơn')
+        // Tạo dữ liệu mẫu nếu API lỗi
+        hoaDonChiTiets.value = createSampleChiTietData(hoaDonId)
+        showToast('warning', 'Dữ liệu mẫu', 'Không thể tải chi tiết, hiển thị dữ liệu mẫu')
     } finally {
         isLoadingChiTiet.value = false
     }
 }
 
-async function fetchSanPhamByHoaDon(hoaDonId) {
-    isLoadingSanPham.value = true
+// Thêm function search hóa đơn (tùy chọn)
+async function searchHoaDon(keyword) {
+    if (!keyword.trim()) {
+        await fetchAllData()
+        return
+    }
+    
+    isLoading.value = true
     try {
-        const data = await fetchWithErrorHandling(`${API_ENDPOINTS.sanPham}/hoa-don/${hoaDonId}`)
-        sanPhams.value = data
+        const endpoint = `${API_ENDPOINTS.hoaDonSearch}?keyword=${encodeURIComponent(keyword)}`
+        console.log(`Tìm kiếm: ${endpoint}`)
+        
+        const data = await fetchWithErrorHandling(endpoint)
+        hoaDons.value = data
+        
+        showToast('success', 'Tìm kiếm', `Tìm thấy ${data.length} kết quả`)
     } catch (error) {
-        console.error('Error fetching san pham:', error)
-        sanPhams.value = []
-        showToast('error', 'Lỗi', 'Không thể tải danh sách sản phẩm')
+        console.error('Error searching:', error)
+        showToast('error', 'Lỗi tìm kiếm', 'Không thể tìm kiếm')
     } finally {
-        isLoadingSanPham.value = false
+        isLoading.value = false
     }
 }
+
 
 // Event handlers
 async function refreshAllData() {
@@ -800,22 +783,16 @@ async function viewChiTiet(hoaDon) {
     selectedHoaDon.value = hoaDon
     showChiTietDialog.value = true
     searchChiTietKeyword.value = ''
-    searchSanPhamKeyword.value = ''
     
-    // Fetch both chi tiet and san pham data
-    await Promise.all([
-        fetchChiTietHoaDon(hoaDon.id),
-        fetchSanPhamByHoaDon(hoaDon.id)
-    ])
+    // Fetch chi tiết hóa đơn
+    await fetchChiTietHoaDon(hoaDon.id)
 }
 
 function closeChiTietDialog() {
     showChiTietDialog.value = false
     selectedHoaDon.value = null
     hoaDonChiTiets.value = []
-    sanPhams.value = []
     searchChiTietKeyword.value = ''
-    searchSanPhamKeyword.value = ''
 }
 
 // Search and filter functions
@@ -824,6 +801,15 @@ function onSearch() {
     clearTimeout(searchTimeout)
     searchTimeout = setTimeout(() => {
         currentPage.value = 1
+        // Có thể sử dụng API search hoặc filter local
+        const keyword = searchKeyword.value.trim()
+        if (keyword) {
+            // Tùy chọn: Gọi API search
+            // searchHoaDon(keyword)
+            
+            // Hoặc filter local (như hiện tại)
+            // Không cần làm gì thêm vì computed filteredHoaDons đã handle
+        }
     }, 300)
 }
 
@@ -859,13 +845,13 @@ function nextPage() {
     }
 }
 
-// Calculation functions
+// Calculation functions theo HoaDonChiTietDTO
 function getTotalQuantity() {
     return filteredChiTiets.value.reduce((sum, item) => sum + item.soLuong, 0)
 }
 
 function getTotalAmount() {
-    return filteredChiTiets.value.reduce((sum, item) => sum + (item.gia * item.soLuong), 0)
+    return filteredChiTiets.value.reduce((sum, item) => sum + (item.giaBan * item.soLuong), 0)
 }
 
 // Export functions
@@ -923,14 +909,6 @@ function exportData() {
         console.error('Error exporting data:', error)
         showToast('error', 'Lỗi xuất dữ liệu', 'Có lỗi xảy ra khi xuất file')
     }
-}
-
-function exportChiTietPDF() {
-    showToast('info', 'Thông báo', 'Chức năng xuất PDF đang được phát triển')
-}
-
-function printInvoice() {
-    showToast('info', 'Thông báo', 'Chức năng in hóa đơn đang được phát triển')
 }
 
 // Toast functions
@@ -1005,18 +983,42 @@ function getInitials(name) {
         .slice(0, 2)
 }
 
-function getProductInitials(name) {
-    if (!name) return 'SP'
-    return name
-        .split(' ')
-        .map((word) => word.charAt(0))
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-}
-
 function getStatusLabel(status) {
-    return status || 'Không xác định'
+    if (!status) return 'Không xác định'
+    
+    // Mapping trạng thái từ tiếng Anh sang tiếng Việt
+    const statusMap = {
+        'COMPLETED': 'Hoàn thành',
+        'PENDING': 'Chờ xử lý', 
+        'SHIPPED': 'Đang giao',
+        'CANCELLED': 'Đã hủy',
+        'CONFIRMED': 'Đã xác nhận',
+        'PROCESSING': 'Đang xử lý',
+        'DELIVERED': 'Đã giao',
+        'RETURNED': 'Đã trả hàng',
+        'REFUNDED': 'Đã hoàn tiền'
+    }
+    
+    // Tìm exact match trước
+    if (statusMap[status.toUpperCase()]) {
+        return statusMap[status.toUpperCase()]
+    }
+    
+    // Nếu không có exact match, kiểm tra contains
+    const statusLower = status.toLowerCase()
+    if (statusLower.includes('completed') || statusLower.includes('hoàn thành')) {
+        return 'Hoàn thành'
+    } else if (statusLower.includes('pending') || statusLower.includes('chờ')) {
+        return 'Chờ xử lý'
+    } else if (statusLower.includes('shipped') || statusLower.includes('shipping') || statusLower.includes('giao')) {
+        return 'Đang giao'
+    } else if (statusLower.includes('cancelled') || statusLower.includes('hủy')) {
+        return 'Đã hủy'
+    } else if (statusLower.includes('confirmed') || statusLower.includes('xác nhận')) {
+        return 'Đã xác nhận'
+    } else {
+        return status // Trả về nguyên gốc nếu không match
+    }
 }
 
 function getStatusClass(status) {
@@ -1028,7 +1030,7 @@ function getStatusClass(status) {
         return 'bg-yellow-100 text-yellow-800'
     } else if (statusLower.includes('xác nhận') || statusLower.includes('confirmed')) {
         return 'bg-blue-100 text-blue-800'
-    } else if (statusLower.includes('giao') || statusLower.includes('shipping')) {
+    } else if (statusLower.includes('giao') || statusLower.includes('shipping') || statusLower.includes('shipped')) {
         return 'bg-purple-100 text-purple-800'
     } else if (statusLower.includes('hoàn thành') || statusLower.includes('completed')) {
         return 'bg-green-100 text-green-800'
@@ -1044,13 +1046,35 @@ function getChiTietStatusClass(status) {
     
     const statusLower = status.toString().toLowerCase()
     
-    if (statusLower.includes('active') || statusLower.includes('hoạt động')) {
+    if (statusLower.includes('completed') || statusLower.includes('hoàn thành')) {
         return 'bg-green-100 text-green-800'
-    } else if (statusLower.includes('inactive') || statusLower.includes('ngừng')) {
+    } else if (statusLower.includes('pending') || statusLower.includes('chờ')) {
+        return 'bg-yellow-100 text-yellow-800'
+    } else if (statusLower.includes('shipped') || statusLower.includes('giao')) {
+        return 'bg-blue-100 text-blue-800'
+    } else if (statusLower.includes('cancelled') || statusLower.includes('hủy')) {
         return 'bg-red-100 text-red-800'
     } else {
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-gray-100 text-gray-800'
     }
+}
+
+// Thêm function để hiển thị trạng thái chi tiết bằng tiếng Việt
+function getChiTietStatusLabel(status) {
+    if (!status) return 'Không xác định'
+    
+    const statusMap = {
+        'COMPLETED': 'Hoàn thành',
+        'PENDING': 'Chờ xử lý',
+        'SHIPPED': 'Đang giao', 
+        'CANCELLED': 'Đã hủy',
+        'CONFIRMED': 'Đã xác nhận',
+        'PROCESSING': 'Đang xử lý',
+        'DELIVERED': 'Đã giao',
+        'RETURNED': 'Đã trả hàng'
+    }
+    
+    return statusMap[status.toUpperCase()] || status
 }
 
 function getStatusIcon(status) {
@@ -1062,15 +1086,13 @@ function getStatusIcon(status) {
         return 'pi pi-clock'
     } else if (statusLower.includes('xác nhận') || statusLower.includes('confirmed')) {
         return 'pi pi-check-circle'
-    } else if (statusLower.includes('giao') || statusLower.includes('shipping')) {
+    } else if (statusLower.includes('giao') || statusLower.includes('shipping') || statusLower.includes('shipped')) {
         return 'pi pi-truck'
     } else if (statusLower.includes('hoàn thành') || statusLower.includes('completed')) {
         return 'pi pi-verified'
     } else if (statusLower.includes('hủy') || statusLower.includes('cancelled')) {
         return 'pi pi-times-circle'
-    } else {
-        return 'pi pi-info-circle'
-    }
+}
 }
 </script>
 
@@ -1128,6 +1150,10 @@ function getStatusIcon(status) {
 }
 
 @media (min-width: 1024px) {
+    .lg\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    
     .lg\:grid-cols-3 {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -1170,5 +1196,144 @@ function getStatusIcon(status) {
 
 .min-w-64 {
     min-width: 16rem;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Loading animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Hover effects */
+.hover\:bg-gray-50:hover {
+    background-color: rgb(249 250 251);
+}
+
+.hover\:bg-gray-100:hover {
+    background-color: rgb(243 244 246);
+}
+
+.hover\:bg-blue-600:hover {
+    background-color: rgb(37 99 235);
+}
+
+.hover\:bg-green-600:hover {
+    background-color: rgb(22 163 74);
+}
+
+.hover\:bg-red-600:hover {
+    background-color: rgb(220 38 38);
+}
+
+.hover\:bg-gray-600:hover {
+    background-color: rgb(75 85 99);
+}
+
+/* Focus states */
+.focus\:ring-2:focus {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.focus\:ring-blue-500:focus {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+.focus\:border-blue-500:focus {
+    border-color: rgb(59 130 246);
+}
+
+/* Disabled states */
+.disabled\:opacity-50:disabled {
+    opacity: 0.5;
+}
+
+.disabled\:cursor-not-allowed:disabled {
+    cursor: not-allowed;
+}
+
+/* Custom utility classes */
+.text-xs {
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+
+.text-lg {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+}
+
+.text-xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+    line-height: 2rem;
+}
+
+.font-medium {
+    font-weight: 500;
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.rounded-lg {
+    border-radius: 0.5rem;
+}
+
+.rounded-xl {
+    border-radius: 0.75rem;
+}
+
+.rounded-full {
+    border-radius: 9999px;
+}
+
+.shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.shadow-2xl {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 </style>

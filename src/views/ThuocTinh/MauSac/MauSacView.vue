@@ -147,8 +147,21 @@ async function fetchData() {
     }
 }
 
+function createId() {
+        let id = '';
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 8; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return 'MS' + id;
+    }
+
 function openNew() {
-    mauSac.value = { trangThai: 1 };
+    mauSac.value = { 
+        maMauSac: createId(),
+        tenMauSac: '',
+        trangThai: 1 
+    };
     submitted.value = false;
     mauSacDialog.value = true;
 }
@@ -172,6 +185,7 @@ async function saveMauSac() {
                     life: 3000
                 });
             } else {
+                mauSac.value.maMauSac = mauSac.value.maMauSac || createId();
                 await axios.post('http://localhost:8080/mau-sac', mauSac.value);
                 toast.add({
                     severity: 'success',

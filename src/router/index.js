@@ -180,7 +180,7 @@ const router = createRouter({
                 {
                     name: 'HinhAnh',
                     path: '/hinh-anh',
-                    component: () => import('@/views/ThuocTinh/ImageManagement.vue')
+                    component: () => import('@/views/HinhAnh/HinhAnhView.vue')
                 },
                 {
                     name: 'TaiKhoan',

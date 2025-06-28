@@ -238,9 +238,17 @@ function formatDate(date) {
   });
 }
 
+function createId() {
+  let id = '';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 8; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return 'V' + id;
+}
 function openNew() {
   voucher.value = {
-    maVoucher: '',
+    maVoucher: createId(),
     tenVoucher: '',
     duongDanHinhAnh: '',
     loaiGiamGia: null,
@@ -277,15 +285,15 @@ async function saveVoucher() {
     toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Loại giảm giá là bắt buộc', life: 3000 });
     return;
   }
-  if (voucher.value.giaTriGiamToiThieu == null || voucher.value.giaTriGiamToiThieu < 0) {
+  if (!voucher.value.giaTriGiamToiThieu  || voucher.value.giaTriGiamToiThieu < 0) {
     toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá trị giảm tối thiểu không hợp lệ', life: 3000 });
     return;
   }
-  if (voucher.value.giaTriGiamToiDa == null || voucher.value.giaTriGiamToiDa < 0) {
+  if (!voucher.value.giaTriGiamToiDa || voucher.value.giaTriGiamToiDa < 0) {
     toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá trị giảm tối đa không hợp lệ', life: 3000 });
     return;
   }
-  if (voucher.value.soLuong == null || voucher.value.soLuong < 0) {
+  if (!voucher.value.soLuong || voucher.value.soLuong < 0) {
     toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Số lượng không hợp lệ', life: 3000 });
     return;
   }
@@ -297,6 +305,18 @@ async function saveVoucher() {
     toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Ngày kết thúc là bắt buộc', life: 3000 });
     return;
   }
+  
+  // Validation: Kiểm tra ngày bắt đầu phải trước ngày kết thúc
+  if (new Date(voucher.value.ngayBatDau) >= new Date(voucher.value.ngayKetThuc)) {
+    toast.add({ 
+      severity: 'warn', 
+      summary: 'Cảnh báo', 
+      detail: 'Ngày bắt đầu phải trước ngày kết thúc', 
+      life: 3000 
+    });
+    return;
+  }
+  
   if (voucher.value.trangThai == null) {
     toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Trạng thái là bắt buộc', life: 3000 });
     return;
@@ -319,6 +339,7 @@ async function saveVoucher() {
         life: 3000
       });
     } else {
+      voucherData.maVoucher = voucherData.maVoucher || createId();
       await axios.post('http://localhost:8080/voucher', voucherData);
       toast.add({
         severity: 'success',
@@ -343,7 +364,6 @@ async function saveVoucher() {
     submitted.value = false;
   }
 }
-
 function editVoucher(vouch) {
   voucher.value = {
     ...vouch,

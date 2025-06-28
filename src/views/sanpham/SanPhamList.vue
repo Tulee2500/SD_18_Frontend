@@ -138,7 +138,7 @@ async function loadProductDetails(productId) {
             ...detail,
             size: detail.kichCo?.tenKichCo || 'N/A',
             color: detail.mauSac?.tenMauSac || 'N/A',
-            giaNhap: detail.giaNhap || 0.0,
+            giaGoc: detail.giaGoc || 0.0,
             giaBan: detail.giaBan || 0.0,
             images: [],
             createdAt: detail.ngayTao ? new Date(detail.ngayTao).toLocaleDateString('vi-VN') : 'N/A'
@@ -402,7 +402,7 @@ function openNewDetail(productId) {
     detail.value = {
         maChiTiet: createId(),
         soLuong: 0,
-        giaNhap: 0.0,
+        giaGoc: 0.0,
         giaBan: 0.0,
         trangThai: 1,
         mauSac: null,
@@ -418,7 +418,7 @@ function editDetail(detailData, productId) {
         id: detailData.id,
         maChiTiet: detailData.maChiTiet,
         soLuong: Math.max(0, detailData.soLuong || 0), // Đảm bảo không âm
-        giaNhap: Math.max(0, detailData.giaNhap || 0), // Đảm bảo không âm
+        giaGoc: Math.max(0, detailData.giaGoc || 0), // Đảm bảo không âm
         giaBan: Math.max(0, detailData.giaBan || 0), // Đảm bảo không âm
         trangThai: detailData.trangThai,
         mauSac: detailData.mauSac,
@@ -472,7 +472,7 @@ async function saveDetail() {
     }
     
     // Validate giá nhập
-    if (detail.value.giaNhap == null || detail.value.giaNhap === '' || detail.value.giaNhap < 0) {
+    if (detail.value.giaGoc == null || detail.value.giaGoc === '' || detail.value.giaGoc < 0) {
         toast.add({ 
             severity: 'warn', 
             summary: 'Cảnh báo', 
@@ -509,7 +509,7 @@ async function saveDetail() {
         const detailData = {
             maChiTiet: detail.value.maChiTiet,
             soLuong: Math.max(0, detail.value.soLuong || 0), // Đảm bảo không âm
-            giaNhap: Math.max(0, detail.value.giaNhap || 0), // Đảm bảo không âm
+            giaGoc: Math.max(0, detail.value.giaGoc || 0), // Đảm bảo không âm
             giaBan: Math.max(0, detail.value.giaBan || 0), // Đảm bảo không âm
             trangThai: detail.value.trangThai,
             mauSac: detail.value.mauSac,
@@ -797,9 +797,9 @@ function collapseAll() {
                             <Column field="size" header="Kích cỡ" sortable style="min-width: 8rem"></Column>
                             <Column field="color" header="Màu sắc" sortable style="min-width: 8rem"></Column>
                             <Column field="soLuong" header="Số lượng" sortable style="min-width: 8rem"></Column>
-                            <Column field="giaNhap" header="Giá nhập" sortable style="min-width: 10rem">
+                            <Column field="giaGoc" header="Giá nhập" sortable style="min-width: 10rem">
                                 <template #body="detailProps">
-                                    {{ formatCurrency(detailProps.data.giaNhap) }}
+                                    {{ formatCurrency(detailProps.data.giaGoc) }}
                                 </template>
                             </Column>
                             <Column field="giaBan" header="Giá bán" sortable style="min-width: 10rem">
@@ -861,11 +861,11 @@ function collapseAll() {
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
                         <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="product.soLuong" integeronly fluid placeholder="0" :min="0" />
-                        <small v-if="submitted && (product.soLuong == null || product.soLuong <= 0)" class="text-red-500">Số lượng không hợp lệ.</small>
-                         <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500">
+                        <small v-if="submitted && (product.soLuong <= 0)" class="text-red-500">Số lượng không hợp lệ.</small>
+                        <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500">
                             Số lượng là bắt buộc.
                         </small>
-                        <small v-else-if="submitted && product.soLuong < 0" class="text-red-500">
+                        <small v-else-if="submitted && product.soLuong <= 0" class="text-red-500">
                             Số lượng không được âm.
                         </small>
             
@@ -923,24 +923,22 @@ function collapseAll() {
                         <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
                         <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
-                        <small v-if="submitted && (detail.soLuong == null || detail.soLuong < 0)" class="text-red-500">Số lượng không hợp lệ.</small>
+                        <small v-if="submitted && (detail.soLuong == null || detail.soLuong <= 0)" class="text-red-500">Số lượng không hợp lệ.</small>
                         <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500">
                             Số lượng là bắt buộc.
                         </small>
                         <small v-else-if="submitted && product.soLuong < 0" class="text-red-500">
                             Số lượng không được âm.
                         </small>
-                        <small v-else class="text-gray-500">
-                            Nhập số nguyên không âm
-                        </small>
+                        
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="giaNhap" class="block font-bold mb-3">Giá nhập *</label>
-                        <InputText id="giaNhap" v-model.number="detail.giaNhap" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaNhap == null || detail.giaNhap < 0)" />
-                        <small v-if="submitted && (detail.giaNhap == null || detail.giaNhap < 0)" class="text-red-500">Giá nhập phải là số không âm.</small>
+                        <label for="giaGoc" class="block font-bold mb-3">Giá nhập *</label>
+                        <InputText id="giaGoc" v-model.number="detail.giaGoc" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaGoc == null || detail.giaGoc < 0)" />
+                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc < 0)" class="text-red-500">Giá nhập phải là số không âm.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="giaBan" class="block font-bold mb-3">Giá bán *</label>
