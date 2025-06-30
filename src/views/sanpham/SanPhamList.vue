@@ -1,8 +1,8 @@
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
+import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
-import axios from 'axios';
 
 // Cấu hình API base URL
 const API_BASE_URL = 'http://localhost:8080';
@@ -133,7 +133,8 @@ async function loadMauSacs() {
 async function loadProductDetails(productId) {
     loadingDetails.value[productId] = true;
     try {
-        const response = await axios.get(`${API_BASE_URL}/san-pham-chi-tiet/san-pham/${productId}`);
+        // SỬA: Thêm /api prefix
+        const response = await axios.get(`${API_BASE_URL}/api/san-pham-chi-tiet/san-pham/${productId}`);
         productDetails.value[productId] = response.data.map((detail) => ({
             ...detail,
             size: detail.kichCo?.tenKichCo || 'N/A',
@@ -231,7 +232,7 @@ function editProduct(prod) {
         deGiay: prod.deGiay,
         ngayTao: prod.ngayTao
     };
-    
+
     // Reset validation state
     submitted.value = false;
     productDialog.value = true;
@@ -239,73 +240,73 @@ function editProduct(prod) {
 
 async function saveProduct() {
     submitted.value = true;
-    
+
     // Validate tên sản phẩm
     if (!product.value.tenSanPham?.trim()) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Tên sản phẩm là bắt buộc', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Tên sản phẩm là bắt buộc',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate số lượng - phải là số không âm
     if (product.value.soLuong == null || product.value.soLuong === '' || product.value.soLuong <= 0) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Số lượng phải là số không âm', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Số lượng phải là số không âm',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate danh mục
     if (!product.value.danhMuc) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Danh mục là bắt buộc', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Danh mục là bắt buộc',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate thương hiệu
     if (!product.value.thuongHieu) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Thương hiệu là bắt buộc', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Thương hiệu là bắt buộc',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate chất liệu
     if (!product.value.chatLieu) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Chất liệu là bắt buộc', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Chất liệu là bắt buộc',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate đế giày
     if (!product.value.deGiay) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Đế giày là bắt buộc', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Đế giày là bắt buộc',
+            life: 3000
         });
         return;
     }
-    
+
     try {
         loading.value = true;
         const productData = {
@@ -317,38 +318,38 @@ async function saveProduct() {
             thuongHieu: product.value.thuongHieu,
             chatLieu: product.value.chatLieu,
             deGiay: product.value.deGiay,
-            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find(p => p.id === product.value.id)?.ngayTao : new Date().toISOString())
+            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find((p) => p.id === product.value.id)?.ngayTao : new Date().toISOString())
         };
-        
+
         if (product.value.id) {
             await axios.put(`${API_BASE_URL}/api/san-pham/update/${product.value.id}`, productData);
-            toast.add({ 
-                severity: 'success', 
-                summary: 'Thành công', 
-                detail: `Đã cập nhật sản phẩm "${product.value.tenSanPham}"`, 
-                life: 3000 
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã cập nhật sản phẩm "${product.value.tenSanPham}"`,
+                life: 3000
             });
         } else {
             await axios.post(`${API_BASE_URL}/api/san-pham/save`, productData);
-            toast.add({ 
-                severity: 'success', 
-                summary: 'Thành công', 
-                detail: `Đã thêm sản phẩm "${product.value.tenSanPham}"`, 
-                life: 3000 
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã thêm sản phẩm "${product.value.tenSanPham}"`,
+                life: 3000
             });
         }
-        
+
         await loadProducts();
         productDialog.value = false;
         product.value = {};
         submitted.value = false;
     } catch (error) {
         console.error('Lỗi khi lưu sản phẩm:', error.response?.status, error.response?.data);
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi', 
-            detail: `Không thể lưu sản phẩm: ${error.response?.data?.message || error.message}`, 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: `Không thể lưu sản phẩm: ${error.response?.data?.message || error.message}`,
+            life: 3000
         });
     } finally {
         loading.value = false;
@@ -412,7 +413,7 @@ function openNewDetail(productId) {
     submitted.value = false;
     detailDialog.value = true;
 }
-//  Câp nhập chi tiet sản phẩm 
+//  Câp nhập chi tiet sản phẩm
 function editDetail(detailData, productId) {
     detail.value = {
         id: detailData.id,
@@ -425,127 +426,129 @@ function editDetail(detailData, productId) {
         kichCo: detailData.kichCo,
         sanPham: { id: productId }
     };
-    
+
     // Reset validation state
     submitted.value = false;
     detailDialog.value = true;
-    }
+}
 function hideDetailDialog() {
     detailDialog.value = false;
     submitted.value = false;
 }
-// Check trống 
+// Check trống
 async function saveDetail() {
     submitted.value = true;
-    
+
     // Validate mã chi tiết
     if (!detail.value.maChiTiet?.trim()) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Mã chi tiết là bắt buộc', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Mã chi tiết là bắt buộc',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate số lượng - phải là số không âm
     if (detail.value.soLuong == null || detail.value.soLuong === '' || detail.value.soLuong <= 0) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Số lượng phải là số không âm', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Số lượng phải là số không âm',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate giá bán
     if (detail.value.giaBan == null || detail.value.giaBan === '' || detail.value.giaBan < 0) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Giá bán phải là số không âm', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Giá bán phải là số không âm',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate giá nhập
     if (detail.value.giaGoc == null || detail.value.giaGoc === '' || detail.value.giaGoc < 0) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Giá nhập phải là số không âm', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Giá Gốc phải là số không âm',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate màu sắc
     if (!detail.value.mauSac) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Màu sắc là bắt buộc', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Màu sắc là bắt buộc',
+            life: 3000
         });
         return;
     }
-    
+
     // Validate kích cỡ
     if (!detail.value.kichCo) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Kích cỡ là bắt buộc', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Kích cỡ là bắt buộc',
+            life: 3000
         });
         return;
     }
-    
+
     try {
         loading.value = true;
         const detailData = {
             maChiTiet: detail.value.maChiTiet,
-            soLuong: Math.max(0, detail.value.soLuong || 0), // Đảm bảo không âm
-            giaGoc: Math.max(0, detail.value.giaGoc || 0), // Đảm bảo không âm
-            giaBan: Math.max(0, detail.value.giaBan || 0), // Đảm bảo không âm
+            soLuong: Math.max(0, detail.value.soLuong || 0),
+            giaGoc: Math.max(0, detail.value.giaGoc || 0),
+            giaBan: Math.max(0, detail.value.giaBan || 0),
             trangThai: detail.value.trangThai,
             mauSac: detail.value.mauSac,
             kichCo: detail.value.kichCo,
             sanPham: detail.value.sanPham
         };
-        
+
         if (detail.value.id) {
-            await axios.put(`${API_BASE_URL}/san-pham-chi-tiet/update/${detail.value.id}`, detailData);
-            toast.add({ 
-                severity: 'success', 
-                summary: 'Thành công', 
-                detail: `Đã cập nhật chi tiết sản phẩm "${detail.value.maChiTiet}"`, 
-                life: 3000 
+            // SỬA: Thêm /api prefix
+            await axios.put(`${API_BASE_URL}/api/san-pham-chi-tiet/update/${detail.value.id}`, detailData);
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã cập nhật chi tiết sản phẩm "${detail.value.maChiTiet}"`,
+                life: 3000
             });
         } else {
-            await axios.post(`${API_BASE_URL}/san-pham-chi-tiet/save`, detailData);
-            toast.add({ 
-                severity: 'success', 
-                summary: 'Thành công', 
-                detail: `Đã thêm chi tiết sản phẩm "${detail.value.maChiTiet}"`, 
-                life: 3000 
+            // SỬA: Thêm /api prefix
+            await axios.post(`${API_BASE_URL}/api/san-pham-chi-tiet/save`, detailData);
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã thêm chi tiết sản phẩm "${detail.value.maChiTiet}"`,
+                life: 3000
             });
         }
-        
+
         await loadProductDetails(detail.value.sanPham.id);
         detailDialog.value = false;
         detail.value = {};
         submitted.value = false;
     } catch (error) {
         console.error('Lỗi khi lưu chi tiết sản phẩm:', error.response?.status, error.response?.data);
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi', 
-            detail: `Không thể lưu chi tiết sản phẩm: ${error.response?.data?.message || error.message}`, 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: `Không thể lưu chi tiết sản phẩm: ${error.response?.data?.message || error.message}`,
+            life: 3000
         });
     } finally {
         loading.value = false;
@@ -560,7 +563,8 @@ function confirmDeleteDetail(detailData) {
 async function deleteDetail() {
     try {
         loading.value = true;
-        await axios.delete(`${API_BASE_URL}/san-pham-chi-tiet/delete/${detail.value.id}`);
+        // SỬA: Thêm /api prefix
+        await axios.delete(`${API_BASE_URL}/api/san-pham-chi-tiet/delete/${detail.value.id}`);
         toast.add({ severity: 'success', summary: 'Đã xóa', detail: `Chi tiết sản phẩm "${detail.value.maChiTiet}" đã được xóa`, life: 3000 });
         await loadProductDetails(detail.value.sanPham.id);
         deleteDetailDialog.value = false;
@@ -599,10 +603,10 @@ function exportCSV() {
         }
 
         // Create CSV headers with Vietnamese labels
-        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
+        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm', 'Số Lượng', 'Danh Mục', 'Thương Hiệu', 'Chất Liệu', 'Đế Giày', 'Trạng Thái', 'Ngày Tạo'];
 
         // Convert data to CSV format
-        const csvData = products.value.map(item => {
+        const csvData = products.value.map((item) => {
             return [
                 item.id || '',
                 item.maSanPham || '',
@@ -619,14 +623,18 @@ function exportCSV() {
 
         // Combine headers and data
         const csvContent = [headers, ...csvData]
-            .map(row => row.map(field => {
-                // Handle fields that might contain commas or quotes
-                const stringField = String(field);
-                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                    return `"${stringField.replace(/"/g, '""')}"`;
-                }
-                return stringField;
-            }).join(','))
+            .map((row) =>
+                row
+                    .map((field) => {
+                        // Handle fields that might contain commas or quotes
+                        const stringField = String(field);
+                        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                            return `"${stringField.replace(/"/g, '""')}"`;
+                        }
+                        return stringField;
+                    })
+                    .join(',')
+            )
             .join('\n');
 
         // Add BOM for proper UTF-8 encoding in Excel
@@ -636,11 +644,11 @@ function exportCSV() {
         // Create and download file
         const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        
+
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            
+
             // Generate filename with current date
             const now = new Date();
             const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
@@ -651,7 +659,7 @@ function exportCSV() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
+
             // Show success message
             toast.add({
                 severity: 'success',
@@ -723,12 +731,12 @@ function collapseAll() {
                 tableStyle="min-width: 60rem"
             >
                 <template #header>
-                    <div class="flex flex-wrap gap-2 items-center justify-between">
-                        <div class="flex gap-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <!-- <div class="flex gap-2">
                             <h4 class="m-0">Quản lý Sản phẩm</h4>
                             <Button text icon="pi pi-plus" label="Mở rộng tất cả" @click="expandAll" size="small" />
                             <Button text icon="pi pi-minus" label="Thu gọn tất cả" @click="collapseAll" size="small" />
-                        </div>
+                        </div> -->
                         <IconField>
                             <InputIcon>
                                 <i class="pi pi-search" />
@@ -788,7 +796,7 @@ function collapseAll() {
                 <template #expansion="slotProps">
                     <div v-if="loadingDetails[slotProps.data.id]" class="p-4 text-center"><i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i> Đang tải...</div>
                     <div v-else-if="productDetails[slotProps.data.id] && productDetails[slotProps.data.id].length" class="p-4">
-                        <div class="flex justify-between items-center mb-4">
+                        <div class="mb-4 flex items-center justify-between">
                             <h5>Chi tiết sản phẩm: {{ slotProps.data.tenSanPham }}</h5>
                             <Button label="Thêm chi tiết" icon="pi pi-plus" severity="secondary" @click="openNewDetail(slotProps.data.id)" :loading="loading" />
                         </div>
@@ -797,7 +805,7 @@ function collapseAll() {
                             <Column field="size" header="Kích cỡ" sortable style="min-width: 8rem"></Column>
                             <Column field="color" header="Màu sắc" sortable style="min-width: 8rem"></Column>
                             <Column field="soLuong" header="Số lượng" sortable style="min-width: 8rem"></Column>
-                            <Column field="giaGoc" header="Giá nhập" sortable style="min-width: 10rem">
+                            <Column field="giaGoc" header="Giá Gốc" sortable style="min-width: 10rem">
                                 <template #body="detailProps">
                                     {{ formatCurrency(detailProps.data.giaGoc) }}
                                 </template>
@@ -810,7 +818,7 @@ function collapseAll() {
                             <Column header="Hình ảnh" style="min-width: 12rem">
                                 <template #body="detailProps">
                                     <div class="flex gap-2">
-                                        <img v-for="img in detailProps.data.images" :key="img.id" :src="img.url" :alt="img.tenHinhAnh" class="w-16 h-16 object-cover rounded" />
+                                        <img v-for="img in detailProps.data.images" :key="img.id" :src="img.url" :alt="img.tenHinhAnh" class="h-16 w-16 rounded object-cover" />
                                         <span v-if="!detailProps.data.images.length">Không có hình ảnh</span>
                                     </div>
                                 </template>
@@ -846,45 +854,39 @@ function collapseAll() {
             <div class="flex flex-col gap-6">
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-8">
-                        <label for="tenSanPham" class="block font-bold mb-3">Tên sản phẩm *</label>
+                        <label for="tenSanPham" class="mb-3 block font-bold">Tên sản phẩm *</label>
                         <InputText id="tenSanPham" v-model.trim="product.tenSanPham" required="true" autofocus :invalid="submitted && !product.tenSanPham" fluid placeholder="Nhập tên sản phẩm" />
                         <small v-if="submitted && !product.tenSanPham" class="text-red-500">Tên sản phẩm là bắt buộc.</small>
                     </div>
                     <div class="col-span-4">
-                        <label for="maSanPham" class="block font-bold mb-3">Mã sản phẩm</label>
+                        <label for="maSanPham" class="mb-3 block font-bold">Mã sản phẩm</label>
                         <InputText id="maSanPham" v-model="product.maSanPham" fluid placeholder="Tự động tạo" :disabled="!!product.id" />
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-4">
-                        <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
+                        <label for="soLuong" class="mb-3 block font-bold">Số lượng</label>
                         <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="product.soLuong" integeronly fluid placeholder="0" :min="0" />
-                        <small v-if="submitted && (product.soLuong <= 0)" class="text-red-500">Số lượng không hợp lệ.</small>
-                        <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500">
-                            Số lượng là bắt buộc.
-                        </small>
-                        <small v-else-if="submitted && product.soLuong <= 0" class="text-red-500">
-                            Số lượng không được âm.
-                        </small>
-            
+                        <small v-if="submitted && product.soLuong <= 0" class="text-red-500">Số lượng không hợp lệ.</small>
+                        <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500"> Số lượng là bắt buộc. </small>
+                        <small v-else-if="submitted && product.soLuong <= 0" class="text-red-500"> Số lượng không được âm. </small>
                     </div>
                     <div class="col-span-4">
-                        <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
+                        <label for="trangThai" class="mb-3 block font-bold">Trạng thái</label>
                         <Select id="trangThai" v-model="product.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
-                        
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="danhMuc" class="block font-bold mb-3">Danh mục</label>
+                        <label for="danhMuc" class="mb-3 block font-bold">Danh mục</label>
                         <Select id="danhMuc" v-model="product.danhMuc" :options="danhMucs" optionLabel="tenDanhMuc" placeholder="Chọn danh mục" fluid />
                         <small v-if="submitted && !product.danhMuc" class="text-red-500">Danh mục là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="thuongHieu" class="block font-bold mb-3">Thương hiệu</label>
+                        <label for="thuongHieu" class="mb-3 block font-bold">Thương hiệu</label>
                         <Select id="thuongHieu" v-model="product.thuongHieu" :options="thuongHieus" optionLabel="tenThuongHieu" placeholder="Chọn thương hiệu" fluid />
                         <small v-if="submitted && !product.thuongHieu" class="text-red-500">Thương hiệu là bắt buộc.</small>
                     </div>
@@ -892,12 +894,12 @@ function collapseAll() {
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="chatLieu" class="block font-bold mb-3">Chất liệu</label>
+                        <label for="chatLieu" class="mb-3 block font-bold">Chất liệu</label>
                         <Select id="chatLieu" v-model="product.chatLieu" :options="chatLieus" optionLabel="tenChatLieu" placeholder="Chọn chất liệu" fluid />
                         <small v-if="submitted && !product.chatLieu" class="text-red-500">Chất liệu là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="deGiay" class="block font-bold mb-3">Đế giày</label>
+                        <label for="deGiay" class="mb-3 block font-bold">Đế giày</label>
                         <Select id="deGiay" v-model="product.deGiay" :options="deGiays" optionLabel="tenDeGiay" placeholder="Chọn đế giày" fluid />
                         <small v-if="submitted && !product.deGiay" class="text-red-500">Đế giày là bắt buộc.</small>
                     </div>
@@ -906,7 +908,7 @@ function collapseAll() {
 
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
-                <Button label="Lưu lại" icon="pi pi-check" @click="saveProduct"  />
+                <Button label="Lưu lại" icon="pi pi-check" @click="saveProduct" />
             </template>
         </Dialog>
 
@@ -915,33 +917,28 @@ function collapseAll() {
             <div class="flex flex-col gap-6">
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-8">
-                        <label for="maChiTiet" class="block font-bold mb-3">Mã chi tiết *</label>
+                        <label for="maChiTiet" class="mb-3 block font-bold">Mã chi tiết *</label>
                         <InputText id="maChiTiet" v-model.trim="detail.maChiTiet" required="true" autofocus :invalid="submitted && !detail.maChiTiet" fluid placeholder="Nhập mã chi tiết" />
                         <small v-if="submitted && !detail.maChiTiet" class="text-red-500">Mã chi tiết là bắt buộc.</small>
                     </div>
                     <div class="col-span-4">
-                        <label for="soLuong" class="block font-bold mb-3">Số lượng</label>
+                        <label for="soLuong" class="mb-3 block font-bold">Số lượng</label>
                         <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
                         <small v-if="submitted && (detail.soLuong == null || detail.soLuong <= 0)" class="text-red-500">Số lượng không hợp lệ.</small>
-                        <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500">
-                            Số lượng là bắt buộc.
-                        </small>
-                        <small v-else-if="submitted && product.soLuong < 0" class="text-red-500">
-                            Số lượng không được âm.
-                        </small>
-                        
+                        <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500"> Số lượng là bắt buộc. </small>
+                        <small v-else-if="submitted && product.soLuong < 0" class="text-red-500"> Số lượng không được âm. </small>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="giaGoc" class="block font-bold mb-3">Giá nhập *</label>
+                        <label for="giaGoc" class="mb-3 block font-bold">Giá Gốc *</label>
                         <InputText id="giaGoc" v-model.number="detail.giaGoc" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaGoc == null || detail.giaGoc < 0)" />
-                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc < 0)" class="text-red-500">Giá nhập phải là số không âm.</small>
+                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc < 0)" class="text-red-500">Giá Gốc phải là số không âm.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="giaBan" class="block font-bold mb-3">Giá bán *</label>
+                        <label for="giaBan" class="mb-3 block font-bold">Giá bán *</label>
                         <InputText id="giaBan" v-model.numberx="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan < 0)" />
                         <small v-if="submitted && (detail.giaBan == null || detail.giaBan < 0)" class="text-red-500">Giá bán phải là số không âm.</small>
                     </div>
@@ -949,12 +946,12 @@ function collapseAll() {
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="mauSac" class="block font-bold mb-3">Màu sắc</label>
+                        <label for="mauSac" class="mb-3 block font-bold">Màu sắc</label>
                         <Select id="mauSac" v-model="detail.mauSac" :options="mauSacs" optionLabel="tenMauSac" placeholder="Chọn màu sắc" fluid />
                         <small v-if="submitted && !detail.mauSac" class="text-red-500">Màu sắc là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="kichCo" class="block font-bold mb-3">Kích cỡ</label>
+                        <label for="kichCo" class="mb-3 block font-bold">Kích cỡ</label>
                         <Select id="kichCo" v-model="detail.kichCo" :options="kichCos" optionLabel="tenKichCo" placeholder="Chọn kích cỡ" fluid />
                         <small v-if="submitted && !detail.kichCo" class="text-red-500">Kích cỡ là bắt buộc.</small>
                     </div>
@@ -962,7 +959,7 @@ function collapseAll() {
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
+                        <label for="trangThai" class="mb-3 block font-bold">Trạng thái</label>
                         <Select id="trangThai" v-model="detail.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
                         <small v-if="submitted && !detail.trangThai" class="text-red-500">Trạng thái là bắt buộc.</small>
                     </div>
