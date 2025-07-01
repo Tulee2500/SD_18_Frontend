@@ -40,6 +40,38 @@ const statuses = ref([
     { label: 'ĐANG HOẠT ĐỘNG', value: 1 },
     { label: 'NGỪNG HOẠT ĐỘNG', value: 0 }
 ]);
+// Thêm vào phần ref declarations
+const imagePreviewDialog = ref(false);
+const selectedImageDetail = ref({});
+
+// Thêm các hàm xử lý
+function handleImageError(event) {
+    event.target.src = '/images/placeholder.png';
+    event.target.onerror = null;
+}
+
+function openImageDetail(image) {
+    selectedImageDetail.value = image;
+    imagePreviewDialog.value = true;
+}
+
+function openAllImages(detail) {
+    selectedImageDetail.value = {
+        detail: detail,
+        images: detail.images,
+        showAll: true
+    };
+    imagePreviewDialog.value = true;
+}
+
+function addImageToDetail(detail) {
+    toast.add({
+        severity: 'info',
+        summary: 'Thông báo',
+        detail: `Vui lòng vào trang quản lý hình ảnh để thêm hình cho chi tiết: ${detail.maChiTiet}`,
+        life: 5000
+    });
+}
 
 // Load dữ liệu khi component mount
 onMounted(async () => {
@@ -130,10 +162,10 @@ async function loadMauSacs() {
     }
 }
 
+// Cập nhật hàm loadProductDetails
 async function loadProductDetails(productId) {
     loadingDetails.value[productId] = true;
     try {
-        // SỬA: Thêm /api prefix
         const response = await axios.get(`${API_BASE_URL}/api/san-pham-chi-tiet/san-pham/${productId}`);
         productDetails.value[productId] = response.data.map((detail) => ({
             ...detail,
@@ -144,15 +176,18 @@ async function loadProductDetails(productId) {
             images: [],
             createdAt: detail.ngayTao ? new Date(detail.ngayTao).toLocaleDateString('vi-VN') : 'N/A'
         }));
-        // Tải hình ảnh (tùy chọn)
+
+        // Tải hình ảnh cho từng chi tiết sản phẩm
         for (const detail of productDetails.value[productId]) {
             try {
-                const imgResponse = await axios.get(`${API_BASE_URL}/hinh-anh/chi-tiet/${detail.maChiTiet}`);
+                // Sử dụng ID thay vì maChiTiet
+                const imgResponse = await axios.get(`${API_BASE_URL}/hinh-anh/chi-tiet-san-pham/${detail.id}`);
                 detail.images = imgResponse.data.map((img) => ({
                     id: img.id,
                     maHinhAnh: img.maHinhAnh,
                     tenHinhAnh: img.tenHinhAnh,
-                    url: `/images/${img.tenHinhAnh}`
+                    trangThai: img.trangThai,
+                    url: `${API_BASE_URL}/hinh-anh/images/${img.tenHinhAnh}`
                 }));
             } catch (imgError) {
                 console.error(`Lỗi khi tải hình ảnh cho chi tiết ${detail.maChiTiet}:`, imgError);
@@ -398,7 +433,7 @@ async function deleteSelectedProducts() {
     }
 }
 
-// Dialog functions for Product Details
+// Dialog functions for Product Details - Updated for multi-select
 function openNewDetail(productId) {
     detail.value = {
         maChiTiet: createId(),
@@ -406,14 +441,15 @@ function openNewDetail(productId) {
         giaGoc: 0.0,
         giaBan: 0.0,
         trangThai: 1,
-        mauSac: null,
-        kichCo: null,
+        mauSacs: [], // Chuyển thành mảng để chọn nhiều màu
+        kichCos: [], // Chuyển thành mảng để chọn nhiều kích cỡ
         sanPham: { id: productId }
     };
     submitted.value = false;
     detailDialog.value = true;
 }
-//  Câp nhập chi tiet sản phẩm
+
+//  Cập nhật chi tiết sản phẩm
 function editDetail(detailData, productId) {
     detail.value = {
         id: detailData.id,
@@ -422,8 +458,8 @@ function editDetail(detailData, productId) {
         giaGoc: Math.max(0, detailData.giaGoc || 0), // Đảm bảo không âm
         giaBan: Math.max(0, detailData.giaBan || 0), // Đảm bảo không âm
         trangThai: detailData.trangThai,
-        mauSac: detailData.mauSac,
-        kichCo: detailData.kichCo,
+        mauSacs: detailData.mauSac ? [detailData.mauSac] : [], // Chuyển single thành array để edit
+        kichCos: detailData.kichCo ? [detailData.kichCo] : [], // Chuyển single thành array để edit
         sanPham: { id: productId }
     };
 
@@ -431,11 +467,13 @@ function editDetail(detailData, productId) {
     submitted.value = false;
     detailDialog.value = true;
 }
+
 function hideDetailDialog() {
     detailDialog.value = false;
     submitted.value = false;
 }
-// Check trống
+
+// Updated saveDetail function to handle multiple variants
 async function saveDetail() {
     submitted.value = true;
 
@@ -477,29 +515,29 @@ async function saveDetail() {
         toast.add({
             severity: 'warn',
             summary: 'Cảnh báo',
-            detail: 'Giá Gốc phải là số không âm',
+            detail: 'Giá nhập phải là số không âm',
             life: 3000
         });
         return;
     }
 
     // Validate màu sắc
-    if (!detail.value.mauSac) {
+    if (!detail.value.mauSacs || detail.value.mauSacs.length === 0) {
         toast.add({
             severity: 'warn',
             summary: 'Cảnh báo',
-            detail: 'Màu sắc là bắt buộc',
+            detail: 'Phải chọn ít nhất một màu sắc',
             life: 3000
         });
         return;
     }
 
     // Validate kích cỡ
-    if (!detail.value.kichCo) {
+    if (!detail.value.kichCos || detail.value.kichCos.length === 0) {
         toast.add({
             severity: 'warn',
             summary: 'Cảnh báo',
-            detail: 'Kích cỡ là bắt buộc',
+            detail: 'Phải chọn ít nhất một kích cỡ',
             life: 3000
         });
         return;
@@ -507,19 +545,20 @@ async function saveDetail() {
 
     try {
         loading.value = true;
-        const detailData = {
-            maChiTiet: detail.value.maChiTiet,
-            soLuong: Math.max(0, detail.value.soLuong || 0),
-            giaGoc: Math.max(0, detail.value.giaGoc || 0),
-            giaBan: Math.max(0, detail.value.giaBan || 0),
-            trangThai: detail.value.trangThai,
-            mauSac: detail.value.mauSac,
-            kichCo: detail.value.kichCo,
-            sanPham: detail.value.sanPham
-        };
 
+        // Nếu là edit (có id), chỉ cập nhật một biến thể
         if (detail.value.id) {
-            // SỬA: Thêm /api prefix
+            const detailData = {
+                maChiTiet: detail.value.maChiTiet,
+                soLuong: Math.max(0, detail.value.soLuong || 0),
+                giaGoc: Math.max(0, detail.value.giaGoc || 0),
+                giaBan: Math.max(0, detail.value.giaBan || 0),
+                trangThai: detail.value.trangThai,
+                mauSac: detail.value.mauSacs[0], // Chỉ lấy màu đầu tiên khi edit
+                kichCo: detail.value.kichCos[0], // Chỉ lấy size đầu tiên khi edit
+                sanPham: detail.value.sanPham
+            };
+
             await axios.put(`${API_BASE_URL}/api/san-pham-chi-tiet/update/${detail.value.id}`, detailData);
             toast.add({
                 severity: 'success',
@@ -528,14 +567,53 @@ async function saveDetail() {
                 life: 3000
             });
         } else {
-            // SỬA: Thêm /api prefix
-            await axios.post(`${API_BASE_URL}/api/san-pham-chi-tiet/save`, detailData);
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: `Đã thêm chi tiết sản phẩm "${detail.value.maChiTiet}"`,
-                life: 3000
-            });
+            // Tạo nhiều biến thể từ combinations của màu và size
+            const variants = [];
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const mauSac of detail.value.mauSacs) {
+                for (const kichCo of detail.value.kichCos) {
+                    const variantData = {
+                        maChiTiet: `${detail.value.maChiTiet}`,
+                        soLuong: Math.max(0, detail.value.soLuong || 0),
+                        giaGoc: Math.max(0, detail.value.giaGoc || 0),
+                        giaBan: Math.max(0, detail.value.giaBan || 0),
+                        trangThai: detail.value.trangThai,
+                        mauSac: mauSac,
+                        kichCo: kichCo,
+                        sanPham: detail.value.sanPham
+                    };
+                    variants.push(variantData);
+                }
+            }
+
+            // Lưu từng biến thể
+            for (const variant of variants) {
+                try {
+                    await axios.post(`${API_BASE_URL}/api/san-pham-chi-tiet/save`, variant);
+                    successCount++;
+                } catch (error) {
+                    errorCount++;
+                    console.error(`Lỗi khi tạo biến thể ${variant.maChiTiet}:`, error);
+                }
+            }
+
+            if (successCount > 0) {
+                toast.add({
+                    severity: 'success',
+                    summary: 'Thành công',
+                    detail: `Đã tạo ${successCount} biến thể sản phẩm${errorCount > 0 ? `, ${errorCount} biến thể thất bại` : ''}`,
+                    life: 3000
+                });
+            } else {
+                toast.add({
+                    severity: 'error',
+                    summary: 'Lỗi',
+                    detail: 'Không thể tạo biến thể nào',
+                    life: 3000
+                });
+            }
         }
 
         await loadProductDetails(detail.value.sanPham.id);
@@ -563,7 +641,6 @@ function confirmDeleteDetail(detailData) {
 async function deleteDetail() {
     try {
         loading.value = true;
-        // SỬA: Thêm /api prefix
         await axios.delete(`${API_BASE_URL}/api/san-pham-chi-tiet/delete/${detail.value.id}`);
         toast.add({ severity: 'success', summary: 'Đã xóa', detail: `Chi tiết sản phẩm "${detail.value.maChiTiet}" đã được xóa`, life: 3000 });
         await loadProductDetails(detail.value.sanPham.id);
@@ -693,6 +770,23 @@ function expandAll() {
 function collapseAll() {
     expandedRows.value = [];
 }
+
+// Function to get variant combinations preview
+function getVariantPreview() {
+    if (!detail.value.mauSacs?.length || !detail.value.kichCos?.length) return [];
+
+    const variants = [];
+    for (const mauSac of detail.value.mauSacs) {
+        for (const kichCo of detail.value.kichCos) {
+            variants.push({
+                maChiTiet: `${detail.value.maChiTiet}`,
+                mauSac: mauSac.tenMauSac,
+                kichCo: kichCo.tenKichCo
+            });
+        }
+    }
+    return variants;
+}
 </script>
 
 <template>
@@ -732,11 +826,11 @@ function collapseAll() {
             >
                 <template #header>
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                        <!-- <div class="flex gap-2">
+                        <div class="flex gap-2">
                             <h4 class="m-0">Quản lý Sản phẩm</h4>
                             <Button text icon="pi pi-plus" label="Mở rộng tất cả" @click="expandAll" size="small" />
                             <Button text icon="pi pi-minus" label="Thu gọn tất cả" @click="collapseAll" size="small" />
-                        </div> -->
+                        </div>
                         <IconField>
                             <InputIcon>
                                 <i class="pi pi-search" />
@@ -805,7 +899,7 @@ function collapseAll() {
                             <Column field="size" header="Kích cỡ" sortable style="min-width: 8rem"></Column>
                             <Column field="color" header="Màu sắc" sortable style="min-width: 8rem"></Column>
                             <Column field="soLuong" header="Số lượng" sortable style="min-width: 8rem"></Column>
-                            <Column field="giaGoc" header="Giá Gốc" sortable style="min-width: 10rem">
+                            <Column field="giaGoc" header="Giá gốc" sortable style="min-width: 10rem">
                                 <template #body="detailProps">
                                     {{ formatCurrency(detailProps.data.giaGoc) }}
                                 </template>
@@ -815,11 +909,31 @@ function collapseAll() {
                                     {{ formatCurrency(detailProps.data.giaBan) }}
                                 </template>
                             </Column>
-                            <Column header="Hình ảnh" style="min-width: 12rem">
+                            <Column header="Hình ảnh" style="min-width: 15rem">
                                 <template #body="detailProps">
-                                    <div class="flex gap-2">
-                                        <img v-for="img in detailProps.data.images" :key="img.id" :src="img.url" :alt="img.tenHinhAnh" class="h-16 w-16 rounded object-cover" />
-                                        <span v-if="!detailProps.data.images.length">Không có hình ảnh</span>
+                                    <div v-if="detailProps.data.images && detailProps.data.images.length > 0" class="flex flex-wrap gap-2">
+                                        <div v-for="img in detailProps.data.images.slice(0, 3)" :key="img.id" class="relative">
+                                            <img
+                                                :src="img.url"
+                                                :alt="img.tenHinhAnh"
+                                                class="h-16 w-16 cursor-pointer rounded border object-cover shadow-sm transition-transform hover:scale-105"
+                                                @click="openImageDetail(img)"
+                                                @error="handleImageError($event)"
+                                            />
+                                            <Badge v-if="img.trangThai === 0" value="Đang tải" severity="warning" class="absolute -right-2 -top-2 text-xs" />
+                                        </div>
+                                        <div
+                                            v-if="detailProps.data.images.length > 3"
+                                            class="flex h-16 w-16 cursor-pointer items-center justify-center rounded border bg-gray-100 transition-colors hover:bg-gray-200"
+                                            @click="openAllImages(detailProps.data)"
+                                        >
+                                            <span class="text-sm font-medium text-gray-600"> +{{ detailProps.data.images.length - 3 }} </span>
+                                        </div>
+                                    </div>
+                                    <div v-else class="flex items-center gap-2 italic text-gray-400">
+                                        <i class="pi pi-image"></i>
+                                        <span>Chưa có hình ảnh</span>
+                                        <Button icon="pi pi-plus" size="small" text rounded @click="addImageToDetail(detailProps.data)" v-tooltip.top="'Thêm hình ảnh'" />
                                     </div>
                                 </template>
                             </Column>
@@ -867,7 +981,6 @@ function collapseAll() {
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-4">
                         <label for="soLuong" class="mb-3 block font-bold">Số lượng</label>
-                        <!-- Chuyển đổi thành InputText với v-model.number -->
                         <InputText id="soLuong" v-model.number="product.soLuong" integeronly fluid placeholder="0" :min="0" />
                         <small v-if="submitted && product.soLuong <= 0" class="text-red-500">Số lượng không hợp lệ.</small>
                         <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500"> Số lượng là bắt buộc. </small>
@@ -912,48 +1025,54 @@ function collapseAll() {
             </template>
         </Dialog>
 
-        <!-- Dialog thêm/sửa chi tiết sản phẩm -->
-        <Dialog v-model:visible="detailDialog" :style="{ width: '600px' }" header="Chi tiết sản phẩm" :modal="true" class="p-fluid">
+        <!-- Dialog thêm/sửa chi tiết sản phẩm với Multi-Select -->
+        <Dialog v-model:visible="detailDialog" :style="{ width: '800px' }" header="Chi tiết sản phẩm" :modal="true" class="p-fluid">
             <div class="flex flex-col gap-6">
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-8">
-                        <label for="maChiTiet" class="mb-3 block font-bold">Mã chi tiết *</label>
-                        <InputText id="maChiTiet" v-model.trim="detail.maChiTiet" required="true" autofocus :invalid="submitted && !detail.maChiTiet" fluid placeholder="Nhập mã chi tiết" />
+                        <label for="maChiTiet" class="mb-3 block font-bold">
+                            Mã chi tiết cơ bản *
+                            <small class="font-normal text-gray-500">(Sẽ tự động thêm màu-size vào cuối)</small>
+                        </label>
+                        <InputText id="maChiTiet" v-model.trim="detail.maChiTiet" required="true" autofocus :invalid="submitted && !detail.maChiTiet" fluid placeholder="Nhập mã chi tiết cơ bản" />
                         <small v-if="submitted && !detail.maChiTiet" class="text-red-500">Mã chi tiết là bắt buộc.</small>
                     </div>
                     <div class="col-span-4">
-                        <label for="soLuong" class="mb-3 block font-bold">Số lượng</label>
-                        <!-- Chuyển đổi thành InputText với v-model.number -->
+                        <label for="soLuong" class="mb-3 block font-bold">Số lượng *</label>
                         <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
-                        <small v-if="submitted && (detail.soLuong == null || detail.soLuong <= 0)" class="text-red-500">Số lượng không hợp lệ.</small>
-                        <small v-if="submitted && (product.soLuong == null || product.soLuong === '')" class="text-red-500"> Số lượng là bắt buộc. </small>
-                        <small v-else-if="submitted && product.soLuong < 0" class="text-red-500"> Số lượng không được âm. </small>
+                        <small v-if="submitted && (detail.soLuong == null || detail.soLuong <= 0)" class="text-red-500">Số lượng phải lớn hơn 0.</small>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="giaGoc" class="mb-3 block font-bold">Giá Gốc *</label>
+                        <label for="giaGoc" class="mb-3 block font-bold">Giá nhập *</label>
                         <InputText id="giaGoc" v-model.number="detail.giaGoc" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaGoc == null || detail.giaGoc < 0)" />
-                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc < 0)" class="text-red-500">Giá Gốc phải là số không âm.</small>
+                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc < 0)" class="text-red-500">Giá nhập phải là số không âm.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="giaBan" class="mb-3 block font-bold">Giá bán *</label>
-                        <InputText id="giaBan" v-model.numberx="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan < 0)" />
+                        <InputText id="giaBan" v-model.number="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan < 0)" />
                         <small v-if="submitted && (detail.giaBan == null || detail.giaBan < 0)" class="text-red-500">Giá bán phải là số không âm.</small>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="mauSac" class="mb-3 block font-bold">Màu sắc</label>
-                        <Select id="mauSac" v-model="detail.mauSac" :options="mauSacs" optionLabel="tenMauSac" placeholder="Chọn màu sắc" fluid />
-                        <small v-if="submitted && !detail.mauSac" class="text-red-500">Màu sắc là bắt buộc.</small>
+                        <label for="mauSacs" class="mb-3 block font-bold">
+                            Màu sắc *
+                            <small class="font-normal text-gray-500">(Có thể chọn nhiều)</small>
+                        </label>
+                        <MultiSelect id="mauSacs" v-model="detail.mauSacs" :options="mauSacs" optionLabel="tenMauSac" placeholder="Chọn màu sắc" fluid :maxSelectedLabels="3" selectedItemsLabel="{0} màu đã chọn" />
+                        <small v-if="submitted && (!detail.mauSacs || detail.mauSacs.length === 0)" class="text-red-500">Phải chọn ít nhất một màu sắc.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="kichCo" class="mb-3 block font-bold">Kích cỡ</label>
-                        <Select id="kichCo" v-model="detail.kichCo" :options="kichCos" optionLabel="tenKichCo" placeholder="Chọn kích cỡ" fluid />
-                        <small v-if="submitted && !detail.kichCo" class="text-red-500">Kích cỡ là bắt buộc.</small>
+                        <label for="kichCos" class="mb-3 block font-bold">
+                            Kích cỡ *
+                            <small class="font-normal text-gray-500">(Có thể chọn nhiều)</small>
+                        </label>
+                        <MultiSelect id="kichCos" v-model="detail.kichCos" :options="kichCos" optionLabel="tenKichCo" placeholder="Chọn kích cỡ" fluid :maxSelectedLabels="3" selectedItemsLabel="{0} size đã chọn" />
+                        <small v-if="submitted && (!detail.kichCos || detail.kichCos.length === 0)" class="text-red-500">Phải chọn ít nhất một kích cỡ.</small>
                     </div>
                 </div>
 
@@ -961,14 +1080,36 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="trangThai" class="mb-3 block font-bold">Trạng thái</label>
                         <Select id="trangThai" v-model="detail.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
-                        <small v-if="submitted && !detail.trangThai" class="text-red-500">Trạng thái là bắt buộc.</small>
                     </div>
+                </div>
+
+                <!-- Preview biến thể sẽ được tạo -->
+                <div v-if="!detail.id && detail.mauSacs?.length && detail.kichCos?.length && detail.maChiTiet" class="mt-4">
+                    <label class="mb-3 block font-bold">
+                        Xem trước các biến thể sẽ được tạo:
+                        <Badge :value="getVariantPreview().length" severity="info" />
+                    </label>
+                    <div class="max-h-40 overflow-y-auto rounded border border-gray-200 p-3">
+                        <div class="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+                            <div v-for="variant in getVariantPreview()" :key="variant.maChiTiet" class="rounded bg-gray-50 p-2 text-sm">
+                                <div class="font-medium">{{ variant.maChiTiet }}</div>
+                                <div class="text-gray-600">{{ variant.mauSac }} - {{ variant.kichCo }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <small class="text-gray-500">Tất cả biến thể sẽ có cùng số lượng, giá nhập và giá bán như đã nhập ở trên.</small>
+                </div>
+
+                <!-- Thông báo khi edit -->
+                <div v-if="detail.id" class="mt-4 rounded border border-yellow-200 bg-yellow-50 p-3">
+                    <i class="pi pi-info-circle mr-2 text-yellow-600"></i>
+                    <span class="text-yellow-800">Chế độ chỉnh sửa: Chỉ có thể chọn một màu và một kích cỡ khi cập nhật biến thể hiện có.</span>
                 </div>
             </div>
 
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDetailDialog" :disabled="loading" />
-                <Button label="Lưu lại" icon="pi pi-check" @click="saveDetail" />
+                <Button :label="detail.id ? 'Cập nhật' : `Tạo ${getVariantPreview().length} biến thể`" icon="pi pi-check" @click="saveDetail" :loading="loading" />
             </template>
         </Dialog>
 
@@ -1025,6 +1166,29 @@ function collapseAll() {
             </template>
         </Dialog>
     </div>
+    <!-- Dialog xem hình ảnh chi tiết -->
+    <Dialog v-model:visible="imagePreviewDialog" :style="{ width: '900px' }" header="Hình ảnh sản phẩm" :modal="true">
+        <div v-if="selectedImageDetail.showAll" class="grid grid-cols-4 gap-4">
+            <div v-for="img in selectedImageDetail.images" :key="img.id" class="text-center">
+                <img :src="img.url" :alt="img.tenHinhAnh" class="h-32 w-full rounded border object-cover shadow-sm" @error="handleImageError($event)" />
+                <div class="mt-2 text-sm">
+                    <div class="font-medium">{{ img.maHinhAnh }}</div>
+                    <Badge :value="img.trangThai === 1 ? 'Đã tải' : 'Đang tải'" :severity="img.trangThai === 1 ? 'success' : 'warning'" />
+                </div>
+            </div>
+        </div>
+        <div v-else class="text-center">
+            <img :src="selectedImageDetail.url" :alt="selectedImageDetail.tenHinhAnh" class="max-h-96 max-w-full rounded object-contain shadow" @error="handleImageError($event)" />
+            <div class="mt-4 text-sm">
+                <div class="font-medium">{{ selectedImageDetail.maHinhAnh }}</div>
+                <div>{{ selectedImageDetail.tenHinhAnh }}</div>
+            </div>
+        </div>
+
+        <template #footer>
+            <Button label="Đóng" icon="pi pi-times" @click="imagePreviewDialog = false" />
+        </template>
+    </Dialog>
 </template>
 
 <style scoped>
