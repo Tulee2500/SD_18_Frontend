@@ -426,7 +426,7 @@ async function saveProduct() {
         loading.value = false;
     }
 }
-
+// CConfirm xóa sản phẩm
 function confirmDeleteProduct(prod) {
     product.value = prod;
     deleteProductDialog.value = true;
