@@ -828,8 +828,8 @@ function getVariantPreview() {
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <div class="flex gap-2">
                             <h4 class="m-0">Quản lý Sản phẩm</h4>
-                            <Button text icon="pi pi-plus" label="Mở rộng tất cả" @click="expandAll" size="small" />
-                            <Button text icon="pi pi-minus" label="Thu gọn tất cả" @click="collapseAll" size="small" />
+                            <!-- <Button text icon="pi pi-plus" label="Mở rộng tất cả" @click="expandAll" size="small" />
+                            <Button text icon="pi pi-minus" label="Thu gọn tất cả" @click="collapseAll" size="small" /> -->
                         </div>
                         <IconField>
                             <InputIcon>

@@ -186,6 +186,11 @@ const router = createRouter({
                     name: 'TaiKhoan',
                     path: '/tai-khoan',
                     component: () => import('@/views/TaiKhoan/TaiKhoanManagement.vue')
+                },
+                {
+                    name: 'BanHang',
+                    path: '/ban-hang',
+                    component: () => import('@/views/BanHang/BanHangView.vue')
                 }
             ]
         },

@@ -2,7 +2,7 @@
     <div class="invoice-management">
         <!-- Toast Component - Sửa theo mẫu PrimeVue -->
         <Toast />
-        
+
         <!-- Header với Tab Navigation -->
         <div class="header-section mb-6 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-white">
             <div class="mb-4 flex items-center justify-between">
@@ -11,20 +11,15 @@
                     <p class="text-blue-100">Hệ thống quản lý hóa đơn POS & Online tích hợp</p>
                 </div>
                 <div class="flex gap-3">
-                    <Button 
-                        @click="refreshAllData" 
+                    <Button
+                        @click="refreshAllData"
                         :icon="isLoading ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'"
                         :label="isLoading ? 'Đang tải...' : 'Làm mới'"
                         :disabled="isLoading"
                         class="bg-white bg-opacity-20 text-white hover:bg-opacity-30"
                         outlined
                     />
-                    <Button 
-                        @click="exportData" 
-                        icon="pi pi-download"
-                        label="Xuất dữ liệu"
-                        severity="success"
-                    />
+                    <Button @click="exportData" icon="pi pi-download" label="Xuất dữ liệu" severity="success" />
                 </div>
             </div>
 
@@ -34,8 +29,7 @@
                     v-for="tab in tabs"
                     :key="tab.id"
                     @click="activeTab = tab.id"
-                    :class="['flex items-center gap-2 rounded-lg px-4 py-2 transition-all', 
-                             activeTab === tab.id ? 'bg-white font-semibold text-blue-600 shadow-lg' : 'bg-white bg-opacity-20 text-white hover:bg-opacity-30']"
+                    :class="['flex items-center gap-2 rounded-lg px-4 py-2 transition-all', activeTab === tab.id ? 'bg-white font-semibold text-blue-600 shadow-lg' : 'bg-white bg-opacity-20 text-white hover:bg-opacity-30']"
                 >
                     <i :class="tab.icon"></i>
                     {{ tab.label }}
@@ -113,51 +107,20 @@
                         <InputIcon>
                             <i class="pi pi-search"></i>
                         </InputIcon>
-                        <InputText 
-                            v-model="searchKeyword" 
-                            placeholder="Tìm kiếm hóa đơn, khách hàng..." 
-                            @input="onSearch"
-                            fluid
-                        />
+                        <InputText v-model="searchKeyword" placeholder="Tìm kiếm hóa đơn, khách hàng..." @input="onSearch" fluid />
                     </IconField>
                 </div>
 
                 <!-- Lọc theo loại hóa đơn -->
-                <Select 
-                    v-model="typeFilter" 
-                    @change="applyFilters" 
-                    :options="typeOptions"
-                    optionLabel="label"
-                    optionValue="value"
-                    placeholder="Tất cả loại"
-                    class="w-48"
-                />
+                <Select v-model="typeFilter" @change="applyFilters" :options="typeOptions" optionLabel="label" optionValue="value" placeholder="Tất cả loại" class="w-48" />
 
                 <!-- Lọc theo trạng thái -->
-                <Select 
-                    v-model="statusFilter" 
-                    @change="applyFilters" 
-                    :options="statusOptions"
-                    optionLabel="label"
-                    optionValue="value"
-                    placeholder="Tất cả trạng thái"
-                    class="w-48"
-                />
+                <Select v-model="statusFilter" @change="applyFilters" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Tất cả trạng thái" class="w-48" />
 
-                <Calendar 
-                    v-model="dateFilter" 
-                    @date-select="applyFilters" 
-                    placeholder="Chọn ngày"
-                    dateFormat="dd/mm/yy"
-                />
+                <Calendar v-model="dateFilter" @date-select="applyFilters" placeholder="Chọn ngày" dateFormat="dd/mm/yy" />
 
                 <!-- Advanced Filter Toggle -->
-                <Button 
-                    @click="showAdvancedFilter = !showAdvancedFilter" 
-                    icon="pi pi-filter"
-                    label="Lọc nâng cao"
-                    severity="secondary"
-                />
+                <Button @click="showAdvancedFilter = !showAdvancedFilter" icon="pi pi-filter" label="Lọc nâng cao" severity="secondary" />
             </div>
 
             <!-- Advanced Filters -->
@@ -173,25 +136,11 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Nhân viên xử lý</label>
-                        <Select 
-                            v-model="staffFilter" 
-                            :options="staffList" 
-                            optionLabel="name" 
-                            optionValue="id"
-                            placeholder="Tất cả nhân viên"
-                            fluid
-                        />
+                        <Select v-model="staffFilter" :options="staffList" optionLabel="name" optionValue="id" placeholder="Tất cả nhân viên" fluid />
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium">Phương thức thanh toán</label>
-                        <Select 
-                            v-model="paymentMethodFilter" 
-                            :options="paymentMethodOptions"
-                            optionLabel="label"
-                            optionValue="value"
-                            placeholder="Tất cả"
-                            fluid
-                        />
+                        <Select v-model="paymentMethodFilter" :options="paymentMethodOptions" optionLabel="label" optionValue="value" placeholder="Tất cả" fluid />
                     </div>
                 </div>
                 <div class="mt-4 flex gap-2">
@@ -204,7 +153,7 @@
         <!-- Loading State -->
         <div v-if="isLoading" class="py-12 text-center">
             <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" />
-            <p class="text-lg text-gray-600 mt-4">Đang tải dữ liệu từ API...</p>
+            <p class="mt-4 text-lg text-gray-600">Đang tải dữ liệu từ API...</p>
             <p class="mt-2 text-sm text-gray-500">{{ loadingMessage }}</p>
         </div>
 
@@ -243,23 +192,23 @@
                         <span class="font-bold text-blue-600">#{{ slotProps.data.id }}</span>
                     </template>
                 </Column>
-                
+
                 <Column field="maHoaDon" header="Mã HĐ" sortable style="min-width: 10rem">
                     <template #body="slotProps">
                         <Badge :value="slotProps.data.maHoaDon" />
                     </template>
                 </Column>
-                
+
                 <Column field="loaiHoaDon" header="Loại" style="min-width: 8rem">
                     <template #body="slotProps">
-                        <Tag 
-                            :value="slotProps.data.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online'" 
+                        <Tag
+                            :value="slotProps.data.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online'"
                             :severity="slotProps.data.loaiHoaDon === 'OFFLINE' ? 'warning' : 'success'"
                             :icon="slotProps.data.loaiHoaDon === 'OFFLINE' ? 'pi pi-desktop' : 'pi pi-globe'"
                         />
                     </template>
                 </Column>
-                
+
                 <Column field="ngayTao" header="Ngày tạo" sortable style="min-width: 12rem">
                     <template #body="slotProps">
                         <div class="flex items-center">
@@ -268,26 +217,19 @@
                         </div>
                     </template>
                 </Column>
-                
+
                 <Column field="tenKhachHang" header="Khách hàng" style="min-width: 16rem">
                     <template #body="slotProps">
                         <div class="flex items-center">
-                            <Avatar 
-                                :label="getInitials(slotProps.data.tenKhachHang || 'KH')"
-                                class="mr-3"
-                                style="background-color: #2196F3; color: #ffffff"
-                                shape="circle"
-                            />
+                            <Avatar :label="getInitials(slotProps.data.tenKhachHang || 'KH')" class="mr-3" style="background-color: #2196f3; color: #ffffff" shape="circle" />
                             <div>
                                 <div class="font-semibold text-gray-900">{{ slotProps.data.tenKhachHang || 'Khách lẻ' }}</div>
-                                <div class="text-sm text-gray-500" v-if="slotProps.data.sdt">
-                                    <i class="pi pi-phone mr-1"></i>{{ slotProps.data.sdt }}
-                                </div>
+                                <div class="text-sm text-gray-500" v-if="slotProps.data.sdt"><i class="pi pi-phone mr-1"></i>{{ slotProps.data.sdt }}</div>
                             </div>
                         </div>
                     </template>
                 </Column>
-                
+
                 <Column field="tongTien" header="Tổng tiền" sortable style="min-width: 12rem">
                     <template #body="slotProps">
                         <div class="flex items-center">
@@ -296,25 +238,18 @@
                         </div>
                     </template>
                 </Column>
-                
+
                 <Column field="trangThaiHoaDon" header="Trạng thái" style="min-width: 12rem">
                     <template #body="slotProps">
-                        <Tag 
-                            :value="getStatusLabel(slotProps.data.trangThaiHoaDon)" 
-                            :severity="getStatusSeverity(slotProps.data.trangThaiHoaDon)"
-                            :icon="getStatusIcon(slotProps.data.trangThaiHoaDon)"
-                        />
+                        <Tag :value="getStatusLabel(slotProps.data.trangThaiHoaDon)" :severity="getStatusSeverity(slotProps.data.trangThaiHoaDon)" :icon="getStatusIcon(slotProps.data.trangThaiHoaDon)" />
                     </template>
                 </Column>
-                
-                <Column header="Workflow" style="min-width: 20rem">
+
+                <Column header="Trạng thái" style="min-width: 20rem">
                     <template #body="slotProps">
                         <div class="flex items-center gap-1">
                             <div v-for="(step, index) in getWorkflowSteps(slotProps.data.loaiHoaDon)" :key="step" class="flex items-center">
-                                <div 
-                                    :class="['workflow-step px-2 py-1 text-xs rounded', getStepClass(slotProps.data, step)]" 
-                                    :title="getStepLabel(step)"
-                                >
+                                <div :class="['workflow-step rounded px-2 py-1 text-xs', getStepClass(slotProps.data, step)]" :title="getStepLabel(step)">
                                     <i :class="getStepIcon(step)" class="text-xs"></i>
                                 </div>
                                 <div v-if="index < getWorkflowSteps(slotProps.data.loaiHoaDon).length - 1" class="workflow-arrow mx-1"></div>
@@ -322,25 +257,12 @@
                         </div>
                     </template>
                 </Column>
-                
+
                 <Column :exportable="false" style="min-width: 12rem">
                     <template #body="slotProps">
                         <div class="flex gap-2">
-                            <Button 
-                                icon="pi pi-eye" 
-                                @click="viewChiTiet(slotProps.data)" 
-                                v-tooltip.top="'Xem chi tiết'"
-                                size="small"
-                                outlined
-                            />
-                            <Button 
-                                v-if="canUpdateStatus(slotProps.data)"
-                                icon="pi pi-arrow-right" 
-                                @click="updateInvoiceStatus(slotProps.data)"
-                                v-tooltip.top="'Cập nhật trạng thái'"
-                                size="small"
-                                severity="success"
-                            />
+                            <Button icon="pi pi-eye" @click="viewChiTiet(slotProps.data)" v-tooltip.top="'Xem chi tiết'" size="small" outlined />
+                            <Button v-if="canUpdateStatus(slotProps.data)" icon="pi pi-arrow-right" @click="updateInvoiceStatus(slotProps.data)" v-tooltip.top="'Cập nhật trạng thái'" size="small" severity="success" />
                         </div>
                     </template>
                 </Column>
@@ -355,14 +277,7 @@
         </div>
 
         <!-- Dialog chi tiết hóa đơn - Sửa theo PrimeVue -->
-        <Dialog 
-            v-model:visible="showChiTietDialog" 
-            :style="{ width: '90vw', maxWidth: '1200px' }" 
-            header="Chi tiết hóa đơn" 
-            :modal="true" 
-            class="p-fluid"
-            maximizable
-        >
+        <Dialog v-model:visible="showChiTietDialog" :style="{ width: '90vw', maxWidth: '1200px' }" header="Chi tiết hóa đơn" :modal="true" class="p-fluid" maximizable>
             <template #header>
                 <div class="flex items-center gap-2">
                     <i class="pi pi-file-text"></i>
@@ -381,42 +296,17 @@
                                 </div>
                                 <span class="mt-2 text-center text-xs">{{ getStepLabel(step) }}</span>
                             </div>
-                            <div v-if="index < getWorkflowSteps(selectedHoaDon.loaiHoaDon).length - 1" 
-                                 :class="['mx-2 h-1 flex-1 transition-all', isStepCompleted(selectedHoaDon, step) ? 'bg-green-400' : 'bg-gray-300']">
-                            </div>
+                            <div v-if="index < getWorkflowSteps(selectedHoaDon.loaiHoaDon).length - 1" :class="['mx-2 h-1 flex-1 transition-all', isStepCompleted(selectedHoaDon, step) ? 'bg-green-400' : 'bg-gray-300']"></div>
                         </div>
                     </div>
                 </Panel>
 
                 <!-- Actions Bar -->
                 <div class="flex justify-end gap-3 rounded-lg bg-gray-50 p-4">
-                    <Button 
-                        v-if="canProcessNextStep(selectedHoaDon)" 
-                        @click="processNextStep(selectedHoaDon)" 
-                        icon="pi pi-arrow-right"
-                        :label="getNextStepAction(selectedHoaDon)"
-                        severity="success"
-                    />
-                    <Button 
-                        v-if="canCancelInvoice(selectedHoaDon)" 
-                        @click="cancelInvoice(selectedHoaDon)" 
-                        icon="pi pi-times"
-                        label="Hủy đơn"
-                        severity="danger"
-                    />
-                    <Button 
-                        v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE'" 
-                        @click="printInvoice(selectedHoaDon)" 
-                        icon="pi pi-print"
-                        label="In hóa đơn"
-                    />
-                    <Button 
-                        v-if="selectedHoaDon.loaiHoaDon === 'ONLINE'" 
-                        @click="trackingInfo(selectedHoaDon)" 
-                        icon="pi pi-map-marker"
-                        label="Tracking"
-                        severity="info"
-                    />
+                    <Button v-if="canProcessNextStep(selectedHoaDon)" @click="processNextStep(selectedHoaDon)" icon="pi pi-arrow-right" :label="getNextStepAction(selectedHoaDon)" severity="success" />
+                    <Button v-if="canCancelInvoice(selectedHoaDon)" @click="cancelInvoice(selectedHoaDon)" icon="pi pi-times" label="Hủy đơn" severity="danger" />
+                    <Button v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE'" @click="printInvoice(selectedHoaDon)" icon="pi pi-print" label="In hóa đơn" />
+                    <Button v-if="selectedHoaDon.loaiHoaDon === 'ONLINE'" @click="trackingInfo(selectedHoaDon)" icon="pi pi-map-marker" label="Tracking" severity="info" />
                 </div>
 
                 <!-- Thông tin chi tiết -->
@@ -430,10 +320,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="font-medium text-gray-600">Loại:</span>
-                                <Tag 
-                                    :value="selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online'" 
-                                    :severity="selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'warning' : 'success'"
-                                />
+                                <Tag :value="selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online'" :severity="selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'warning' : 'success'" />
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="font-medium text-gray-600">Ngày tạo:</span>
@@ -445,10 +332,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="font-medium text-gray-600">Trạng thái:</span>
-                                <Tag 
-                                    :value="getStatusLabel(selectedHoaDon.trangThaiHoaDon)" 
-                                    :severity="getStatusSeverity(selectedHoaDon.trangThaiHoaDon)"
-                                />
+                                <Tag :value="getStatusLabel(selectedHoaDon.trangThaiHoaDon)" :severity="getStatusSeverity(selectedHoaDon.trangThaiHoaDon)" />
                             </div>
                         </div>
                     </Panel>
@@ -484,10 +368,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="font-medium text-gray-600">Tình trạng:</span>
-                                <Tag 
-                                    :value="getPaymentStatusLabel(selectedHoaDon.tinhTrangThanhToan)" 
-                                    :severity="getPaymentStatusSeverity(selectedHoaDon.tinhTrangThanhToan)"
-                                />
+                                <Tag :value="getPaymentStatusLabel(selectedHoaDon.tinhTrangThanhToan)" :severity="getPaymentStatusSeverity(selectedHoaDon.tinhTrangThanhToan)" />
                             </div>
                             <div v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE' && selectedHoaDon.tienThua" class="flex items-center justify-between">
                                 <span class="font-medium text-gray-600">Tiền thừa:</span>
@@ -504,7 +385,7 @@
                 <!-- Chi tiết sản phẩm -->
                 <Panel header="Chi tiết sản phẩm" toggleable>
                     <template #header>
-                        <div class="flex items-center justify-between w-full mr-4">
+                        <div class="mr-4 flex w-full items-center justify-between">
                             <span class="flex items-center gap-2">
                                 <i class="pi pi-list"></i>
                                 Chi tiết sản phẩm ({{ hoaDonChiTiets.length }} mặt hàng)
@@ -514,19 +395,9 @@
                                     <InputIcon>
                                         <i class="pi pi-search"></i>
                                     </InputIcon>
-                                    <InputText 
-                                        v-model="searchChiTietKeyword" 
-                                        placeholder="Tìm kiếm sản phẩm..." 
-                                        size="small"
-                                    />
+                                    <InputText v-model="searchChiTietKeyword" placeholder="Tìm kiếm sản phẩm..." size="small" />
                                 </IconField>
-                                <Button
-                                    v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE' && canEditPOSItems(selectedHoaDon)"
-                                    @click="editPOSItems(selectedHoaDon)"
-                                    icon="pi pi-pencil"
-                                    label="Sửa"
-                                    size="small"
-                                />
+                                <Button v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE' && canEditPOSItems(selectedHoaDon)" @click="editPOSItems(selectedHoaDon)" icon="pi pi-pencil" label="Sửa" size="small" />
                             </div>
                         </div>
                     </template>
@@ -534,24 +405,17 @@
                     <!-- Loading Chi Tiết -->
                     <div v-if="isLoadingChiTiet" class="py-8 text-center">
                         <ProgressSpinner style="width: 30px; height: 30px" strokeWidth="8" />
-                        <p class="text-gray-600 mt-4">Đang tải chi tiết hóa đơn...</p>
+                        <p class="mt-4 text-gray-600">Đang tải chi tiết hóa đơn...</p>
                     </div>
 
                     <!-- Chi Tiết Table -->
-                    <DataTable 
-                        v-else 
-                        :value="filteredChiTiets" 
-                        tableStyle="min-width: 50rem"
-                        :paginator="true"
-                        :rows="10"
-                        responsiveLayout="scroll"
-                    >
+                    <DataTable v-else :value="filteredChiTiets" tableStyle="min-width: 50rem" :paginator="true" :rows="10" responsiveLayout="scroll">
                         <Column field="id" header="STT" style="min-width: 6rem">
                             <template #body="slotProps">
                                 <Badge :value="slotProps.index + 1" />
                             </template>
                         </Column>
-                        
+
                         <Column field="tenSanPham" header="Tên sản phẩm" style="min-width: 20rem">
                             <template #body="slotProps">
                                 <div>
@@ -560,7 +424,7 @@
                                 </div>
                             </template>
                         </Column>
-                        
+
                         <Column header="Thuộc tính" style="min-width: 12rem">
                             <template #body="slotProps">
                                 <div class="space-y-1">
@@ -569,13 +433,13 @@
                                 </div>
                             </template>
                         </Column>
-                        
+
                         <Column field="giaBan" header="Giá bán" sortable style="min-width: 10rem">
                             <template #body="slotProps">
                                 <span class="font-bold text-green-600">{{ formatCurrency(slotProps.data.giaBan) }}</span>
                             </template>
                         </Column>
-                        
+
                         <Column field="soLuong" header="Số lượng" style="min-width: 8rem">
                             <template #body="slotProps">
                                 <div v-if="isEditingItem(slotProps.data.id)" class="flex items-center gap-2">
@@ -586,43 +450,28 @@
                                 <Badge v-else :value="slotProps.data.soLuong" />
                             </template>
                         </Column>
-                        
+
                         <Column header="Thành tiền" style="min-width: 10rem">
                             <template #body="slotProps">
                                 <span class="font-bold text-blue-600">{{ formatCurrency(slotProps.data.giaBan * slotProps.data.soLuong) }}</span>
                             </template>
                         </Column>
-                        
+
                         <Column field="trangThai" header="Trạng thái" style="min-width: 8rem">
                             <template #body="slotProps">
-                                <Tag 
-                                    :value="getChiTietStatusLabel(slotProps.data.trangThai)" 
-                                    :severity="getChiTietStatusSeverity(slotProps.data.trangThai)"
-                                />
+                                <Tag :value="getChiTietStatusLabel(slotProps.data.trangThai)" :severity="getChiTietStatusSeverity(slotProps.data.trangThai)" />
                             </template>
                         </Column>
-                        
+
                         <Column v-if="canEditItems(selectedHoaDon)" header="Thao tác" style="min-width: 8rem">
                             <template #body="slotProps">
                                 <div class="flex gap-1">
-                                    <Button 
-                                        v-if="!isEditingItem(slotProps.data.id)" 
-                                        @click="editItem(slotProps.data)" 
-                                        icon="pi pi-pencil"
-                                        size="small"
-                                        v-tooltip.top="'Sửa số lượng'"
-                                    />
-                                    <Button 
-                                        @click="removeItem(slotProps.data.id)" 
-                                        icon="pi pi-trash"
-                                        size="small"
-                                        severity="danger"
-                                        v-tooltip.top="'Xóa sản phẩm'"
-                                    />
+                                    <Button v-if="!isEditingItem(slotProps.data.id)" @click="editItem(slotProps.data)" icon="pi pi-pencil" size="small" v-tooltip.top="'Sửa số lượng'" />
+                                    <Button @click="removeItem(slotProps.data.id)" icon="pi pi-trash" size="small" severity="danger" v-tooltip.top="'Xóa sản phẩm'" />
                                 </div>
                             </template>
                         </Column>
-                        
+
                         <template #empty>
                             <div class="p-8 text-center">
                                 <i class="pi pi-info-circle mb-4 text-4xl text-gray-400"></i>
@@ -662,37 +511,22 @@
         </Dialog>
 
         <!-- Status Update Dialog -->
-        <Dialog 
-            v-model:visible="showStatusUpdateDialog" 
-            :style="{ width: '450px' }" 
-            header="Cập nhật trạng thái" 
-            :modal="true"
-        >
+        <Dialog v-model:visible="showStatusUpdateDialog" :style="{ width: '450px' }" header="Cập nhật trạng thái" :modal="true">
             <div class="space-y-4">
                 <div>
                     <label class="mb-2 block text-sm font-medium">Trạng thái hiện tại:</label>
-                    <Tag 
-                        :value="getStatusLabel(selectedInvoiceForUpdate?.trangThaiHoaDon)" 
-                        :severity="getStatusSeverity(selectedInvoiceForUpdate?.trangThaiHoaDon)"
-                    />
+                    <Tag :value="getStatusLabel(selectedInvoiceForUpdate?.trangThaiHoaDon)" :severity="getStatusSeverity(selectedInvoiceForUpdate?.trangThaiHoaDon)" />
                 </div>
                 <div>
                     <label class="mb-2 block text-sm font-medium">Trạng thái mới:</label>
-                    <Select 
-                        v-model="newStatus" 
-                        :options="getAvailableStatuses(selectedInvoiceForUpdate)"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Chọn trạng thái mới"
-                        fluid
-                    />
+                    <Select v-model="newStatus" :options="getAvailableStatuses(selectedInvoiceForUpdate)" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái mới" fluid />
                 </div>
                 <div v-if="needsNote(newStatus)">
                     <label class="mb-2 block text-sm font-medium">Ghi chú:</label>
                     <Textarea v-model="statusNote" rows="3" placeholder="Nhập ghi chú..." fluid />
                 </div>
             </div>
-            
+
             <template #footer>
                 <Button @click="confirmStatusUpdate" label="Cập nhật" />
                 <Button @click="closeStatusUpdateDialog" label="Hủy" severity="secondary" />
@@ -702,8 +536,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
+import { computed, onMounted, ref, watch } from 'vue';
 
 // Reactive data
 const toast = useToast();
@@ -832,12 +666,7 @@ const filteredHoaDons = computed(() => {
     // Search filter
     if (searchKeyword.value.trim()) {
         const keyword = searchKeyword.value.toLowerCase();
-        filtered = filtered.filter((hd) => 
-            hd.maHoaDon?.toLowerCase().includes(keyword) || 
-            hd.tenKhachHang?.toLowerCase().includes(keyword) || 
-            hd.sdt?.includes(keyword) || 
-            hd.email?.toLowerCase().includes(keyword)
-        );
+        filtered = filtered.filter((hd) => hd.maHoaDon?.toLowerCase().includes(keyword) || hd.tenKhachHang?.toLowerCase().includes(keyword) || hd.sdt?.includes(keyword) || hd.email?.toLowerCase().includes(keyword));
     }
 
     // Type filter
@@ -896,11 +725,7 @@ const filteredChiTiets = computed(() => {
     }
 
     const keyword = searchChiTietKeyword.value.toLowerCase();
-    return hoaDonChiTiets.value.filter((item) =>
-        item.id.toString().includes(keyword) ||
-        item.tenSanPham?.toLowerCase().includes(keyword) ||
-        item.maSanPham?.toLowerCase().includes(keyword)
-    );
+    return hoaDonChiTiets.value.filter((item) => item.id.toString().includes(keyword) || item.tenSanPham?.toLowerCase().includes(keyword) || item.maSanPham?.toLowerCase().includes(keyword));
 });
 
 // Statistics
@@ -913,21 +738,15 @@ const onlineInvoices = computed(() => {
 });
 
 const totalRevenue = computed(() => {
-    return hoaDons.value
-        .filter((hd) => ['COMPLETED', 'PAID'].includes(hd.trangThaiHoaDon))
-        .reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
+    return hoaDons.value.filter((hd) => ['COMPLETED', 'PAID'].includes(hd.trangThaiHoaDon)).reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
 });
 
 const posRevenue = computed(() => {
-    return posInvoices.value
-        .filter((hd) => ['COMPLETED', 'PAID'].includes(hd.trangThaiHoaDon))
-        .reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
+    return posInvoices.value.filter((hd) => ['COMPLETED', 'PAID'].includes(hd.trangThaiHoaDon)).reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
 });
 
 const onlineRevenue = computed(() => {
-    return onlineInvoices.value
-        .filter((hd) => hd.trangThaiHoaDon === 'COMPLETED')
-        .reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
+    return onlineInvoices.value.filter((hd) => hd.trangThaiHoaDon === 'COMPLETED').reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
 });
 
 const completedInvoices = computed(() => {
@@ -941,10 +760,7 @@ const pendingInvoices = computed(() => {
 const urgentInvoices = computed(() => {
     const urgentStatuses = ['PAYMENT_PENDING', 'PENDING'];
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return hoaDons.value.filter((hd) => 
-        urgentStatuses.includes(hd.trangThaiHoaDon) && 
-        new Date(hd.ngayTao) < oneDayAgo
-    ).length;
+    return hoaDons.value.filter((hd) => urgentStatuses.includes(hd.trangThaiHoaDon) && new Date(hd.ngayTao) < oneDayAgo).length;
 });
 
 const completionRate = computed(() => {
@@ -996,30 +812,30 @@ async function fetchAllData() {
         hoaDons.value = data;
         console.log('Dữ liệu hóa đơn nhận được:', data);
 
-        toast.add({ 
-            severity: 'success', 
-            summary: 'Thành công', 
-            detail: `Đã tải ${data.length} hóa đơn`, 
-            life: 3000 
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Đã tải ${data.length} hóa đơn`,
+            life: 3000
         });
     } catch (error) {
         console.error('Lỗi khi gọi API:', error);
         hasError.value = true;
         errorMessage.value = `Không thể kết nối đến API: ${error.message}`;
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi kết nối', 
-            detail: 'Không thể tải dữ liệu từ server', 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi kết nối',
+            detail: 'Không thể tải dữ liệu từ server',
+            life: 3000
         });
 
         // Fallback to sample data
         hoaDons.value = createSampleData();
-        toast.add({ 
-            severity: 'info', 
-            summary: 'Dữ liệu mẫu', 
-            detail: 'Hiển thị dữ liệu mẫu để demo', 
-            life: 3000 
+        toast.add({
+            severity: 'info',
+            summary: 'Dữ liệu mẫu',
+            detail: 'Hiển thị dữ liệu mẫu để demo',
+            life: 3000
         });
     } finally {
         isLoading.value = false;
@@ -1128,21 +944,21 @@ async function fetchChiTietHoaDon(hoaDonId) {
         console.log('Chi tiết hóa đơn nhận được:', data);
 
         if (data.length === 0) {
-            toast.add({ 
-                severity: 'info', 
-                summary: 'Thông báo', 
-                detail: 'Hóa đơn này không có chi tiết sản phẩm', 
-                life: 3000 
+            toast.add({
+                severity: 'info',
+                summary: 'Thông báo',
+                detail: 'Hóa đơn này không có chi tiết sản phẩm',
+                life: 3000
             });
         }
     } catch (error) {
         console.error('Error fetching chi tiet:', error);
         hoaDonChiTiets.value = createSampleChiTietData(hoaDonId);
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Dữ liệu mẫu', 
-            detail: 'Không thể tải chi tiết, hiển thị dữ liệu mẫu', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Dữ liệu mẫu',
+            detail: 'Không thể tải chi tiết, hiển thị dữ liệu mẫu',
+            life: 3000
         });
     } finally {
         isLoadingChiTiet.value = false;
@@ -1341,11 +1157,11 @@ function closeStatusUpdateDialog() {
 
 async function confirmStatusUpdate() {
     if (!newStatus.value) {
-        toast.add({ 
-            severity: 'warn', 
-            summary: 'Cảnh báo', 
-            detail: 'Vui lòng chọn trạng thái mới', 
-            life: 3000 
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Vui lòng chọn trạng thái mới',
+            life: 3000
         });
         return;
     }
@@ -1367,19 +1183,19 @@ async function confirmStatusUpdate() {
             hoaDons.value[index].trangThaiHoaDon = newStatus.value;
         }
 
-        toast.add({ 
-            severity: 'success', 
-            summary: 'Thành công', 
-            detail: 'Cập nhật trạng thái thành công', 
-            life: 3000 
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Cập nhật trạng thái thành công',
+            life: 3000
         });
         closeStatusUpdateDialog();
     } catch (error) {
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi', 
-            detail: 'Không thể cập nhật trạng thái', 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể cập nhật trạng thái',
+            life: 3000
         });
     }
 }
@@ -1447,19 +1263,19 @@ async function processNextStep(hoaDon) {
                 selectedHoaDon.value.trangThaiHoaDon = nextStep;
             }
 
-            toast.add({ 
-                severity: 'success', 
-                summary: 'Thành công', 
-                detail: `Đã chuyển sang ${getStepLabel(nextStep)}`, 
-                life: 3000 
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã chuyển sang ${getStepLabel(nextStep)}`,
+                life: 3000
             });
         }
     } catch (error) {
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi', 
-            detail: 'Không thể cập nhật trạng thái', 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể cập nhật trạng thái',
+            life: 3000
         });
     }
 }
@@ -1484,46 +1300,46 @@ async function cancelInvoice(hoaDon) {
             selectedHoaDon.value.trangThaiHoaDon = 'CANCELLED';
         }
 
-        toast.add({ 
-            severity: 'success', 
-            summary: 'Thành công', 
-            detail: 'Đã hủy đơn hàng', 
-            life: 3000 
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Đã hủy đơn hàng',
+            life: 3000
         });
     } catch (error) {
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi', 
-            detail: 'Không thể hủy đơn hàng', 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể hủy đơn hàng',
+            life: 3000
         });
     }
 }
 
 function printInvoice(hoaDon) {
-    toast.add({ 
-        severity: 'info', 
-        summary: 'In hóa đơn', 
-        detail: 'Chức năng in hóa đơn đang được phát triển', 
-        life: 3000 
+    toast.add({
+        severity: 'info',
+        summary: 'In hóa đơn',
+        detail: 'Chức năng in hóa đơn đang được phát triển',
+        life: 3000
     });
 }
 
 function trackingInfo(hoaDon) {
-    toast.add({ 
-        severity: 'info', 
-        summary: 'Tracking', 
-        detail: 'Chức năng tracking đang được phát triển', 
-        life: 3000 
+    toast.add({
+        severity: 'info',
+        summary: 'Tracking',
+        detail: 'Chức năng tracking đang được phát triển',
+        life: 3000
     });
 }
 
 function editPOSItems(hoaDon) {
-    toast.add({ 
-        severity: 'info', 
-        summary: 'Chỉnh sửa', 
-        detail: 'Chức năng chỉnh sửa sản phẩm đang được phát triển', 
-        life: 3000 
+    toast.add({
+        severity: 'info',
+        summary: 'Chỉnh sửa',
+        detail: 'Chức năng chỉnh sửa sản phẩm đang được phát triển',
+        life: 3000
     });
 }
 
@@ -1566,19 +1382,19 @@ async function saveQuantity(itemId) {
             hoaDonChiTiets.value[index].soLuong = editQuantity.value;
         }
 
-        toast.add({ 
-            severity: 'success', 
-            summary: 'Thành công', 
-            detail: 'Cập nhật số lượng thành công', 
-            life: 3000 
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Cập nhật số lượng thành công',
+            life: 3000
         });
         cancelEdit();
     } catch (error) {
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi', 
-            detail: 'Không thể cập nhật số lượng', 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể cập nhật số lượng',
+            life: 3000
         });
     }
 }
@@ -1596,18 +1412,18 @@ async function removeItem(itemId) {
             hoaDonChiTiets.value.splice(index, 1);
         }
 
-        toast.add({ 
-            severity: 'success', 
-            summary: 'Thành công', 
-            detail: 'Đã xóa sản phẩm', 
-            life: 3000 
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Đã xóa sản phẩm',
+            life: 3000
         });
     } catch (error) {
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi', 
-            detail: 'Không thể xóa sản phẩm', 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể xóa sản phẩm',
+            life: 3000
         });
     }
 }
@@ -1627,11 +1443,11 @@ function applyFilters() {
 
 function applyAdvancedFilters() {
     currentPage.value = 1;
-    toast.add({ 
-        severity: 'info', 
-        summary: 'Bộ lọc', 
-        detail: 'Đã áp dụng bộ lọc nâng cao', 
-        life: 3000 
+    toast.add({
+        severity: 'info',
+        summary: 'Bộ lọc',
+        detail: 'Đã áp dụng bộ lọc nâng cao',
+        life: 3000
     });
 }
 
@@ -1645,11 +1461,11 @@ function clearAllFilters() {
     staffFilter.value = '';
     paymentMethodFilter.value = '';
     currentPage.value = 1;
-    toast.add({ 
-        severity: 'info', 
-        summary: 'Bộ lọc', 
-        detail: 'Đã xóa tất cả bộ lọc', 
-        life: 3000 
+    toast.add({
+        severity: 'info',
+        summary: 'Bộ lọc',
+        detail: 'Đã xóa tất cả bộ lọc',
+        life: 3000
     });
 }
 
@@ -1665,16 +1481,13 @@ function getTotalQuantity() {
 }
 
 function getTotalAmount() {
-    return filteredChiTiets.value.reduce((sum, item) => sum + (item.giaBan * item.soLuong), 0);
+    return filteredChiTiets.value.reduce((sum, item) => sum + item.giaBan * item.soLuong, 0);
 }
 
 // Export function
 function exportData() {
     try {
-        const headers = [
-            'ID', 'Mã hóa đơn', 'Loại', 'Ngày tạo', 'Tên khách hàng', 
-            'Số điện thoại', 'Email', 'Tổng tiền', 'Trạng thái', 'Phương thức thanh toán'
-        ];
+        const headers = ['ID', 'Mã hóa đơn', 'Loại', 'Ngày tạo', 'Tên khách hàng', 'Số điện thoại', 'Email', 'Tổng tiền', 'Trạng thái', 'Phương thức thanh toán'];
 
         const csvData = filteredHoaDons.value.map((hd) => [
             hd.id,
@@ -1692,13 +1505,15 @@ function exportData() {
         const csvContent = [
             headers.join(','),
             ...csvData.map((row) =>
-                row.map((field) => {
-                    const stringField = String(field);
-                    if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                        return `"${stringField.replace(/"/g, '""')}"`;
-                    }
-                    return stringField;
-                }).join(',')
+                row
+                    .map((field) => {
+                        const stringField = String(field);
+                        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                            return `"${stringField.replace(/"/g, '""')}"`;
+                        }
+                        return stringField;
+                    })
+                    .join(',')
             )
         ].join('\n');
 
@@ -1720,19 +1535,19 @@ function exportData() {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        toast.add({ 
-            severity: 'success', 
-            summary: 'Xuất dữ liệu thành công', 
-            detail: `Đã xuất ${filteredHoaDons.value.length} hóa đơn ra file ${filename}`, 
-            life: 3000 
+        toast.add({
+            severity: 'success',
+            summary: 'Xuất dữ liệu thành công',
+            detail: `Đã xuất ${filteredHoaDons.value.length} hóa đơn ra file ${filename}`,
+            life: 3000
         });
     } catch (error) {
         console.error('Error exporting data:', error);
-        toast.add({ 
-            severity: 'error', 
-            summary: 'Lỗi xuất dữ liệu', 
-            detail: 'Có lỗi xảy ra khi xuất file', 
-            life: 3000 
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi xuất dữ liệu',
+            detail: 'Có lỗi xảy ra khi xuất file',
+            life: 3000
         });
     }
 }
@@ -1895,7 +1710,9 @@ onMounted(() => {
 }
 
 .stat-card {
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    transition:
+        transform 0.2s ease-in-out,
+        box-shadow 0.2s ease-in-out;
 }
 
 .stat-card:hover {
@@ -1969,25 +1786,53 @@ onMounted(() => {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.gap-2 { gap: 0.5rem; }
-.gap-3 { gap: 0.75rem; }
-.gap-4 { gap: 1rem; }
-.gap-6 { gap: 1.5rem; }
+.gap-2 {
+    gap: 0.5rem;
+}
+.gap-3 {
+    gap: 0.75rem;
+}
+.gap-4 {
+    gap: 1rem;
+}
+.gap-6 {
+    gap: 1.5rem;
+}
 
 @media (min-width: 768px) {
-    .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .md\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .md\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .md\:grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 }
 
 @media (min-width: 1024px) {
-    .lg\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .lg\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .lg\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .lg\:grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 }
 
-.min-w-64 { min-width: 16rem; }
-.max-w-40 { max-width: 10rem; }
-.w-48 { width: 12rem; }
-.w-16 { width: 4rem; }
+.min-w-64 {
+    min-width: 16rem;
+}
+.max-w-40 {
+    max-width: 10rem;
+}
+.w-48 {
+    width: 12rem;
+}
+.w-16 {
+    width: 4rem;
+}
 </style>
