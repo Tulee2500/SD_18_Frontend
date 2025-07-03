@@ -1,6 +1,6 @@
 import AppLayout from '@/layout/AppLayout.vue';
-import { createRouter, createWebHistory } from 'vue-router';
 
+import { createRouter, createWebHistory } from 'vue-router';
 const router = createRouter({
     history: createWebHistory(),
     routes: [
@@ -10,7 +10,16 @@ const router = createRouter({
             name: 'user-home',
             component: () => import('@/views/user/UserHome.vue')
         },
-
+         {
+            path: '/products',
+            name: 'products',
+            component: () => import('@/views/user/product/ProductList.vue')
+  },
+  {
+    path: '/product/:id',
+    name: 'product',
+    component: () => import('@/components/user/product/Product.vue')
+  },
         // ADMIN ROUTES - CẦN ĐĂNG NHẬP VÀ LÀ ADMIN/NHÂN VIÊN
         {
             path: '/admin',

@@ -6,10 +6,12 @@ import Aura from '@primeuix/themes/aura';
 import PrimeVue from 'primevue/config';
 import ConfirmationService from 'primevue/confirmationservice';
 import ToastService from 'primevue/toastservice';
-import './style.css';
+
 import '@/assets/styles.scss';
 import { MotionPlugin } from '@vueuse/motion';
-// import VueSmoothScroll from "v-smooth-scroll"; // Comment out dòng này
+import './style.css';
+
+
 
 const app = createApp(App);
 
@@ -25,8 +27,8 @@ app.use(PrimeVue, {
 app.use(ToastService);
 app.use(ConfirmationService);
 app.use(MotionPlugin);
-// .use(VueSmoothScroll,{
-//     duration: 2000,
-// }) // Comment out đoạn này
+
+
+
 
 app.mount('#app');
