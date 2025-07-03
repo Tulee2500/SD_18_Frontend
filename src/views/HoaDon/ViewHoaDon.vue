@@ -245,7 +245,7 @@
                     </template>
                 </Column>
 
-                <Column header="Trạng thái" style="min-width: 20rem">
+                <Column header="Workflow" style="min-width: 20rem">
                     <template #body="slotProps">
                         <div class="flex items-center gap-1">
                             <div v-for="(step, index) in getWorkflowSteps(slotProps.data.loaiHoaDon)" :key="step" class="flex items-center">
