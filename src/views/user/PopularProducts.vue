@@ -1,10 +1,10 @@
 <script setup>
-import { products } from "@/constants";
 import ProductCard from "@/components/user/PopularProductsCard.vue";
-import { Swiper, SwiperSlide } from "swiper/vue";
-import { ref } from "vue";
+import { products } from "@/constants";
 import "swiper/css";
 import { Keyboard } from "swiper/modules";
+import { Swiper, SwiperSlide } from "swiper/vue";
+import { ref } from "vue";
 const slidesPerViewVar = ref(4);
 window.addEventListener("resize", () => {
   const width = window.innerWidth;

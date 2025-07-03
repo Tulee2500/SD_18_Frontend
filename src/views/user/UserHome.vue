@@ -2,13 +2,12 @@
 import Hero from '@/views/user/Hero.vue';
 import Services from '@/views/user/Services.vue';
 //import SpecialOffers from '@/views/user/SpecialOffers.vue';
-import CustomerReviews from '@/views/user/CustomerReviews.vue';
-//import Subscribe from '@/views/user/Subscribe.vue';
-import Footer from '@/views/user/Footer.vue';
-import SuperQuality from '@/views/user/SuperQuality.vue';
-import PopularProducts from '@/views/user/PopularProducts.vue';
 import Nav from '@/components/user/Nav.vue';
 import ScrollToggler from '@/components/user/ScrollToggler.vue';
+import CustomerReviews from '@/views/user/CustomerReviews.vue';
+import Footer from '@/views/user/Footer.vue';
+import PopularProducts from '@/views/user/PopularProducts.vue';
+import SuperQuality from '@/views/user/SuperQuality.vue';
 </script>
 
 <template>
