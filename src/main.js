@@ -9,6 +9,7 @@ import ToastService from 'primevue/toastservice';
 import './style.css';
 import '@/assets/styles.scss';
 import { MotionPlugin } from '@vueuse/motion';
+import './plugins/axios';
 // import VueSmoothScroll from "v-smooth-scroll"; // Comment out dòng này
 
 const app = createApp(App);
