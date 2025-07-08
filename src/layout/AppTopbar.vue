@@ -1,10 +1,10 @@
 <!-- layout/AppTopbar.vue -->
 <script setup>
+import { useAuth } from '@/composables/useAuth';
 import { useLayout } from '@/layout/composables/layout';
+import { useToast } from 'primevue/usetoast';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-// import { useAuth } from '@/composables/useAuth';
-import { useToast } from 'primevue/usetoast';
 
 const { layoutConfig, onMenuToggle } = useLayout();
 const outsideClickListener = ref(null);
