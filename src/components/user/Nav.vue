@@ -1,8 +1,7 @@
 <script setup>
 import headerLogo from "@/assets/images/header-logo.svg";
-import hamburger from "@/assets/icons/hamburger.svg";
 import { navLinks } from "@/constants/index.js";
-import { ref, onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from 'vue-router';
 
 // Thêm state cho giỏ hàng

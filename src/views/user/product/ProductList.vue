@@ -2,75 +2,96 @@
   <div class="nike-complete-layout">
     <!-- Navigation Component -->
     <Nav />
-
+    <section id="home" class="xl:padding-l wide:padding-r padding-b overflow-hidden">
+      <Hero />
+    </section>
     <!-- Main Content -->
     <main class="nike-layout">
-      <!-- Hero Section -->
-      <section class="hero-section">
-        <div class="hero-container">
-          <div class="hero-content">
-            <p class="hero-subtitle">Bộ Sưu Tập Giày Của Chúng Tôi</p>
-            <h1 class="hero-title">
-              Giày<br>
-              <span class="highlight">Nike</span> Mới Ra Mắt
-            </h1>
-            <p class="hero-description">
-              Khám phá những mẫu giày Nike thời trang, chất lượng 
-              thoải mái và sự đổi mới cho cuộc sống năng động của bạn.
-            </p>
-            <button class="cta-button" @click="scrollToProducts">
-              Mua ngay
-              <svg class="button-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z"/>
+      <div class="main-container">
+        <!-- Sidebar Categories -->
+        <aside class="categories-sidebar" :class="{ 'mobile-open': isMobileMenuOpen }">
+          <div class="sidebar-header">
+            <h3 class="sidebar-title">
+              <svg class="category-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+              </svg>
+              Danh Mục
+            </h3>
+            <button class="mobile-close-btn" @click="isMobileMenuOpen = false">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
               </svg>
             </button>
           </div>
-          <div class="hero-image">
-            <div class="featured-shoe-container">
-              <div class="shoe-placeholder">
-                <svg viewBox="0 0 200 120" class="shoe-icon">
-                  <path d="M20 80 Q30 60 60 55 Q100 50 140 55 Q170 60 180 80 L175 90 Q150 95 100 95 Q50 95 25 90 Z" fill="#FFD700"/>
-                  <path d="M25 90 Q50 100 100 100 Q150 100 175 90 L170 95 Q145 100 100 100 Q55 100 30 95 Z" fill="#FFA500"/>
-                </svg>
+          
+          <div class="categories-list">
+            <div 
+              v-if="loadingCategories" 
+              class="category-skeleton"
+              v-for="n in 5" 
+              :key="n"
+            >
+              <div class="skeleton-text"></div>
+            </div>
+            
+            <div v-else>
+              <div
+                class="category-item"
+                :class="{ active: selectedCategory === null }"
+                @click="selectCategory(null)"
+              >
+                <span class="category-name">Tất cả sản phẩm</span>
+                <span class="category-count">{{ totalProducts }}</span>
+              </div>
+              
+              <div
+                v-for="category in categories"
+                :key="category.id"
+                class="category-item"
+                :class="{ active: selectedCategory === category.id }"
+                @click="selectCategory(category.id)"
+              >
+                <span class="category-name">{{ category.tenDanhMuc }}</span>
+                <span class="category-arrow">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                  </svg>
+                </span>
               </div>
             </div>
           </div>
-        </div>
-        
-        <!-- Stats Section -->
-        <div class="stats-section">
-          <div class="stat-item">
-            <h3 class="stat-number">1K+</h3>
-            <p class="stat-label">Thương hiệu</p>
+          
+          <div class="sidebar-footer">
+            <div class="filter-section">
+              <h4 class="filter-title">Bộ lọc nâng cao</h4>
+              <button class="filter-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
+                </svg>
+                <span>Lọc sản phẩm</span>
+              </button>
+            </div>
           </div>
-          <div class="stat-item">
-            <h3 class="stat-number">250+</h3>
-            <p class="stat-label">Cửa hàng</p>
-          </div>
-          <div class="stat-item">
-            <h3 class="stat-number">250K+</h3>
-            <p class="stat-label">Khách hàng</p>
-          </div>
-        </div>
-      </section>
+        </aside>
 
-      <!-- Enhanced Products Section -->
-      <section class="products-section" ref="productsSection">
-        <!-- Background decorations -->
-        <div class="section-background">
-          <div class="bg-decoration bg-decoration-1"></div>
-          <div class="bg-decoration bg-decoration-2"></div>
-          <div class="bg-decoration bg-decoration-3"></div>
-        </div>
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" @click="isMobileMenuOpen = true">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+          </svg>
+          <span>Danh mục</span>
+        </button>
 
+        <!-- Products Section -->
         <div class="products-container">
           <div class="section-header">
             <div class="section-badge">Sản phẩm nổi bật</div>
             <h2 class="section-title">
-              <span class="highlight-gradient">Sản Phẩm</span> Phổ Biến
+              <span class="highlight-gradient">Sản Phẩm</span> 
+              {{ selectedCategoryName }}
             </h2>
             <p class="section-description">
-              Trải nghiệm chất lượng và phong cách hàng đầu với các lựa chọn được tìm kiếm nhiều nhất
+              {{ selectedCategory ? `Khám phá bộ sưu tập ${selectedCategoryName.toLowerCase()} chất lượng cao` : 'Trải nghiệm chất lượng và phong cách hàng đầu với các lựa chọn được tìm kiếm nhiều nhất' }}
             </p>
           </div>
 
@@ -90,7 +111,7 @@
           <!-- Products Grid -->
           <div v-else class="products-grid">
             <div 
-              v-for="(product, index) in products"
+              v-for="(product, index) in filteredProducts"
               :key="product.id"
               @click="goToProductDetail(product)"
               class="product-card"
@@ -176,12 +197,23 @@
               </div>
             </div>
           </div>
+
+          <!-- Empty State -->
+          <div v-if="!loading && filteredProducts.length === 0" class="empty-state">
+            <svg viewBox="0 0 24 24" class="empty-icon">
+              <path fill="currentColor" d="M19,2H5A3,3 0 0,0 2,5V19A3,3 0 0,0 5,22H19A3,3 0 0,0 22,19V5A3,3 0 0,0 19,2M19,19H5V5H19V19M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z"/>
+            </svg>
+            <p class="empty-text">Không có sản phẩm nào trong danh mục này</p>
+          </div>
         </div>
-      </section>
+      </div>
     </main>
 
     <!-- Footer Component -->
-    <Footer />
+    <section id="#" class="padding-x padding-t bg-black pb-8">
+      <Footer />
+    </section>
+    <ScrollToggler />
   </div>
 </template>
 
@@ -189,24 +221,59 @@
 import Nav from '@/components/user/Nav.vue';
 import Footer from '@/views/user/Footer.vue';
 import axios from 'axios';
+import Hero from '../Hero.vue';
 
 export default {
   name: 'ProductList',
   
   components: {
     Nav,
-    Footer
+    Footer,
+    Hero,
   },
   
   data() {
     return {
       products: [],
+      categories: [],
+      selectedCategory: null,
       cartItems: 0,
-      loading: true
+      loading: true,
+      loadingCategories: true,
+      isMobileMenuOpen: false
+    }
+  },
+
+  computed: {
+    filteredProducts() {
+      if (!this.selectedCategory) {
+        return this.products;
+      }
+      return this.products.filter(product => 
+        product.categoryId === this.selectedCategory
+      );
+    },
+    
+    selectedCategoryName() {
+      if (!this.selectedCategory) {
+        return 'Phổ Biến';
+      }
+      const category = this.categories.find(cat => cat.id === this.selectedCategory);
+      return category ? category.tenDanhMuc : 'Phổ Biến';
+    },
+    
+    totalProducts() {
+      return this.products.length;
     }
   },
 
   methods: {
+    selectCategory(categoryId) {
+      this.selectedCategory = categoryId;
+      this.isMobileMenuOpen = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    
     scrollToProducts() {
       this.$refs.productsSection.scrollIntoView({ behavior: 'smooth' });
     },
@@ -232,223 +299,287 @@ export default {
     formatPrice(price) {
       if (!price) return '0';
       return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    },
+    
+    async fetchCategories() {
+      try {
+        this.loadingCategories = true;
+        const response = await axios.get('http://localhost:8080/danh-muc');
+        this.categories = response.data.filter(cat => cat.trangThai === 1);
+      } catch (error) {
+        console.error("Lỗi khi gọi API danh mục:", error);
+      } finally {
+        this.loadingCategories = false;
+      }
+    },
+    
+    async fetchProducts() {
+      try {
+        this.loading = true;
+        const response = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
+        this.products = response.data.map(p => ({
+          id: p.id,
+          imgUrl: p.hinhAnh?.duongDan ?? '',
+          label: p.sanPham?.tenSanPham ?? '',
+          price: p.giaBan,
+          rating: 4.8,
+          colorId: p.mauSac?.id,
+          sizeId: p.kichCo?.id,
+          productId: p.sanPham?.id,
+          categoryId: p.sanPham?.danhMuc?.id
+        }));
+      } catch (error) {
+        console.error("Lỗi khi gọi API sản phẩm:", error);
+      } finally {
+        this.loading = false;
+      }
     }
   },
 
   mounted() {
-    this.loading = true;
-    axios.get('http://localhost:8080/api/san-pham-chi-tiet')
-    .then(response => {
-      console.log(response.data);
-      this.products = response.data.map(p => ({
-        id: p.id,
-        imgUrl: p.hinhAnh?.duongDan ?? '',
-        label: p.sanPham?.tenSanPham ?? '',
-        price: p.giaBan,
-        rating: 4.8,
-        colorId: p.mauSac?.id,
-        sizeId: p.kichCo?.id,
-        productId: p.sanPham?.id
-      }));
-    })
-    .catch(error => {
-      console.error("Lỗi khi gọi API:", error);
-    })
-    .finally(() => {
-      this.loading = false;
-    });
+    this.fetchCategories();
+    this.fetchProducts();
   }
 }
 </script>
 
 <style lang="scss" scoped>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 .nike-complete-layout {
   font-family: 'Helvetica Neue', Arial, sans-serif;
   background-color: #f5f5f5;
   min-height: 100vh;
 }
 
-.nike-layout {
-  padding-top: 80px; // Space for fixed navigation
-}
-
-/* Hero Section */
-.hero-section {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  padding: 4rem 0;
-}
-
-.hero-container {
-  max-width: 1200px;
+.main-container {
+  display: flex;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 0 2rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem;
+  gap: 2rem;
+  padding: 2rem;
+  position: relative;
+}
+
+/* Categories Sidebar */
+.categories-sidebar {
+  width: 280px;
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  height: fit-content;
+  position: sticky;
+  top: 2rem;
+  transition: all 0.3s ease;
+}
+
+.sidebar-header {
+  display: flex;
   align-items: center;
-}
-
-.hero-subtitle {
-  color: #FF6452;
-  font-size: 1rem;
-  margin-bottom: 1rem;
-  font-weight: 500;
-}
-
-.hero-title {
-  font-size: 4rem;
-  font-weight: bold;
-  color: #2c3e50;
-  line-height: 1.1;
-  margin-bottom: 1.5rem;
-}
-
-.highlight {
-  color: #FF6452;
-}
-
-.hero-description {
-  color: #6c757d;
-  font-size: 1.1rem;
-  line-height: 1.6;
+  justify-content: space-between;
   margin-bottom: 2rem;
-  max-width: 500px;
 }
 
-.cta-button {
-  background: #FF6452;
-  color: white;
+.sidebar-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1a202c;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.category-icon {
+  width: 24px;
+  height: 24px;
+  color: #FF6452;
+}
+
+
+.mobile-close-btn {
+  display: none;
+  background: none;
   border: none;
-  padding: 1rem 2rem;
-  border-radius: 50px;
-  font-size: 1.1rem;
-  font-weight: 600;
+  padding: 0.5rem;
   cursor: pointer;
+  color: #64748b;
+  
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.categories-list {
+  margin-bottom: 2rem;
+}
+
+.category-skeleton {
+  margin-bottom: 1rem;
+  
+  .skeleton-text {
+    height: 48px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+    border-radius: 12px;
+  }
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(135deg, #FF6452, #ff8a80);
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
+  }
+  
+  &:hover {
+    background-color: #f8fafc;
+    transform: translateX(8px);
+    
+    .category-arrow {
+      transform: translateX(4px);
+    }
+  }
+  
+  &.active {
+    background: linear-gradient(135deg, #FF6452 0%, #ff8a80 100%);
+    color: white;
+    box-shadow: 0 8px 20px rgba(255, 100, 82, 0.3);
+    
+    &::before {
+      transform: scaleY(1);
+      background: white;
+    }
+    
+    .category-count {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+  }
+}
+
+.category-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.category-count {
+  background: #f1f5f9;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.category-arrow {
+  display: flex;
+  align-items: center;
+  transition: transform 0.3s ease;
+  
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.sidebar-footer {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1.5rem;
+}
+
+.filter-section {
+  text-align: center;
+}
+
+.filter-title {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.filter-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  &:hover {
+    background: #FF6452;
+    border-color: #FF6452;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255, 100, 82, 0.2);
+  }
+}
+
+/* Mobile Menu Toggle */
+.mobile-menu-toggle {
+  display: none;
+  position: fixed;
+  bottom: 2rem;
+  left: 2rem;
+  z-index: 100;
+  background: linear-gradient(135deg, #FF6452, #ff8a80);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 50px;
+  border: none;
+  box-shadow: 0 8px 25px rgba(255, 100, 82, 0.4);
+  cursor: pointer;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   transition: all 0.3s ease;
-
-  &:hover {
-    background: #e55a4a;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(255, 100, 82, 0.3);
-  }
-}
-
-.button-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.hero-image {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.featured-shoe-container {
-  width: 300px;
-  height: 200px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.shoe-placeholder {
-  width: 100%;
-  height: 100%;
-}
-
-.shoe-icon {
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.1));
-}
-
-/* Stats Section */
-.stats-section {
-  display: flex;
-  justify-content: center;
-  gap: 4rem;
-  margin-top: 3rem;
-  padding: 2rem 0;
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-number {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-}
-
-.stat-label {
-  color: #6c757d;
-  font-size: 1rem;
-}
-
-/* Enhanced Products Section */
-.products-section {
-  position: relative;
-  padding: 6rem 0;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #ffffff 100%);
-  overflow: hidden;
-}
-
-.section-background {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
   
-  .bg-decoration {
-    position: absolute;
-    border-radius: 50%;
-    opacity: 0.03;
-    
-    &-1 {
-      width: 400px;
-      height: 400px;
-      background: linear-gradient(135deg, #FF6452, #ff8a80);
-      top: 10%;
-      left: -10%;
-      animation: float 20s ease-in-out infinite;
-    }
-    
-    &-2 {
-      width: 300px;
-      height: 300px;
-      background: linear-gradient(135deg, #4f46e5, #7c3aed);
-      top: 60%;
-      right: -5%;
-      animation: float 25s ease-in-out infinite reverse;
-    }
-    
-    &-3 {
-      width: 200px;
-      height: 200px;
-      background: linear-gradient(135deg, #06b6d4, #0891b2);
-      bottom: 20%;
-      left: 20%;
-      animation: float 30s ease-in-out infinite;
-    }
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(255, 100, 82, 0.5);
   }
 }
 
+/* Products Container - Adjusted */
 .products-container {
+  flex: 1;
   position: relative;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 2rem;
   z-index: 1;
 }
 
@@ -493,6 +624,25 @@ export default {
   font-weight: 400;
 }
 
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  
+  .empty-icon {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 2rem;
+    color: #e2e8f0;
+  }
+  
+  .empty-text {
+    font-size: 1.25rem;
+    color: #64748b;
+    font-weight: 500;
+  }
+}
+
 /* Loading Skeleton */
 .product-card-skeleton {
   background: white;
@@ -534,11 +684,11 @@ export default {
   }
 }
 
-/* Products Grid */
+/* Products Grid - Adjusted for smaller width */
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 2.5rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
   margin-top: 3rem;
 }
 
@@ -792,57 +942,93 @@ export default {
   }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-20px) rotate(5deg); }
-}
-
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
 /* Responsive Design */
+@media (max-width: 1400px) {
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .main-container {
+    padding: 1rem;
+  }
+  
+  .categories-sidebar {
+    position: fixed;
+    left: -100%;
+    top: 0;
+    height: 100vh;
+    z-index: 1000;
+    border-radius: 0;
+    width: 300px;
+    max-width: 80vw;
+    padding: 2rem;
+    overflow-y: auto;
+    
+    &.mobile-open {
+      left: 0;
+      box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
+    }
+  }
+  
+  .mobile-close-btn {
+    display: block;
+  }
+  
+  .mobile-menu-toggle {
+    display: flex;
+  }
+  
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+  
+  .section-title {
+    font-size: 2.5rem;
+  }
+}
+
 @media (max-width: 768px) {
   .nike-layout {
     padding-top: 60px;
   }
   
-  .hero-container {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-    text-align: center;
-  }
-  
-  .hero-title {
-    font-size: 2.5rem;
-  }
-  
-  .stats-section {
-    gap: 2rem;
-  }
-  
-  .stat-number {
-    font-size: 2rem;
+  .products-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
   }
   
   .section-title {
     font-size: 2.5rem;
   }
   
-  .products-grid {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
+  .section-description {
+    font-size: 1rem;
   }
   
-  .products-section {
-    padding: 4rem 0;
+  .product-info {
+    padding: 1.5rem;
+  }
+  
+  .product-name {
+    font-size: 1.1rem;
+  }
+  
+  .product-price {
+    font-size: 1.5rem;
   }
 }
 
 @media (max-width: 480px) {
-  .hero-title {
-    font-size: 2rem;
+  .main-container {
+    padding: 0.5rem;
   }
   
   .section-title {
@@ -857,6 +1043,12 @@ export default {
   .product-info {
     padding: 1.5rem;
   }
+  
+  .mobile-menu-toggle {
+    bottom: 1rem;
+    left: 1rem;
+    padding: 0.875rem 1.25rem;
+    font-size: 0.9rem;
+  }
 }
-
 </style>
