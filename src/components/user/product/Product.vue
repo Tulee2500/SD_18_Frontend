@@ -2,10 +2,7 @@
   <div class="product-detail-container">
     <!-- Navigation -->
     <Nav />
-    <section id="home" class="xl:padding-l wide:padding-r padding-b overflow-hidden">
-      <Hero />
-    </section>
-
+  
     <!-- Main Product Content -->
     <div class="product-main">
       <div class="container" v-if="product.sanPham">
@@ -53,57 +50,78 @@
             <div class="product-status">
               <div class="status-item">
                 <span class="status-icon">✓</span>
-                <span>Kho hàng: <strong class="text-success">CÒN HÀNG</strong></span>
+                <span>Kho hàng: 
+                  <strong :class="currentStock > 0 ? 'text-success' : 'text-danger'">
+                    {{ currentStock > 0 ? `CÒN HÀNG (${currentStock} sản phẩm)` : 'HẾT HÀNG' }}
+                  </strong>
+                </span>
               </div>
               <div class="status-item">
-                <span>● Điểm thưởng: <strong>{{ Math.floor(product.giaBan / 100) }}</strong></span>
+                <span>● Điểm thưởng: <strong>{{ Math.floor(currentPrice / 100) }}</strong></span>
               </div>
               <div class="status-item">
-                <span>● Mã sản phẩm: <strong>{{ product.sanPham.maSanPham || 'MSL472' }}</strong></span>
+                <span>● Mã sản phẩm: <strong>{{ currentVariant?.maChiTiet || product.maChiTiet || 'MSL472' }}</strong></span>
               </div>
             </div>
 
             <!-- Price Section -->
             <div class="price-section">
-              <span class="current-price">{{ formatPrice(product.giaBan) }}₫</span>
-              <span class="original-price">{{ formatPrice(product.giaGoc || product.giaBan * 1.3) }}₫</span>
+              <div class="price-row">
+                <span class="current-price">{{ formatPrice(totalPrice) }}₫</span>
+                <span class="original-price">{{ formatPrice(totalOriginalPrice) }}₫</span>
+              </div>
+              <div class="unit-price" v-if="quantity > 1">
+                <span>Đơn giá: {{ formatPrice(currentPrice) }}₫ x {{ quantity }}</span>
+              </div>
             </div>
 
             <!-- Size Selection -->
-            <div class="option-section" v-if="sizes.length > 0">
-              <label class="option-label">Chọn size</label>
+            <div class="option-section size-selection" v-if="sizes.length > 0">
+              <div class="section-header">
+                <label class="option-label">Size</label>
+                <a href="#" class="size-guide-link" @click.prevent="showSizeGuide">
+                  <span>📏</span> Hướng dẫn chọn size
+                </a>
+              </div>
               <div class="size-grid">
                 <button 
                   v-for="size in sizes"
                   :key="size.id"
                   class="size-button"
                   :class="{
-                    selected: selectedSize?.id === size.id,
+                    selected: isSelectedSize(size),
                     disabled: !isSizeAvailable(size)
                   }"
-                  @click="selectSize(size)"
+                  @click="toggleSize(size)"
                   :disabled="!isSizeAvailable(size)"
                 >
                   {{ size.tenKichCo }}
                 </button>
               </div>
-              <a href="#" class="size-guide-link">
-                <span class="icon">📏</span> Hướng dẫn chọn size
-              </a>
+              <div class="selected-sizes-display" v-if="selectedSizes.length > 0">
+                <span>Đã chọn: <strong>Size {{ selectedSizes.map(s => s.tenKichCo).join(', ') }}</strong></span>
+              </div>
             </div>
 
             <!-- Color Selection -->
-            <div class="option-section" v-if="colors.length > 1">
-              <label class="option-label">Màu sắc: <strong>{{ selectedColor?.tenMauSac }}</strong></label>
+            <div class="option-section color-selection" v-if="colors.length > 0">
+              <div class="section-header">
+                <label class="option-label">Màu sắc: <strong style="color: #000;">{{ selectedColor?.tenMauSac }}</strong></label>
+              </div>
               <div class="color-options">
-                <div 
+                <div
                   v-for="color in colors"
                   :key="color.id"
                   class="color-option"
                   :class="{ selected: selectedColor?.id === color.id }"
                   @click="selectColor(color)"
                 >
-                  <img :src="color.image || '/placeholder-shoe.png'" :alt="color.tenMauSac" />
+                  <div
+                    class="color-circle"
+                    :style="{
+                      backgroundColor: getColorHex(color.tenMauSac)
+                    }"
+                  ></div>
                   <span class="color-name">{{ color.tenMauSac }}</span>
                 </div>
               </div>
@@ -118,26 +136,38 @@
             <!-- Quantity and Actions -->
             <div class="purchase-section">
               <div class="quantity-wrapper">
+                <label class="quantity-label">Số lượng:</label>
                 <div class="quantity-selector">
-                  <button @click="decreaseQuantity" class="qty-btn">-</button>
+                  <button @click="decreaseQuantity" class="qty-btn" :disabled="quantity <= 1">-</button>
                   <input 
                     type="number"
                     v-model.number="quantity"
                     @input="validateQuantity"
                     class="qty-input"
                     min="1"
-                    :max="maxQuantity"
+                    :max="currentStock"
                   />
-                  <button @click="increaseQuantity" class="qty-btn">+</button>
+                  <button @click="increaseQuantity" class="qty-btn" :disabled="quantity >= currentStock">+</button>
                 </div>
+                <span class="stock-warning" v-if="quantity === currentStock && currentStock > 0">
+                  (Tối đa)
+                </span>
               </div>
               
               <div class="action-buttons">
-                <button class="btn-add-cart" @click="addToCart">
+                <button 
+                  class="btn-add-cart" 
+                  @click="addToCart"
+                  :disabled="!canAddToCart"
+                >
                   <span class="icon">🛒</span>
                   THÊM VÀO GIỎ
                 </button>
-                <button class="btn-buy-now" @click="buyNow">
+                <button 
+                  class="btn-buy-now" 
+                  @click="buyNow"
+                  :disabled="!canAddToCart"
+                >
                   <span class="icon">⚡</span>
                   MUA HÀNG NGAY
                 </button>
@@ -149,7 +179,7 @@
               <div class="gift-icon">🎁</div>
               <div class="gift-text">
                 <strong>MUA GIÀY TẶNG TẤT CAO CẤP MYSHOES 🎁</strong>
-                <p>Tặng tất cao cấp Myshoes khẳng khúc tính khử mùi</p>
+                <p>Tặng tất cao cấp Myshoes kháng khuẩn tính khử mùi</p>
               </div>
             </div>
 
@@ -161,7 +191,7 @@
                 <li>✓ Đổi hàng trong 30 ngày, bảo hành 1 năm, hỗ trợ mãi trọn đời</li>
                 <li>✓ Uy tín hơn 9 năm được khẳng định</li>
                 <li>✓ Hơn 100.000 khách hàng đã tin tưởng</li>
-                <li>✓ Nhận viền tự vấn tận tình, dịch vụ chu đáo</li>
+                <li>✓ Nhân viên tư vấn tận tình, dịch vụ chu đáo</li>
                 <li>✓ 99% khách hàng hài lòng về chất lượng sản phẩm</li>
                 <li>✓ Miễn phí vận chuyển toàn quốc với đơn hàng từ 300k</li>
                 <li>✓ Giá cả hợp lý, hệ thống điểm thưởng hấp dẫn</li>
@@ -193,7 +223,6 @@
 <script>
 import Nav from '@/components/user/Nav.vue';
 import Footer from '@/views/user/Footer.vue';
-import Hero from '@/views/user/Hero.vue';
 import axios from 'axios';
 
 export default {
@@ -204,16 +233,17 @@ export default {
       productImages: [],
       selectedImageIndex: 0,
       selectedColor: null,
-      selectedSize: null,
+      selectedSizes: [], // Changed from selectedSize to selectedSizes array
       quantity: 1,
       colors: [],
       sizes: [],
       availableVariants: [],
+      currentVariant: null,
       brandLogo: '/lacoste-logo.png'
     };
   },
   components: {
-    Nav, Footer, Hero,
+    Nav, Footer,
   },
   computed: {
     productId() {
@@ -222,12 +252,32 @@ export default {
     selectedImage() {
       return this.productImages[this.selectedImageIndex] || '/placeholder-shoe.png';
     },
-    maxQuantity() {
-      if (this.selectedSize && this.selectedColor) {
-        const variant = this.getVariant(this.selectedColor, this.selectedSize);
-        return variant?.soLuong || 99;
+    currentStock() {
+      if (this.currentVariant) {
+        return this.currentVariant.soLuong || 0;
       }
-      return this.product.soLuong || 99;
+      return this.product.soLuong || 0;
+    },
+    currentPrice() {
+      if (this.currentVariant) {
+        return this.currentVariant.giaBan || 0;
+      }
+      return this.product.giaBan || 0;
+    },
+    currentOriginalPrice() {
+      if (this.currentVariant) {
+        return this.currentVariant.giaGoc || this.currentVariant.giaBan * 1.3;
+      }
+      return this.product.giaGoc || this.product.giaBan * 1.3 || 0;
+    },
+    totalPrice() {
+      return this.currentPrice * this.quantity;
+    },
+    totalOriginalPrice() {
+      return this.currentOriginalPrice * this.quantity;
+    },
+    canAddToCart() {
+      return this.selectedSizes.length > 0 && this.selectedColor && this.quantity > 0;
     }
   },
   methods: {
@@ -249,48 +299,37 @@ export default {
         }
         
         // Set brand logo based on product brand
-        if (this.product.thuongHieu?.tenThuongHieu) {
-          this.brandLogo = `/${this.product.thuongHieu.tenThuongHieu.toLowerCase()}-logo.png`;
+        if (this.product.sanPham?.thuongHieu?.tenThuongHieu) {
+          this.brandLogo = `/${this.product.sanPham.thuongHieu.tenThuongHieu.toLowerCase()}-logo.png`;
         }
         
         await this.fetchVariants();
       } catch (error) {
         console.error('Error fetching product:', error);
+        alert('Không thể tải thông tin sản phẩm. Vui lòng thử lại sau.');
       }
     },
     
     async fetchVariants() {
       try {
-        const [variantsRes, colorsRes, sizesRes] = await Promise.all([
-          axios.get('http://localhost:8080/api/san-pham-chi-tiet'),
-          axios.get('http://localhost:8080/mau-sac'),
-          axios.get('http://localhost:8080/api/kich-co')
-        ]);
+        const variantsRes = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
         
         // Filter variants for this product
         this.availableVariants = variantsRes.data.filter(v => 
-          v.sanPham?.id === this.product.sanPham?.id
+          v.sanPham?.id === this.product.sanPham?.id && v.trangThai === 1
         );
         
-        // Get unique colors and sizes
-        const colorIds = [...new Set(this.availableVariants.map(v => v.mauSac?.id).filter(Boolean))];
-        const sizeIds = [...new Set(this.availableVariants.map(v => v.kichCo?.id).filter(Boolean))];
-        
-        // Filter available colors and sizes
-        this.colors = colorsRes.data.filter(c => colorIds.includes(c.id) && c.trangThai === 1);
-        this.sizes = sizesRes.data.filter(s => sizeIds.includes(s.id) && s.trangThai === 1)
-          .sort((a, b) => parseFloat(a.tenKichCo) - parseFloat(b.tenKichCo));
-        
-        // Add images to colors
-        this.colors = this.colors.map(color => {
-          const variant = this.availableVariants.find(v => 
-            v.mauSac?.id === color.id && v.hinhAnh?.duongDan
-          );
-          return {
-            ...color,
-            image: variant?.hinhAnh?.duongDan || null
-          };
+        // Get unique colors from variants
+        const colorMap = new Map();
+        this.availableVariants.forEach(v => {
+          if (v.mauSac && !colorMap.has(v.mauSac.id)) {
+            colorMap.set(v.mauSac.id, v.mauSac);
+          }
         });
+        this.colors = Array.from(colorMap.values());
+        
+        // Don't get sizes from variants, we'll use all sizes from API instead
+        // This is handled in fetchAllSizes()
         
         // Set default selections
         if (this.product.mauSac) {
@@ -299,12 +338,54 @@ export default {
           this.selectedColor = this.colors[0];
         }
         
-        if (this.product.kichCo) {
-          this.selectedSize = this.sizes.find(s => s.id === this.product.kichCo.id);
-        }
+        // Update current variant
+        this.updateProductVariant();
         
       } catch (error) {
         console.error('Error fetching variants:', error);
+      }
+    },
+    
+    async fetchAllSizes() {
+      try {
+        const res = await axios.get('http://localhost:8080/kich-co');
+        // Filter only active sizes and sort by size number
+        this.sizes = res.data
+          .filter(size => size.trangThai === 1)
+          .sort((a, b) => parseFloat(a.tenKichCo) - parseFloat(b.tenKichCo));
+        console.log('Loaded sizes:', this.sizes);
+      } catch (err) {
+        console.error('Lỗi khi tải kích cỡ:', err);
+      }
+    },
+    
+    getColorHex(tenMau) {
+      const map = {
+        'Trắng': '#ffffff',
+        'Đen': '#000000',
+        'Đỏ': '#ff0000',
+        'Xanh Dương': '#0000ff',
+        'Xanh Navy': '#001f3f',
+        'Xanh Lá': '#008000',
+        'Vàng': '#ffff00',
+        'Cam': '#ffa500',
+        'Hồng': '#ff69b4',
+        'Tím': '#800080',
+        'Nâu': '#8b4513',
+        'Xám': '#808080',
+        'Bạc': '#c0c0c0',
+        'Vàng Gold': '#ffd700',
+        'Be': '#f5f5dc'
+      };
+      return map[tenMau] || '#cccccc';
+    },
+
+    async fetchAllColors() {
+      try {
+        const res = await axios.get('http://localhost:8080/mau-sac');
+        this.colors = res.data;
+      } catch (err) {
+        console.error('Lỗi khi tải màu sắc:', err);
       }
     },
     
@@ -316,18 +397,50 @@ export default {
       this.selectedColor = color;
       this.updateProductVariant();
       
-      // Update images based on color
-      if (color.image) {
-        this.productImages = [color.image, color.image, color.image, color.image];
+      // Reset quantity when changing color
+      this.quantity = 1;
+      
+      // Update images based on variant with this color
+      const variantWithImage = this.availableVariants.find(v => 
+        v.mauSac?.id === color.id && v.hinhAnh?.duongDan
+      );
+      
+      if (variantWithImage?.hinhAnh?.duongDan) {
+        this.productImages = [
+          variantWithImage.hinhAnh.duongDan,
+          variantWithImage.hinhAnh.duongDan,
+          variantWithImage.hinhAnh.duongDan,
+          variantWithImage.hinhAnh.duongDan
+        ];
         this.selectedImageIndex = 0;
       }
     },
     
-    selectSize(size) {
-      if (this.isSizeAvailable(size)) {
-        this.selectedSize = size;
+    isSelectedSize(size) {
+      return this.selectedSizes.some(s => s.id === size.id);
+    },
+    
+    toggleSize(size) {
+      if (!this.isSizeAvailable(size)) return;
+      
+      const index = this.selectedSizes.findIndex(s => s.id === size.id);
+      if (index > -1) {
+        // Remove size if already selected
+        this.selectedSizes.splice(index, 1);
+      } else {
+        // Add size if not selected
+        this.selectedSizes.push(size);
+      }
+      
+      // Update variant for the first selected size
+      if (this.selectedSizes.length > 0) {
         this.updateProductVariant();
       }
+    },
+    
+    selectSize(size) {
+      // Keep this method for backward compatibility
+      this.toggleSize(size);
     },
     
     isSizeAvailable(size) {
@@ -347,19 +460,14 @@ export default {
       if (this.selectedColor && this.selectedSize) {
         const variant = this.getVariant(this.selectedColor, this.selectedSize);
         if (variant) {
-          this.product = {
-            ...this.product,
-            ...variant,
-            sanPham: this.product.sanPham,
-            danhMuc: this.product.danhMuc
-          };
+          this.currentVariant = variant;
         }
       }
     },
     
     formatPrice(price) {
       if (!price) return '0';
-      return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      return Math.round(price).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     },
     
     decreaseQuantity() {
@@ -369,7 +477,7 @@ export default {
     },
     
     increaseQuantity() {
-      if (this.quantity < this.maxQuantity) {
+      if (this.quantity < this.currentStock) {
         this.quantity++;
       }
     },
@@ -377,9 +485,13 @@ export default {
     validateQuantity() {
       if (this.quantity < 1) {
         this.quantity = 1;
-      } else if (this.quantity > this.maxQuantity) {
-        this.quantity = this.maxQuantity;
+      } else if (this.quantity > this.currentStock) {
+        this.quantity = this.currentStock;
       }
+    },
+    
+    showSizeGuide() {
+      alert('Hướng dẫn chọn size:\n\n• Size 35-36: Phù hợp với bàn chân 22-23cm\n• Size 37-38: Phù hợp với bàn chân 23.5-24.5cm\n• Size 39-40: Phù hợp với bàn chân 25-26cm\n• Size 41-42: Phù hợp với bàn chân 26.5-27.5cm\n• Size 43-44: Phù hợp với bàn chân 28-29cm\n• Size 45: Phù hợp với bàn chân trên 29.5cm\n\nLưu ý: Nếu bàn chân bạn thuộc dạng bè ngang, nên chọn size lớn hơn 1 số.');
     },
     
     addToCart() {
@@ -388,18 +500,58 @@ export default {
         return;
       }
       
+      if (!this.selectedColor) {
+        alert('Vui lòng chọn màu sắc!');
+        return;
+      }
+      
+      if (this.currentStock === 0) {
+        alert('Sản phẩm đã hết hàng!');
+        return;
+      }
+      
       const cartItem = {
-        productId: this.product.id,
+        productId: this.currentVariant?.id || this.product.id,
+        productDetailId: this.currentVariant?.id,
         name: this.product.sanPham?.tenSanPham,
-        price: this.product.giaBan,
+        price: this.currentPrice,
         quantity: this.quantity,
-        color: this.selectedColor,
-        size: this.selectedSize,
-        image: this.selectedImage
+        totalPrice: this.totalPrice,
+        color: {
+          id: this.selectedColor.id,
+          name: this.selectedColor.tenMauSac,
+          code: this.selectedColor.maMauSac
+        },
+        size: {
+          id: this.selectedSize.id,
+          name: this.selectedSize.tenKichCo
+        },
+        image: this.selectedImage,
+        stock: this.currentStock
       };
       
+      // Get existing cart from localStorage
+      let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      
+      // Check if item already exists in cart
+      const existingIndex = cart.findIndex(item => 
+        item.productDetailId === cartItem.productDetailId
+      );
+      
+      if (existingIndex > -1) {
+        // Update quantity if item exists
+        cart[existingIndex].quantity += this.quantity;
+        cart[existingIndex].totalPrice = cart[existingIndex].price * cart[existingIndex].quantity;
+      } else {
+        // Add new item
+        cart.push(cartItem);
+      }
+      
+      // Save to localStorage
+      localStorage.setItem('cart', JSON.stringify(cart));
+      
       console.log('Added to cart:', cartItem);
-      alert('Đã thêm vào giỏ hàng!');
+      alert(`Đã thêm ${this.quantity} sản phẩm vào giỏ hàng!`);
     },
     
     buyNow() {
@@ -410,11 +562,12 @@ export default {
   
   mounted() {
     this.fetchProductDetail();
+    // Fetch all sizes and colors from API
+    this.fetchAllSizes();
+    this.fetchAllColors();
   }
 };
-</script>
-
-<style scoped>
+</script><style scoped>
 .product-detail-container {
   background-color: #f8f9fa;
   min-height: 100vh;
@@ -573,6 +726,10 @@ export default {
   color: #28a745;
 }
 
+.text-danger {
+  color: #dc3545;
+}
+
 .price-section {
   margin-bottom: 30px;
   padding: 20px 0;
@@ -580,17 +737,29 @@ export default {
   border-bottom: 1px solid #e9ecef;
 }
 
+.price-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+
 .current-price {
   font-size: 32px;
   font-weight: bold;
   color: #ff6b35;
-  margin-right: 20px;
 }
 
 .original-price {
   font-size: 20px;
   color: #999;
   text-decoration: line-through;
+}
+
+.unit-price {
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
 }
 
 .contact-info {
@@ -629,90 +798,84 @@ export default {
 }
 
 .size-button {
-  min-width: 60px;
-  height: 45px;
-  border: 2px solid #e9ecef;
+  padding: 8px 12px;
+  margin: 4px;
+  border: 1px solid #ccc;
   background: white;
-  border-radius: 8px;
   cursor: pointer;
-  font-weight: bold;
-  font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.size-button:hover:not(.disabled) {
-  border-color: #ff6b35;
 }
 
 .size-button.selected {
-  border-color: #ff6b35;
-  background: #ff6b35;
+  background: #222;
   color: white;
 }
 
 .size-button.disabled {
-  background: #f8f9fa;
-  color: #ccc;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.size-guide-link {
-  color: #007bff;
-  text-decoration: none;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.color-options {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-}
-
 .color-option {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  display: inline-block;
+  margin: 5px;
   cursor: pointer;
-  padding: 10px;
-  border-radius: 8px;
-  transition: background-color 0.3s ease;
 }
 
-.color-option:hover {
-  background-color: #f8f9fa;
+.color-option.selected .color-swatch {
+  border: 2px solid black;
 }
 
-.color-option.selected {
-  background-color: #e3f2fd;
-}
-
-.color-option img {
-  width: 40px;
-  height: 40px;
+.color-swatch {
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2px solid #ddd;
+  border: 1px solid #ccc;
 }
+
 
 .color-name {
   font-size: 12px;
   color: #666;
+  text-align: center;
+}
+
+.selected-variant-info {
+  background: #f0f8ff;
+  border: 1px solid #d0e4ff;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.variant-details p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.variant-details strong {
+  color: #007bff;
 }
 
 .purchase-section {
   display: flex;
   gap: 20px;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 30px;
   padding: 20px 0;
   border-top: 1px solid #e9ecef;
+  flex-wrap: wrap;
 }
 
 .quantity-wrapper {
   display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.quantity-label {
+  font-weight: bold;
+  color: #333;
 }
 
 .quantity-selector {
@@ -733,8 +896,13 @@ export default {
   transition: background-color 0.3s ease;
 }
 
-.qty-btn:hover {
+.qty-btn:hover:not(:disabled) {
   background: #e9ecef;
+}
+
+.qty-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .qty-input {
@@ -746,10 +914,17 @@ export default {
   font-size: 16px;
 }
 
+.stock-warning {
+  color: #ff6b35;
+  font-size: 12px;
+  font-weight: bold;
+}
+
 .action-buttons {
   display: flex;
   gap: 15px;
   flex: 1;
+  min-width: 300px;
 }
 
 .btn-add-cart, .btn-buy-now {
@@ -772,7 +947,7 @@ export default {
   color: white;
 }
 
-.btn-add-cart:hover {
+.btn-add-cart:hover:not(:disabled) {
   background: #0056b3;
   transform: translateY(-2px);
 }
@@ -782,9 +957,15 @@ export default {
   color: white;
 }
 
-.btn-buy-now:hover {
+.btn-buy-now:hover:not(:disabled) {
   background: #e55a2b;
   transform: translateY(-2px);
+}
+
+.btn-add-cart:disabled, .btn-buy-now:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .gift-banner {
