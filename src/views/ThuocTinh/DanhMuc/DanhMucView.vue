@@ -59,7 +59,7 @@
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maDanhMuc" class="block font-bold mb-3">Mã Danh Mục</label>
-                    <InputText id="maDanhMuc" v-model.trim="danhMuc.maDanhMuc" required="true" autofocus :invalid="submitted && !danhMuc.maDanhMuc" fluid />
+                    <InputText id="maDanhMuc" v-model.trim="danhMuc.maDanhMuc" required="true" autofocus :invalid="submitted && !danhMuc.maDanhMuc" fluid readonly="true"/>
                     <small v-if="submitted && !danhMuc.maDanhMuc" class="text-red-500">Mã Danh Mục là bắt buộc.</small>
                 </div>
                 <div>
@@ -147,8 +147,21 @@ async function fetchData() {
     }
 }
 
+function createId() {
+        let id = '';
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 8; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return 'DM' + id;
+    }
+
 function openNew() {
-    danhMuc.value = { trangThai: 1 };
+    danhMuc.value = { 
+        maDanhMuc: createId(),
+        tenDanhMuc: '',
+        trangThai: 1 
+    };
     submitted.value = false;
     danhMucDialog.value = true;
 }
@@ -172,6 +185,7 @@ async function saveDanhMuc() {
                     life: 3000
                 });
             } else {
+                danhMuc.value.maDanhMuc = danhMuc.value.maDanhMuc || createId();
                 await axios.post('http://localhost:8080/danh-muc', danhMuc.value);
                 toast.add({
                     severity: 'success',

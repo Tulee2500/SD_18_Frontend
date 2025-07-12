@@ -111,7 +111,7 @@
                 </div>
                 <div>
                     <label for="maKhuyenMai" class="mb-3 block font-bold">Mã Khuyến Mãi</label>
-                    <InputText id="maKhuyenMai" v-model="khuyenMai.maKhuyenMai" fluid />
+                    <InputText id="maKhuyenMai" v-model="khuyenMai.maKhuyenMai" fluid readonly="true" />
                 </div>
                 <div>
                     <label for="giaTri" class="mb-3 block font-bold">Giá Trị Giảm (%)</label>

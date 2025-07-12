@@ -59,7 +59,7 @@
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maMauSac" class="block font-bold mb-3">Mã Màu Sắc</label>
-                    <InputText id="maMauSac" v-model.trim="mauSac.maMauSac" required="true" autofocus :invalid="submitted && !mauSac.maMauSac" fluid />
+                    <InputText id="maMauSac" v-model.trim="mauSac.maMauSac" required="true" autofocus :invalid="submitted && !mauSac.maMauSac" fluid readonly="true" />
                     <small v-if="submitted && !mauSac.maMauSac" class="text-red-500">Mã Màu Sắc là bắt buộc.</small>
                 </div>
                 <div>
