@@ -59,7 +59,7 @@
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maChatLieu" class="block font-bold mb-3">Mã Chất Liệu</label>
-                    <InputText id="maChatLieu" v-model.trim="chatLieu.maChatLieu" required="true" autofocus :invalid="submitted && !chatLieu.maChatLieu" fluid />
+                    <InputText id="maChatLieu" v-model.trim="chatLieu.maChatLieu" required="true" autofocus :invalid="submitted && !chatLieu.maChatLieu" fluid readonly="true"/>
                     <small v-if="submitted && !chatLieu.maChatLieu" class="text-red-500">Mã Chất Liệu là bắt buộc.</small>
                 </div>
                 <div>

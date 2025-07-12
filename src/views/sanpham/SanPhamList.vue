@@ -1,8 +1,8 @@
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
-import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
+import axios from 'axios';
 
 // Cấu hình API base URL
 const API_BASE_URL = 'http://localhost:8080';
@@ -31,6 +31,14 @@ const chatLieus = ref([]);
 const deGiays = ref([]);
 const kichCos = ref([]);
 const mauSacs = ref([]);
+const hinhAnhs = ref([]); // Thêm danh sách hình ảnh
+
+// Dialog chọn hình ảnh
+const imageSelectionDialog = ref(false);
+const selectedImages = ref([]);
+const imageFilters = ref({
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+});
 
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
@@ -40,6 +48,7 @@ const statuses = ref([
     { label: 'ĐANG HOẠT ĐỘNG', value: 1 },
     { label: 'NGỪNG HOẠT ĐỘNG', value: 0 }
 ]);
+
 // Thêm vào phần ref declarations
 const imagePreviewDialog = ref(false);
 const selectedImageDetail = ref({});
@@ -54,17 +63,32 @@ const getProductTotalQuantity = (productId) => {
 
 // Computed để cập nhật products với tổng số lượng thực tế
 const productsWithTotalQuantity = computed(() => {
-    return products.value.map((product) => ({
+    return products.value.map(product => ({
         ...product,
         totalQuantity: getProductTotalQuantity(product.id),
         displayQuantity: getProductTotalQuantity(product.id) || product.soLuong || 0
     }));
 });
 
+// Computed để lọc hình ảnh có sẵn (trạng thái = 1)
+const availableImages = computed(() => {
+    return hinhAnhs.value.filter(img => img.trangThai === 1);
+});
+
 // Thêm các hàm xử lý
-function handleImageError(event) {
+function handleImageError(event) {  
+    // Tránh loop vô hạn
+    if (event.target.src.includes('placeholder.png')) {
+        console.log('⚠️ Already using placeholder, stopping');
+        return;
+    }
+    
+    // Thử fallback một lần
+    const originalSrc = event.target.src;
+    event.target.onerror = null; // Ngăn loop
+    
+    // Set placeholder
     event.target.src = '/images/placeholder.png';
-    event.target.onerror = null;
 }
 
 function openImageDetail(image) {
@@ -73,10 +97,10 @@ function openImageDetail(image) {
 }
 
 function openAllImages(detail) {
-    selectedImageDetail.value = {
-        detail: detail,
-        images: detail.images,
-        showAll: true
+    selectedImageDetail.value = { 
+        detail: detail, 
+        images: detail.images, 
+        showAll: true 
     };
     imagePreviewDialog.value = true;
 }
@@ -89,10 +113,53 @@ function addImageToDetail(detail) {
         life: 5000
     });
 }
+ const selectedImage = ref(null); 
+// Hàm mở dialog chọn hình ảnh
+function openImageSelection() {
+    // Nếu đã có hình ảnh được chọn, set làm selected
+    selectedImage.value = detail.value.selectedImage || null;
+    imageSelectionDialog.value = true;
+}
+
+// Hàm xác nhận chọn hình ảnh
+function confirmImageSelection() {
+    detail.value.selectedImage = selectedImage.value;
+    imageSelectionDialog.value = false;
+    
+    if (selectedImage.value) {
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Đã chọn hình ảnh: ${selectedImage.value.maHinhAnh}`,
+            life: 3000
+        });
+    } else {
+        toast.add({
+            severity: 'info',
+            summary: 'Thông báo',
+            detail: 'Đã bỏ chọn hình ảnh',
+            life: 3000
+        });
+    }
+}
+
+// SỬA HÀM removeSelectedImage
+function removeSelectedImage() {
+    detail.value.selectedImage = null;
+}
 
 // Load dữ liệu khi component mount
 onMounted(async () => {
-    await Promise.all([loadProducts(), loadDanhMucs(), loadThuongHieus(), loadChatLieus(), loadDeGiays(), loadKichCos(), loadMauSacs()]);
+    await Promise.all([
+        loadProducts(), 
+        loadDanhMucs(), 
+        loadThuongHieus(), 
+        loadChatLieus(), 
+        loadDeGiays(), 
+        loadKichCos(), 
+        loadMauSacs(),
+        loadHinhAnhs() // Thêm load hình ảnh
+    ]);
 });
 
 // API calls
@@ -110,16 +177,15 @@ async function loadProducts() {
             material: item.chatLieu?.tenChatLieu || 'Không có',
             sole: item.deGiay?.tenDeGiay || 'Không có',
             quantity: item.soLuong || 0,
-            ngayTao: item.ngayTao, // Lưu nguyên giá trị ngayTao
+            ngayTao: item.ngayTao,
             createdAt: item.ngayTao ? new Date(item.ngayTao).toLocaleDateString('vi-VN') : 'N/A',
             updatedAt: item.ngayCapNhat ? new Date(item.ngayCapNhat).toLocaleDateString('vi-VN') : 'N/A'
         }));
-
-        // Tải chi tiết cho tất cả sản phẩm để tính tổng số lượng
+        
         for (const product of products.value) {
-            await loadProductDetails(product.id, false); // false để không hiển thị loading
+            await loadProductDetails(product.id, false);
         }
-
+        
         if (products.value.length === 0) {
             toast.add({ severity: 'info', summary: 'Thông báo', detail: 'Không có sản phẩm nào', life: 3000 });
         }
@@ -185,6 +251,42 @@ async function loadMauSacs() {
     }
 }
 
+// Hàm load hình ảnh từ API
+async function loadHinhAnhs() {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/hinh-anh`);
+        
+        console.log('Raw image data:', response.data); // Debug
+        
+        hinhAnhs.value = response.data.map(img => {
+            const imageUrl = createImageUrl(img.duongDan);
+            
+            console.log(`Image ${img.id}:`, {
+                tenHinhAnh: img.tenHinhAnh,
+                duongDan: img.duongDan,
+                generatedUrl: imageUrl
+            });
+            
+            return {
+                ...img,
+                url: imageUrl,
+                preview: imageUrl
+            };
+        });
+        
+        console.log('Processed images:', hinhAnhs.value);
+        
+    } catch (error) {
+        console.error('Lỗi khi tải hình ảnh:', error);
+        toast.add({ 
+            severity: 'error', 
+            summary: 'Lỗi', 
+            detail: 'Không thể tải danh sách hình ảnh', 
+            life: 3000 
+        });
+    }
+}
+
 // Cập nhật hàm loadProductDetails với tham số showLoading
 async function loadProductDetails(productId, showLoading = true) {
     if (showLoading) {
@@ -201,19 +303,31 @@ async function loadProductDetails(productId, showLoading = true) {
             images: [],
             createdAt: detail.ngayTao ? new Date(detail.ngayTao).toLocaleDateString('vi-VN') : 'N/A'
         }));
-
-        // Tải hình ảnh cho từng chi tiết sản phẩm
+        
+        // SỬA PHẦN LOAD HÌNH ẢNH
         for (const detail of productDetails.value[productId]) {
             try {
-                // Sử dụng ID thay vì maChiTiet
                 const imgResponse = await axios.get(`${API_BASE_URL}/hinh-anh/chi-tiet-san-pham/${detail.id}`);
-                detail.images = imgResponse.data.map((img) => ({
-                    id: img.id,
-                    maHinhAnh: img.maHinhAnh,
-                    tenHinhAnh: img.tenHinhAnh,
-                    trangThai: img.trangThai,
-                    url: `${API_BASE_URL}/hinh-anh/images/${img.tenHinhAnh}`
-                }));
+                
+                console.log(`Images for detail ${detail.id}:`, imgResponse.data); // Debug
+                
+                detail.images = imgResponse.data.map((img) => {
+                    const imageUrl = createImageUrl(img.duongDan);
+                    
+                    console.log(`Detail ${detail.id} - Image ${img.id}:`, {
+                        tenHinhAnh: img.tenHinhAnh,
+                        duongDan: img.duongDan,
+                        generatedUrl: imageUrl
+                    });
+                    
+                    return {
+                        id: img.id,
+                        maHinhAnh: img.maHinhAnh,
+                        tenHinhAnh: img.tenHinhAnh,
+                        trangThai: img.trangThai,
+                        url: imageUrl
+                    };
+                });
             } catch (imgError) {
                 console.error(`Lỗi khi tải hình ảnh cho chi tiết ${detail.maChiTiet}:`, imgError);
                 detail.images = [];
@@ -231,6 +345,7 @@ async function loadProductDetails(productId, showLoading = true) {
     }
 }
 
+
 async function onRowExpand(event) {
     const productId = event.data.id;
     if (!productDetails.value[productId]) {
@@ -238,10 +353,8 @@ async function onRowExpand(event) {
     }
 }
 
-// Hàm cập nhật tổng số lượng sản phẩm sau khi thay đổi chi tiết
 async function updateProductTotalQuantity(productId) {
     await loadProductDetails(productId, false);
-    // Trigger reactivity update
     products.value = [...products.value];
 }
 
@@ -274,7 +387,7 @@ function openNew() {
     product.value = {
         tenSanPham: '',
         maSanPham: createProductId(),
-        soLuong: 0, // Giá trị mặc định là 0 (hợp lệ)
+        soLuong: 0,
         trangThai: 1,
         danhMuc: null,
         thuongHieu: null,
@@ -295,7 +408,7 @@ function editProduct(prod) {
         id: prod.id,
         tenSanPham: prod.tenSanPham,
         maSanPham: prod.maSanPham,
-        soLuong: Math.max(0, prod.soLuong || 0), // Đảm bảo không âm, nếu giá trị hiện tại âm thì đặt về 0
+        soLuong: Math.max(0, prod.soLuong || 0),
         trangThai: prod.trangThai,
         danhMuc: prod.danhMuc,
         thuongHieu: prod.thuongHieu,
@@ -303,125 +416,73 @@ function editProduct(prod) {
         deGiay: prod.deGiay,
         ngayTao: prod.ngayTao
     };
-
-    // Reset validation state
+    
     submitted.value = false;
     productDialog.value = true;
 }
 
 async function saveProduct() {
     submitted.value = true;
-
-    // Validate tên sản phẩm
+    
     if (!product.value.tenSanPham?.trim()) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Tên sản phẩm là bắt buộc',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Tên sản phẩm là bắt buộc', life: 3000 });
         return;
     }
-
-    // Validate số lượng - phải là số không âm
+    
     if (product.value.soLuong == null || product.value.soLuong === '' || product.value.soLuong < 0) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Số lượng phải là số không âm',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Số lượng phải là số không âm', life: 3000 });
         return;
     }
-
-    // Validate danh mục
+    
     if (!product.value.danhMuc) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Danh mục là bắt buộc',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Danh mục là bắt buộc', life: 3000 });
         return;
     }
-
-    // Validate thương hiệu
+    
     if (!product.value.thuongHieu) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Thương hiệu là bắt buộc',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Thương hiệu là bắt buộc', life: 3000 });
         return;
     }
-
-    // Validate chất liệu
+    
     if (!product.value.chatLieu) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Chất liệu là bắt buộc',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Chất liệu là bắt buộc', life: 3000 });
         return;
     }
-
-    // Validate đế giày
+    
     if (!product.value.deGiay) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Đế giày là bắt buộc',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Đế giày là bắt buộc', life: 3000 });
         return;
     }
-
+    
     try {
         loading.value = true;
         const productData = {
             tenSanPham: product.value.tenSanPham,
             maSanPham: product.value.maSanPham,
-            soLuong: Math.max(0, product.value.soLuong || 0), // Đảm bảo không âm
+            soLuong: Math.max(0, product.value.soLuong || 0),
             trangThai: product.value.trangThai,
             danhMuc: product.value.danhMuc,
             thuongHieu: product.value.thuongHieu,
             chatLieu: product.value.chatLieu,
             deGiay: product.value.deGiay,
-            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find((p) => p.id === product.value.id)?.ngayTao : new Date().toISOString())
+            ngayTao: product.value.ngayTao || (product.value.id ? products.value.find(p => p.id === product.value.id)?.ngayTao : new Date().toISOString())
         };
-
+        
         if (product.value.id) {
             await axios.put(`${API_BASE_URL}/api/san-pham/update/${product.value.id}`, productData);
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: `Đã cập nhật sản phẩm "${product.value.tenSanPham}"`,
-                life: 3000
-            });
+            toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã cập nhật sản phẩm "${product.value.tenSanPham}"`, life: 3000 });
         } else {
             await axios.post(`${API_BASE_URL}/api/san-pham/save`, productData);
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: `Đã thêm sản phẩm "${product.value.tenSanPham}"`,
-                life: 3000
-            });
+            toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã thêm sản phẩm "${product.value.tenSanPham}"`, life: 3000 });
         }
-
+        
         await loadProducts();
         productDialog.value = false;
         product.value = {};
         submitted.value = false;
     } catch (error) {
         console.error('Lỗi khi lưu sản phẩm:', error.response?.status, error.response?.data);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: `Không thể lưu sản phẩm: ${error.response?.data?.message || error.message}`,
-            life: 3000
-        });
+        toast.add({ severity: 'error', summary: 'Lỗi', detail: `Không thể lưu sản phẩm: ${error.response?.data?.message || error.message}`, life: 3000 });
     } finally {
         loading.value = false;
     }
@@ -469,7 +530,7 @@ async function deleteSelectedProducts() {
     }
 }
 
-// Dialog functions for Product Details - Updated for multi-select
+// Dialog functions for Product Details - Updated for multi-select with images
 function openNewDetail(productId) {
     detail.value = {
         maChiTiet: createId(),
@@ -477,138 +538,190 @@ function openNewDetail(productId) {
         giaGoc: 0.0,
         giaBan: 0.0,
         trangThai: 1,
-        mauSacs: [], // Chuyển thành mảng để chọn nhiều màu
-        kichCos: [], // Chuyển thành mảng để chọn nhiều kích cỡ
+        mauSacs: [],
+        kichCos: [],
+        selectedImage: null, // Thay đổi từ selectedImages thành selectedImage
         sanPham: { id: productId }
     };
     submitted.value = false;
     detailDialog.value = true;
 }
 
-//  Cập nhật chi tiết sản phẩm
+
 function editDetail(detailData, productId) {
     detail.value = {
         id: detailData.id,
         maChiTiet: detailData.maChiTiet,
-        soLuong: Math.max(0, detailData.soLuong || 0), // Đảm bảo không âm
-        giaGoc: Math.max(0, detailData.giaGoc || 0), // Đảm bảo không âm
-        giaBan: Math.max(0, detailData.giaBan || 0), // Đảm bảo không âm
+        soLuong: Math.max(0, detailData.soLuong || 0),
+        giaGoc: Math.max(0, detailData.giaGoc || 0),
+        giaBan: Math.max(0, detailData.giaBan || 0),
         trangThai: detailData.trangThai,
-        mauSacs: detailData.mauSac ? [detailData.mauSac] : [], // Chuyển single thành array để edit
-        kichCos: detailData.kichCo ? [detailData.kichCo] : [], // Chuyển single thành array để edit
+        mauSacs: detailData.mauSac ? [detailData.mauSac] : [],
+        kichCos: detailData.kichCo ? [detailData.kichCo] : [],
+        selectedImage: null, // Thay đổi từ selectedImages thành selectedImage
         sanPham: { id: productId }
     };
-
-    // Reset validation state
+    
+    // Load hình ảnh hiện có của chi tiết sản phẩm
+    loadCurrentImages(detailData.id);
+    
     submitted.value = false;
     detailDialog.value = true;
 }
+function createImageUrl(duongDan) {
+    if (!duongDan) return '/images/placeholder.png';
+    
+    // Debug log
+    console.log('Original duongDan:', duongDan);
+    
+    // Clean path - loại bỏ tất cả prefix
+    let cleanPath = duongDan;
+    if (cleanPath.startsWith('/hinh-anh/images/')) {
+        cleanPath = cleanPath.replace('/hinh-anh/images/', '');
+    } else if (cleanPath.startsWith('/images/')) {
+        cleanPath = cleanPath.replace('/images/', '');
+    }
+    
+    // Tạo URL đầy đủ
+    const fullUrl = `${API_BASE_URL}/hinh-anh/images/${cleanPath}`;
+    console.log('Generated URL:', fullUrl);
+    
+    return fullUrl;
+}
+
+// THÊM HÀM MỚI: Load hình ảnh hiện có
+async function loadCurrentImages(detailId) {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/hinh-anh/chi-tiet-san-pham/${detailId}`);
+        
+        console.log(`Current images for detail ${detailId}:`, response.data);
+        
+        if (response.data && response.data.length > 0) {
+            // Chỉ lấy hình ảnh đầu tiên
+            const img = response.data[0];
+            const imageUrl = createImageUrl(img.duongDan);
+            
+            console.log(`Current image ${img.id}:`, {
+                tenHinhAnh: img.tenHinhAnh,
+                duongDan: img.duongDan,
+                generatedUrl: imageUrl
+            });
+            
+            detail.value.selectedImage = {
+                id: img.id,
+                maHinhAnh: img.maHinhAnh,
+                tenHinhAnh: img.tenHinhAnh,
+                trangThai: img.trangThai,
+                url: imageUrl,
+                preview: imageUrl
+            };
+        } else {
+            detail.value.selectedImage = null;
+        }
+    } catch (error) {
+        console.error('Lỗi khi load hình ảnh hiện có:', error);
+        detail.value.selectedImage = null;
+    }
+}
+
 
 function hideDetailDialog() {
     detailDialog.value = false;
     submitted.value = false;
 }
 
-// Updated saveDetail function to handle multiple variants
+// Hàm lưu hình ảnh cho chi tiết sản phẩm (ĐƠN GIẢN HÓA)
+async function saveProductDetailImages(detailId, selectedImages) {
+    try {
+        // Xóa hình ảnh cũ
+        await axios.delete(`${API_BASE_URL}/hinh-anh/chi-tiet-san-pham/${detailId}/clear`);
+        
+        // Chỉ thêm hình ảnh đầu tiên (vì chỉ lưu 1 hình ảnh chính)
+        if (selectedImages && selectedImages.length > 0) {
+            const firstImage = selectedImages[0];
+            await axios.post(`${API_BASE_URL}/hinh-anh/chi-tiet-san-pham`, {
+                chiTietSanPhamId: detailId,
+                hinhAnhId: firstImage.id
+            });
+        }
+    } catch (error) {
+        console.error('Lỗi khi lưu hình ảnh:', error);
+        // Không throw error, để tiếp tục lưu chi tiết sản phẩm
+    }
+}
+
+
+// Updated saveDetail function to handle multiple variants with images
 async function saveDetail() {
     submitted.value = true;
-
-    // Validate mã chi tiết
+    
+    // Validation như cũ...
     if (!detail.value.maChiTiet?.trim()) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Mã chi tiết là bắt buộc',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Mã chi tiết là bắt buộc', life: 3000 });
         return;
     }
-
-    // Validate số lượng - phải là số không âm
+    
     if (detail.value.soLuong == null || detail.value.soLuong === '' || detail.value.soLuong <= 0) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Số lượng phải lớn hơn 0',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Số lượng phải lớn hơn 0', life: 3000 });
         return;
     }
-
-    // Validate giá bán
+    
     if (detail.value.giaBan == null || detail.value.giaBan === '' || detail.value.giaBan <= 0) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Giá bán phải lớn hơn 0',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá bán phải lớn hơn 0', life: 3000 });
         return;
     }
-
-    // Validate giá nhập
+    
     if (detail.value.giaGoc == null || detail.value.giaGoc === '' || detail.value.giaGoc <= 0) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Giá nhập phải lớn hơn 0',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá nhập phải lớn hơn 0', life: 3000 });
         return;
     }
-
-    // Validate màu sắc
+    
     if (!detail.value.mauSacs || detail.value.mauSacs.length === 0) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Phải chọn ít nhất một màu sắc',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Phải chọn ít nhất một màu sắc', life: 3000 });
         return;
     }
-
-    // Validate kích cỡ
+    
     if (!detail.value.kichCos || detail.value.kichCos.length === 0) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Phải chọn ít nhất một kích cỡ',
-            life: 3000
-        });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Phải chọn ít nhất một kích cỡ', life: 3000 });
         return;
     }
-
+    
     try {
         loading.value = true;
-
-        // Nếu là edit (có id), chỉ cập nhật một biến thể
+        
         if (detail.value.id) {
+            // CẬP NHẬT CHI TIẾT HIỆN CÓ
             const detailData = {
                 maChiTiet: detail.value.maChiTiet,
                 soLuong: Math.max(0, detail.value.soLuong || 0),
                 giaGoc: Math.max(0, detail.value.giaGoc || 0),
                 giaBan: Math.max(0, detail.value.giaBan || 0),
                 trangThai: detail.value.trangThai,
-                mauSac: detail.value.mauSacs[0], // Chỉ lấy màu đầu tiên khi edit
-                kichCo: detail.value.kichCos[0], // Chỉ lấy size đầu tiên khi edit
+                mauSac: detail.value.mauSacs[0],
+                kichCo: detail.value.kichCos[0],
                 sanPham: detail.value.sanPham
             };
-
+            
+            // THÊM HÌNH ẢNH VÀO DETAIL DATA
+            if (detail.value.selectedImage) {
+                detailData.hinhAnh = { id: detail.value.selectedImage.id };
+                console.log('Gửi hình ảnh ID:', detail.value.selectedImage.id);
+            } else {
+                detailData.hinhAnh = null;
+                console.log('Không có hình ảnh, set null');
+            }
+            
+            console.log('Dữ liệu gửi đi:', detailData);
+            
             await axios.put(`${API_BASE_URL}/api/san-pham-chi-tiet/update/${detail.value.id}`, detailData);
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: `Đã cập nhật chi tiết sản phẩm "${detail.value.maChiTiet}"`,
-                life: 3000
-            });
+            
+            toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã cập nhật chi tiết sản phẩm "${detail.value.maChiTiet}"`, life: 3000 });
         } else {
-            // Tạo nhiều biến thể từ combinations của màu và size
+            // TẠO NHIỀU BIẾN THỂ
             const variants = [];
             let successCount = 0;
             let errorCount = 0;
-            let variantIndex = 1;
-
+            
             for (const mauSac of detail.value.mauSacs) {
                 for (const kichCo of detail.value.kichCos) {
                     const variantData = {
@@ -621,10 +734,16 @@ async function saveDetail() {
                         kichCo: kichCo,
                         sanPham: detail.value.sanPham
                     };
+                    
+                    // THÊM HÌNH ẢNH VÀO MỖI BIẾN THỂ
+                    if (detail.value.selectedImage) {
+                        variantData.hinhAnh = { id: detail.value.selectedImage.id };
+                    }
+                    
                     variants.push(variantData);
                 }
             }
-
+            
             // Lưu từng biến thể
             for (const variant of variants) {
                 try {
@@ -635,43 +754,39 @@ async function saveDetail() {
                     console.error(`Lỗi khi tạo biến thể ${variant.maChiTiet}:`, error);
                 }
             }
-
+            
             if (successCount > 0) {
-                toast.add({
-                    severity: 'success',
-                    summary: 'Thành công',
-                    detail: `Đã tạo ${successCount} biến thể sản phẩm${errorCount > 0 ? `, ${errorCount} biến thể thất bại` : ''}`,
-                    life: 3000
+                toast.add({ 
+                    severity: 'success', 
+                    summary: 'Thành công', 
+                    detail: `Đã tạo ${successCount} biến thể sản phẩm${errorCount > 0 ? `, ${errorCount} biến thể thất bại` : ''}`, 
+                    life: 3000 
                 });
             } else {
-                toast.add({
-                    severity: 'error',
-                    summary: 'Lỗi',
-                    detail: 'Không thể tạo biến thể nào',
-                    life: 3000
-                });
+                toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tạo biến thể nào', life: 3000 });
             }
         }
-
+        
         await loadProductDetails(detail.value.sanPham.id);
-        // Cập nhật tổng số lượng sản phẩm
         await updateProductTotalQuantity(detail.value.sanPham.id);
-
+        
         detailDialog.value = false;
         detail.value = {};
         submitted.value = false;
     } catch (error) {
         console.error('Lỗi khi lưu chi tiết sản phẩm:', error.response?.status, error.response?.data);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: `Không thể lưu chi tiết sản phẩm: ${error.response?.data?.message || error.message}`,
-            life: 3000
+        toast.add({ 
+            severity: 'error', 
+            summary: 'Lỗi', 
+            detail: `Không thể lưu chi tiết sản phẩm: ${error.response?.data?.message || error.message}`, 
+            life: 3000 
         });
     } finally {
         loading.value = false;
     }
 }
+
+
 
 function confirmDeleteDetail(detailData) {
     detail.value = detailData;
@@ -685,9 +800,8 @@ async function deleteDetail() {
         await axios.delete(`${API_BASE_URL}/api/san-pham-chi-tiet/delete/${detail.value.id}`);
         toast.add({ severity: 'success', summary: 'Đã xóa', detail: `Chi tiết sản phẩm "${detail.value.maChiTiet}" đã được xóa`, life: 3000 });
         await loadProductDetails(productId);
-        // Cập nhật tổng số lượng sản phẩm
         await updateProductTotalQuantity(productId);
-
+        
         deleteDetailDialog.value = false;
         detail.value = {};
     } catch (error) {
@@ -713,7 +827,6 @@ function getStockSeverity(product) {
 // Xuất file CSV
 function exportCSV() {
     try {
-        // If no data, show warning
         if (!products.value || products.value.length === 0) {
             toast.add({
                 severity: 'warn',
@@ -724,11 +837,9 @@ function exportCSV() {
             return;
         }
 
-        // Create CSV headers with Vietnamese labels
-        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm', 'Tổng Số Lượng', 'Danh Mục', 'Thương Hiệu', 'Chất Liệu', 'Đế Giày', 'Trạng Thái', 'Ngày Tạo'];
+        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Tổng Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
 
-        // Convert data to CSV format
-        const csvData = productsWithTotalQuantity.value.map((item) => {
+        const csvData = productsWithTotalQuantity.value.map(item => {
             return [
                 item.id || '',
                 item.maSanPham || '',
@@ -743,37 +854,28 @@ function exportCSV() {
             ];
         });
 
-        // Combine headers and data
         const csvContent = [headers, ...csvData]
-            .map((row) =>
-                row
-                    .map((field) => {
-                        // Handle fields that might contain commas or quotes
-                        const stringField = String(field);
-                        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                            return `"${stringField.replace(/"/g, '""')}"`;
-                        }
-                        return stringField;
-                    })
-                    .join(',')
-            )
+            .map(row => row.map(field => {
+                const stringField = String(field);
+                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                    return `"${stringField.replace(/"/g, '""')}"`;
+                }
+                return stringField;
+            }).join(','))
             .join('\n');
 
-        // Add BOM for proper UTF-8 encoding in Excel
         const BOM = '\uFEFF';
         const csvWithBOM = BOM + csvContent;
 
-        // Create and download file
         const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-
+        
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-
-            // Generate filename with current date
+            
             const now = new Date();
-            const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+            const dateStr = now.toISOString().split('T')[0];
             const filename = `SanPham-${dateStr}.csv`;
 
             link.setAttribute('download', filename);
@@ -781,8 +883,7 @@ function exportCSV() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-
-            // Show success message
+            
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
@@ -819,7 +920,7 @@ function collapseAll() {
 // Function to get variant combinations preview
 function getVariantPreview() {
     if (!detail.value.mauSacs?.length || !detail.value.kichCos?.length) return [];
-
+    
     const variants = [];
     for (const mauSac of detail.value.mauSacs) {
         for (const kichCo of detail.value.kichCos) {
@@ -832,6 +933,123 @@ function getVariantPreview() {
     }
     return variants;
 }
+
+// 1. Function để test debug endpoint
+async function debugChiTietSanPham(id) {
+    try {
+        const response = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/debug/${id}`);
+        console.log('🔍 Debug Chi Tiết Sản Phẩm:', response.data);
+        
+        if (response.data.hinhAnh) {
+            console.log('🖼️ Hình ảnh info:', response.data.hinhAnh);
+            console.log('🔗 Full URL:', response.data.hinhAnh.fullImageUrl);
+            
+            // Test load hình ảnh
+            testImageUrl(response.data.hinhAnh.fullImageUrl);
+        } else {
+            console.log('❌ Không có hình ảnh');
+        }
+        
+        return response.data;
+    } catch (error) {
+        console.error('❌ Debug error:', error);
+    }
+}
+
+// 2. Function để test load hình ảnh
+function testImageUrl(url) {
+    console.log('🧪 Testing image URL:', url);
+    
+    const img = new Image();
+    img.onload = () => {
+        console.log('✅ Image loaded successfully:', url);
+    };
+    img.onerror = () => {
+        console.log('❌ Image failed to load:', url);
+        console.log('🔍 Trying alternative URLs...');
+        
+        // Test các URL khác
+        const alternatives = [
+            url.replace('/hinh-anh/images/', '/images/'),
+            url.replace('/images/', '/hinh-anh/images/'),
+            url.replace('http://localhost:8080/hinh-anh/images/', 'http://localhost:8080/images/'),
+        ];
+        
+        alternatives.forEach((altUrl, index) => {
+            const testImg = new Image();
+            testImg.onload = () => console.log(`✅ Alternative ${index + 1} works:`, altUrl);
+            testImg.onerror = () => console.log(`❌ Alternative ${index + 1} failed:`, altUrl);
+            testImg.src = altUrl;
+        });
+    };
+    img.src = url;
+}
+
+// 3. Function để lấy danh sách hình ảnh available
+async function getAvailableImages() {
+    try {
+        const response = await axios.get('http://localhost:8080/api/san-pham-chi-tiet/available-images');
+        console.log('📋 Available images:', response.data);
+        
+        // Test load từng hình ảnh
+        response.data.forEach((img, index) => {
+            console.log(`Testing image ${index + 1}:`, img.tenHinhAnh);
+            if (img.fullImageUrl) {
+                testImageUrl(img.fullImageUrl);
+            }
+        });
+        
+        return response.data;
+    } catch (error) {
+        console.error('❌ Error getting available images:', error);
+    }
+}
+
+// 4. Function để load chi tiết sản phẩm với debug
+async function loadChiTietSanPhamWithDebug(id) {
+    try {
+        // Load dữ liệu bình thường
+        const response = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${id}`);
+        console.log('📦 Chi tiết sản phẩm:', response.data);
+        
+        // Debug hình ảnh nếu có
+        if (response.data.hinhAnh) {
+            console.log('🖼️ Hình ảnh data:', response.data.hinhAnh);
+            
+            // Tạo URL và test
+            const imageUrl = getCorrectImageUrl(response.data.hinhAnh.duongDan);
+            console.log('🔗 Generated URL:', imageUrl);
+            testImageUrl(imageUrl);
+        }
+        
+        return response.data;
+    } catch (error) {
+        console.error('❌ Error loading chi tiết:', error);
+    }
+}
+
+// 5. Function để tạo URL hình ảnh đúng
+function getCorrectImageUrl(duongDan) {
+    if (!duongDan) return '/images/placeholder.png';
+    
+    console.log('🔄 Converting duongDan:', duongDan);
+    
+    // Clean path - loại bỏ prefix không cần thiết
+    let cleanPath = duongDan;
+    if (cleanPath.startsWith('/images/')) {
+        cleanPath = cleanPath.replace('/images/', '');
+    }
+    if (cleanPath.startsWith('/hinh-anh/images/')) {
+        cleanPath = cleanPath.replace('/hinh-anh/images/', '');
+    }
+    
+    // Tạo URL đầy đủ
+    const fullUrl = `http://localhost:8080/hinh-anh/images/${cleanPath}`;
+    console.log('✨ Final URL:', fullUrl);
+    
+    return fullUrl;
+}
+
 </script>
 
 <template>
@@ -870,11 +1088,11 @@ function getVariantPreview() {
                 tableStyle="min-width: 60rem"
             >
                 <template #header>
-                    <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex flex-wrap gap-2 items-center justify-between">
                         <div class="flex gap-2">
                             <h4 class="m-0">Quản lý Sản phẩm</h4>
-                            <!-- <Button text icon="pi pi-plus" label="Mở rộng tất cả" @click="expandAll" size="small" />
-                            <Button text icon="pi pi-minus" label="Thu gọn tất cả" @click="collapseAll" size="small" /> -->
+                            <Button text icon="pi pi-plus" label="Mở rộng tất cả" @click="expandAll" size="small" />
+                            <Button text icon="pi pi-minus" label="Thu gọn tất cả" @click="collapseAll" size="small" />
                         </div>
                         <IconField>
                             <InputIcon>
@@ -937,7 +1155,7 @@ function getVariantPreview() {
                 <template #expansion="slotProps">
                     <div v-if="loadingDetails[slotProps.data.id]" class="p-4 text-center"><i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i> Đang tải...</div>
                     <div v-else-if="productDetails[slotProps.data.id] && productDetails[slotProps.data.id].length" class="p-4">
-                        <div class="mb-4 flex items-center justify-between">
+                        <div class="flex justify-between items-center mb-4">
                             <div>
                                 <h5>Chi tiết sản phẩm: {{ slotProps.data.tenSanPham }}</h5>
                             </div>
@@ -957,36 +1175,54 @@ function getVariantPreview() {
                                     {{ formatCurrency(detailProps.data.giaGoc) }}
                                 </template>
                             </Column>
-                            <Column field="giaBan" header="Giá bán" sortable style="min-width: 10rem">
+                             <Column field="giaBan" header="Giá bán" sortable style="min-width: 10rem">
                                 <template #body="detailProps">
                                     {{ formatCurrency(detailProps.data.giaBan) }}
                                 </template>
                             </Column>
                             <Column header="Hình ảnh" style="min-width: 15rem">
                                 <template #body="detailProps">
-                                    <div v-if="detailProps.data.images && detailProps.data.images.length > 0" class="flex flex-wrap gap-2">
-                                        <div v-for="img in detailProps.data.images.slice(0, 3)" :key="img.id" class="relative">
-                                            <img
-                                                :src="img.url"
+                                    <div v-if="detailProps.data.images && detailProps.data.images.length > 0" class="flex gap-2 flex-wrap">
+                                        <div 
+                                            v-for="img in detailProps.data.images.slice(0, 3)" 
+                                            :key="img.id" 
+                                            class="relative"
+                                        >
+                                            <img 
+                                                :src="img.url" 
                                                 :alt="img.tenHinhAnh"
-                                                class="h-16 w-16 cursor-pointer rounded border object-cover shadow-sm transition-transform hover:scale-105"
+                                                class="w-16 h-16 object-cover rounded border cursor-pointer hover:scale-105 transition-transform shadow-sm"
                                                 @click="openImageDetail(img)"
                                                 @error="handleImageError($event)"
                                             />
-                                            <Badge v-if="img.trangThai === 0" value="Đang tải" severity="warning" class="absolute -right-2 -top-2 text-xs" />
+                                            <Badge 
+                                                v-if="img.trangThai === 0" 
+                                                value="Đang tải" 
+                                                severity="warning" 
+                                                class="absolute -top-2 -right-2 text-xs"
+                                            />
                                         </div>
-                                        <div
+                                        <div 
                                             v-if="detailProps.data.images.length > 3"
-                                            class="flex h-16 w-16 cursor-pointer items-center justify-center rounded border bg-gray-100 transition-colors hover:bg-gray-200"
+                                            class="w-16 h-16 bg-gray-100 rounded border flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors"
                                             @click="openAllImages(detailProps.data)"
                                         >
-                                            <span class="text-sm font-medium text-gray-600"> +{{ detailProps.data.images.length - 3 }} </span>
+                                            <span class="text-sm font-medium text-gray-600">
+                                                +{{ detailProps.data.images.length - 3 }}
+                                            </span>
                                         </div>
                                     </div>
-                                    <div v-else class="flex items-center gap-2 italic text-gray-400">
+                                    <div v-else class="text-gray-400 italic flex items-center gap-2">
                                         <i class="pi pi-image"></i>
                                         <span>Chưa có hình ảnh</span>
-                                        <Button icon="pi pi-plus" size="small" text rounded @click="addImageToDetail(detailProps.data)" v-tooltip.top="'Thêm hình ảnh'" />
+                                        <Button 
+                                            icon="pi pi-plus" 
+                                            size="small" 
+                                            text 
+                                            rounded 
+                                            @click="addImageToDetail(detailProps.data)"
+                                            v-tooltip.top="'Thêm hình ảnh'"
+                                        />
                                     </div>
                                 </template>
                             </Column>
@@ -1021,31 +1257,31 @@ function getVariantPreview() {
             <div class="flex flex-col gap-6">
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-8">
-                        <label for="tenSanPham" class="mb-3 block font-bold">Tên sản phẩm </label>
+                        <label for="tenSanPham" class="block font-bold mb-3">Tên sản phẩm </label>
                         <InputText id="tenSanPham" v-model.trim="product.tenSanPham" required="true" autofocus :invalid="submitted && !product.tenSanPham" fluid placeholder="Nhập tên sản phẩm" />
                         <small v-if="submitted && !product.tenSanPham" class="text-red-500">Tên sản phẩm là bắt buộc.</small>
                     </div>
                     <div class="col-span-4">
-                        <label for="maSanPham" class="mb-3 block font-bold">Mã sản phẩm</label>
+                        <label for="maSanPham" class="block font-bold mb-3">Mã sản phẩm</label>
                         <InputText id="maSanPham" v-model="product.maSanPham" fluid placeholder="Tự động tạo" :disabled="!!product.id" />
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-4">
-                        <label for="trangThai" class="mb-3 block font-bold">Trạng thái</label>
+                        <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
                         <Select id="trangThai" v-model="product.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="danhMuc" class="mb-3 block font-bold">Danh mục </label>
+                        <label for="danhMuc" class="block font-bold mb-3">Danh mục </label>
                         <Select id="danhMuc" v-model="product.danhMuc" :options="danhMucs" optionLabel="tenDanhMuc" placeholder="Chọn danh mục" fluid />
                         <small v-if="submitted && !product.danhMuc" class="text-red-500">Danh mục là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="thuongHieu" class="mb-3 block font-bold">Thương hiệu </label>
+                        <label for="thuongHieu" class="block font-bold mb-3">Thương hiệu </label>
                         <Select id="thuongHieu" v-model="product.thuongHieu" :options="thuongHieus" optionLabel="tenThuongHieu" placeholder="Chọn thương hiệu" fluid />
                         <small v-if="submitted && !product.thuongHieu" class="text-red-500">Thương hiệu là bắt buộc.</small>
                     </div>
@@ -1053,12 +1289,12 @@ function getVariantPreview() {
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="chatLieu" class="mb-3 block font-bold">Chất liệu </label>
+                        <label for="chatLieu" class="block font-bold mb-3">Chất liệu </label>
                         <Select id="chatLieu" v-model="product.chatLieu" :options="chatLieus" optionLabel="tenChatLieu" placeholder="Chọn chất liệu" fluid />
                         <small v-if="submitted && !product.chatLieu" class="text-red-500">Chất liệu là bắt buộc.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="deGiay" class="mb-3 block font-bold">Đế giày </label>
+                        <label for="deGiay" class="block font-bold mb-3">Đế giày </label>
                         <Select id="deGiay" v-model="product.deGiay" :options="deGiays" optionLabel="tenDeGiay" placeholder="Chọn đế giày" fluid />
                         <small v-if="submitted && !product.deGiay" class="text-red-500">Đế giày là bắt buộc.</small>
                     </div>
@@ -1071,17 +1307,19 @@ function getVariantPreview() {
             </template>
         </Dialog>
 
-        <!-- Dialog thêm/sửa chi tiết sản phẩm với Multi-Select -->
-        <Dialog v-model:visible="detailDialog" :style="{ width: '800px' }" header="Chi tiết sản phẩm" :modal="true" class="p-fluid">
+        <!-- Dialog thêm/sửa chi tiết sản phẩm với Multi-Select và chọn hình ảnh -->
+        <Dialog v-model:visible="detailDialog" :style="{ width: '900px' }" header="Chi tiết sản phẩm" :modal="true" class="p-fluid">
             <div class="flex flex-col gap-6">
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-8">
-                        <label for="maChiTiet" class="mb-3 block font-bold"> Mã chi tiết </label>
-                        <InputText id="maChiTiet" v-model.trim="detail.maChiTiet" required="true" autofocus :invalid="submitted && !detail.maChiTiet" fluid placeholder="Nhập mã chi tiết cơ bản" />
+                        <label for="maChiTiet" class="block font-bold mb-3">
+                            Mã chi tiết 
+                        </label>
+                        <InputText id="maChiTiet" v-model.trim="detail.maChiTiet" required="true" autofocus :invalid="submitted && !detail.maChiTiet" fluid readonly="true" />
                         <small v-if="submitted && !detail.maChiTiet" class="text-red-500">Mã chi tiết là bắt buộc.</small>
                     </div>
                     <div class="col-span-4">
-                        <label for="soLuong" class="mb-3 block font-bold">Số lượng </label>
+                        <label for="soLuong" class="block font-bold mb-3">Số lượng </label>
                         <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
                         <small v-if="submitted && (detail.soLuong == null || detail.soLuong <= 0)" class="text-red-500">Số lượng phải lớn hơn 0.</small>
                     </div>
@@ -1089,12 +1327,12 @@ function getVariantPreview() {
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="giaGoc" class="mb-3 block font-bold">Giá gốc </label>
+                        <label for="giaGoc" class="block font-bold mb-3">Giá nhập </label>
                         <InputText id="giaGoc" v-model.number="detail.giaGoc" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" />
                         <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" class="text-red-500">Giá nhập phải lớn hơn 0.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="giaBan" class="mb-3 block font-bold">Giá bán </label>
+                        <label for="giaBan" class="block font-bold mb-3">Giá bán </label>
                         <InputText id="giaBan" v-model.number="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan <= 0)" />
                         <small v-if="submitted && (detail.giaBan == null || detail.giaBan <= 0)" class="text-red-500">Giá bán phải lớn hơn 0.</small>
                     </div>
@@ -1102,52 +1340,225 @@ function getVariantPreview() {
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="mauSacs" class="mb-3 block font-bold"> Màu sắc </label>
-                        <MultiSelect id="mauSacs" v-model="detail.mauSacs" :options="mauSacs" optionLabel="tenMauSac" placeholder="Chọn màu sắc" fluid :maxSelectedLabels="3" selectedItemsLabel="{0} màu đã chọn" />
+                        <label for="mauSacs" class="block font-bold mb-3">
+                            Màu sắc 
+                        </label>
+                        <MultiSelect 
+                            id="mauSacs" 
+                            v-model="detail.mauSacs" 
+                            :options="mauSacs" 
+                            optionLabel="tenMauSac" 
+                            placeholder="Chọn màu sắc" 
+                            fluid 
+                            :maxSelectedLabels="3"
+                            selectedItemsLabel="{0} màu đã chọn"
+                        />
                         <small v-if="submitted && (!detail.mauSacs || detail.mauSacs.length === 0)" class="text-red-500">Phải chọn ít nhất một màu sắc.</small>
                     </div>
                     <div class="col-span-6">
-                        <label for="kichCos" class="mb-3 block font-bold"> Kích cỡ </label>
-                        <MultiSelect id="kichCos" v-model="detail.kichCos" :options="kichCos" optionLabel="tenKichCo" placeholder="Chọn kích cỡ" fluid :maxSelectedLabels="3" selectedItemsLabel="{0} size đã chọn" />
+                        <label for="kichCos" class="block font-bold mb-3">
+                            Kích cỡ 
+                        </label>
+                        <MultiSelect 
+                            id="kichCos" 
+                            v-model="detail.kichCos" 
+                            :options="kichCos" 
+                            optionLabel="tenKichCo" 
+                            placeholder="Chọn kích cỡ" 
+                            fluid 
+                            :maxSelectedLabels="3"
+                            selectedItemsLabel="{0} size đã chọn"
+                        />
                         <small v-if="submitted && (!detail.kichCos || detail.kichCos.length === 0)" class="text-red-500">Phải chọn ít nhất một kích cỡ.</small>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="trangThai" class="mb-3 block font-bold">Trạng thái</label>
+                        <label for="trangThai" class="block font-bold mb-3">Trạng thái</label>
                         <Select id="trangThai" v-model="detail.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
+                    </div>
+                </div>
+
+                <!-- Phần chọn hình ảnh -->
+               <div class="mt-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="block font-bold">Hình ảnh sản phẩm</label>
+                        <Button 
+                            label="Chọn hình ảnh" 
+                            icon="pi pi-images" 
+                            size="small" 
+                            @click="openImageSelection"
+                            severity="secondary"
+                        />
+                    </div>
+                    
+                    <!-- Hiển thị hình ảnh đã chọn (CHỈ 1 HÌNH ẢNH) -->
+                    <div v-if="detail.selectedImage" class="p-3 border border-gray-200 rounded">
+                        <div class="flex items-center gap-4">
+                            <!-- Hình ảnh preview -->
+                            <div class="relative group">
+                                <img 
+                                    :src="detail.selectedImage.url || detail.selectedImage.preview" 
+                                    :alt="detail.selectedImage.tenHinhAnh"
+                                    class="w-20 h-20 object-cover rounded border shadow-sm"
+                                    @error="handleImageError($event)"
+                                />
+                                <Button 
+                                    icon="pi pi-times" 
+                                    class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    size="small" 
+                                    rounded 
+                                    severity="danger"
+                                    @click="removeSelectedImage()"
+                                />
+                            </div>
+                            
+                            <!-- Thông tin hình ảnh -->
+                            <div class="flex-1">
+                                <div class="font-medium text-gray-900">{{ detail.selectedImage.maHinhAnh }}</div>
+                                <div class="text-sm text-gray-600">{{ detail.selectedImage.tenHinhAnh }}</div>
+                                <div class="text-xs text-gray-500 mt-1">{{ detail.selectedImage.duongDan }}</div>
+                                <Badge 
+                                    :value="detail.selectedImage.trangThai === 1 ? 'Sẵn sàng' : 'Đang xử lý'" 
+                                    :severity="detail.selectedImage.trangThai === 1 ? 'success' : 'warning'"
+                                    class="mt-2"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Placeholder khi chưa chọn hình ảnh -->
+                    <div v-else class="p-4 border border-dashed border-gray-300 rounded text-center text-gray-500">
+                        <i class="pi pi-image text-2xl mb-2"></i>
+                        <p>Chưa chọn hình ảnh nào</p>
+                        <small>Nhấn "Chọn hình ảnh" để thêm hình ảnh cho sản phẩm</small>
                     </div>
                 </div>
 
                 <!-- Preview biến thể sẽ được tạo -->
                 <div v-if="!detail.id && detail.mauSacs?.length && detail.kichCos?.length && detail.maChiTiet" class="mt-4">
-                    <label class="mb-3 block font-bold">
-                        Xem trước các biến thể sẽ được tạo:
+                    <label class="block font-bold mb-3">
+                        Xem trước các biến thể sẽ được tạo: 
                         <Badge :value="getVariantPreview().length" severity="info" />
                     </label>
-                    <div class="max-h-40 overflow-y-auto rounded border border-gray-200 p-3">
-                        <div class="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
-                            <div v-for="variant in getVariantPreview()" :key="variant.maChiTiet" class="rounded bg-gray-50 p-2 text-sm">
+                    <div class="border border-gray-200 rounded p-3 max-h-40 overflow-y-auto">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <div v-for="variant in getVariantPreview()" :key="variant.maChiTiet" class="text-sm p-2 bg-gray-50 rounded">
                                 <div class="font-medium">{{ variant.maChiTiet }}</div>
                                 <div class="text-gray-600">{{ variant.mauSac }} - {{ variant.kichCo }}</div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Thông báo khi edit -->
-                <!-- <div v-if="detail.id" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                    <i class="pi pi-info-circle text-yellow-600 mr-2"></i>
-                    <span class="text-yellow-800">Chế độ chỉnh sửa: Chỉ có thể chọn một màu và một kích cỡ khi cập nhật biến thể hiện có.</span>
-                </div> -->
             </div>
 
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDetailDialog" :disabled="loading" />
-                <Button :label="detail.id ? 'Cập nhật' : `Thêm`" icon="pi pi-check" @click="saveDetail" :loading="loading" />
+                <Button 
+                    :label="detail.id ? 'Cập nhật' : `Thêm ${getVariantPreview().length} biến thể`" 
+                    icon="pi pi-check" 
+                    @click="saveDetail" 
+                    :loading="loading"
+                />
             </template>
         </Dialog>
+
+        <!-- Dialog chọn hình ảnh -->
+        <Dialog v-model:visible="imageSelectionDialog" :style="{ width: '1000px' }" header="Chọn hình ảnh" :modal="true">
+    <div class="flex flex-col gap-4">
+        <!-- Thanh tìm kiếm -->
+        <div class="flex justify-between items-center">
+            <h6 class="m-0">Danh sách hình ảnh có sẵn</h6>
+            <IconField>
+                <InputIcon>
+                    <i class="pi pi-search" />
+                </InputIcon>
+                <InputText v-model="imageFilters['global'].value" placeholder="Tìm kiếm hình ảnh..." />
+            </IconField>
+        </div>
+
+        <!-- Bảng chọn hình ảnh - SINGLE SELECT -->
+        <DataTable
+            v-model:selection="selectedImage"
+            :value="availableImages"
+            dataKey="id"
+            :paginator="true"
+            :rows="8"
+            :filters="imageFilters"
+            selectionMode="single"
+            tableStyle="min-width: 50rem"
+            class="max-h-96"
+        >
+            <Column selectionMode="single" style="width: 3rem"></Column>
+            <Column header="Hình ảnh" style="width: 120px">
+                <template #body="slotProps">
+                    <img 
+                        :src="slotProps.data.preview" 
+                        :alt="slotProps.data.tenHinhAnh"
+                        class="w-16 h-16 object-cover rounded border shadow-sm cursor-pointer hover:scale-105 transition-transform"
+                        @error="handleImageError($event)"
+                        @click="selectedImage = slotProps.data"
+                    />
+                </template>
+            </Column>
+            <Column field="maHinhAnh" header="Mã hình ảnh" sortable style="min-width: 12rem">
+                <template #body="slotProps">
+                    <span 
+                        class="cursor-pointer hover:text-blue-600"
+                        @click="selectedImage = slotProps.data"
+                    >
+                        {{ slotProps.data.maHinhAnh }}
+                    </span>
+                </template>
+            </Column>
+            <Column field="tenHinhAnh" header="Tên file" sortable style="min-width: 16rem"></Column>
+            <Column field="duongDan" header="Đường dẫn" sortable style="min-width: 20rem">
+                <template #body="slotProps">
+                    <span class="text-sm text-gray-600 truncate block">{{ slotProps.data.duongDan }}</span>
+                </template>
+            </Column>
+            <Column header="Trạng thái" style="min-width: 10rem">
+                <template #body="slotProps">
+                    <Tag :value="slotProps.data.trangThai === 1 ? 'Sẵn sàng' : 'Đang xử lý'" :severity="getStatusLabel(slotProps.data.trangThai)" />
+                </template>
+            </Column>
+        </DataTable>
+
+        <!-- Thông tin đã chọn -->
+        <div v-if="selectedImage" class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+            <div class="flex items-center gap-3">
+                <img 
+                    :src="selectedImage.preview" 
+                    :alt="selectedImage.tenHinhAnh"
+                    class="w-12 h-12 object-cover rounded border"
+                    @error="handleImageError($event)"
+                />
+                <div>
+                    <div class="font-medium text-blue-800">{{ selectedImage.maHinhAnh }}</div>
+                    <div class="text-sm text-blue-600">{{ selectedImage.tenHinhAnh }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <template #footer>
+        <Button label="Hủy" icon="pi pi-times" text @click="imageSelectionDialog = false" />
+        <Button 
+            label="Bỏ chọn" 
+            icon="pi pi-minus-circle" 
+            severity="secondary"
+            @click="selectedImage = null"
+            v-if="selectedImage"
+        />
+        <Button 
+            :label="selectedImage ? `Xác nhận: ${selectedImage.maHinhAnh}` : 'Chọn hình ảnh'" 
+            icon="pi pi-check" 
+            @click="confirmImageSelection"
+            :disabled="!selectedImage"
+        />
+    </template>
+</Dialog>
 
         <!-- Dialog xác nhận xóa sản phẩm -->
         <Dialog v-model:visible="deleteProductDialog" :style="{ width: '450px' }" header="Xác nhận xóa" :modal="true">
@@ -1155,8 +1566,7 @@ function getVariantPreview() {
                 <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
                 <div>
                     <p v-if="product" class="mb-2">
-                        Bạn có chắc chắn muốn xóa sản phẩm <strong>{{ product.tenSanPham || product.name }}</strong
-                        >?
+                        Bạn có chắc chắn muốn xóa sản phẩm <strong>{{ product.tenSanPham || product.name }}</strong>?
                     </p>
                     <small class="text-gray-500">Hành động này không thể hoàn tác.</small>
                 </div>
@@ -1190,8 +1600,7 @@ function getVariantPreview() {
                 <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
                 <div>
                     <p v-if="detail" class="mb-2">
-                        Bạn có chắc chắn muốn xóa chi tiết sản phẩm <strong>{{ detail.maChiTiet }}</strong
-                        >?
+                        Bạn có chắc chắn muốn xóa chi tiết sản phẩm <strong>{{ detail.maChiTiet }}</strong>?
                     </p>
                     <small class="text-gray-500">Hành động này không thể hoàn tác.</small>
                 </div>
@@ -1206,21 +1615,34 @@ function getVariantPreview() {
         <Dialog v-model:visible="imagePreviewDialog" :style="{ width: '900px' }" header="Hình ảnh sản phẩm" :modal="true">
             <div v-if="selectedImageDetail.showAll" class="grid grid-cols-4 gap-4">
                 <div v-for="img in selectedImageDetail.images" :key="img.id" class="text-center">
-                    <img :src="img.url" :alt="img.tenHinhAnh" class="h-32 w-full rounded border object-cover shadow-sm" @error="handleImageError($event)" />
+                    <img 
+                        :src="img.url" 
+                        :alt="img.tenHinhAnh"
+                        class="w-full h-32 object-cover rounded border shadow-sm"
+                        @error="handleImageError($event)"
+                    />
                     <div class="mt-2 text-sm">
                         <div class="font-medium">{{ img.maHinhAnh }}</div>
-                        <Badge :value="img.trangThai === 1 ? 'Đã tải' : 'Đang tải'" :severity="img.trangThai === 1 ? 'success' : 'warning'" />
+                        <Badge 
+                            :value="img.trangThai === 1 ? 'Đã tải' : 'Đang tải'" 
+                            :severity="img.trangThai === 1 ? 'success' : 'warning'" 
+                        />
                     </div>
                 </div>
             </div>
             <div v-else class="text-center">
-                <img :src="selectedImageDetail.url" :alt="selectedImageDetail.tenHinhAnh" class="max-h-96 max-w-full rounded object-contain shadow" @error="handleImageError($event)" />
+                <img 
+                    :src="selectedImageDetail.url" 
+                    :alt="selectedImageDetail.tenHinhAnh"
+                    class="max-w-full max-h-96 object-contain rounded shadow"
+                    @error="handleImageError($event)"
+                />
                 <div class="mt-4 text-sm">
                     <div class="font-medium">{{ selectedImageDetail.maHinhAnh }}</div>
                     <div>{{ selectedImageDetail.tenHinhAnh }}</div>
                 </div>
             </div>
-
+            
             <template #footer>
                 <Button label="Đóng" icon="pi pi-times" @click="imagePreviewDialog = false" />
             </template>

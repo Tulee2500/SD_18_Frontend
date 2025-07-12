@@ -34,5 +34,4 @@ import SuperQuality from '@/views/user/SuperQuality.vue';
         <ScrollToggler />
     </main>
 </template>
-
 <style scoped></style>

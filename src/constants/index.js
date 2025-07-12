@@ -14,9 +14,9 @@ import bigShoe9 from "../assets/images/product6.png";
 import bigShoe10 from "../assets/images/product8(1).png";
 export const navLinks = [
     { href: "home", label: "Trang Chủ" },
-    { href: "about-us", label: "Giới Thiệu" },
+    { href: "gioithieu", label: "Giới Thiệu" },
     { href: "products", label: "Sản Phẩm" },
-    { href: "contact-us", label: "Liên Hệ" },
+    { href: "lienhe", label: "Liên Hệ" },
 ];
 
 export const statistics = [

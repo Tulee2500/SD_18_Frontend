@@ -6,7 +6,7 @@ const router = createRouter({
     routes: [
         // ROUTE USER - Trang chủ người dùng (KHÔNG CẦN ĐĂNG NHẬP)
         {
-            path: '/',
+            path: '/home',
             name: 'user-home',
             component: () => import('@/views/user/UserHome.vue')
         },
@@ -14,6 +14,16 @@ const router = createRouter({
             path: '/products',
             name: 'products',
             component: () => import('@/views/user/product/ProductList.vue')
+  },
+           {
+            path: '/gioithieu',
+            name: 'gioi-thieu',
+            component: () => import('@/views/user/gioithieu/gioithieu.vue')
+  },
+  {
+            path: '/lienhe',
+            name: 'lien-he',
+            component: () => import('@/views/user/lienhe/Lienhe.vue')
   },
   {
     path: '/product/:id',
