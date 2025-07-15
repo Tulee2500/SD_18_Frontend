@@ -16,6 +16,7 @@ const router = createRouter({
             name: 'products',
             component: () => import('@/views/user/product/ProductList.vue')
   },
+<<<<<<< Updated upstream
 //            {
 //             path: '/gioithieu',
 //             name: 'gioi-thieu',
@@ -26,6 +27,18 @@ const router = createRouter({
 //             name: 'lien-he',
 //             component: () => import('@/views/user/lienhe/Lienhe.vue')
 //   },
+=======
+           {
+            path: '/gioithieu',
+            name: 'gioi-thieu',
+            component: () => import('@/views/user/gioithieu/Gioithieu.vue')
+  },
+  {
+            path: '/lienhe',
+            name: 'lien-he',
+            component: () => import('@/views/user/lienhe/LienHe.vue')
+  },
+>>>>>>> Stashed changes
   {
     path: '/product/:id',
     name: 'product',

@@ -53,6 +53,11 @@ const statuses = ref([
 const imagePreviewDialog = ref(false);
 const selectedImageDetail = ref({});
 
+// SỬA: Thay thế computed bằng ref đơn giản cho edit mode
+const selectedMauSac = ref(null);
+const selectedKichCo = ref(null);
+const selectedImage = ref(null); 
+
 // Thêm computed để tính tổng số lượng từ chi tiết sản phẩm
 const getProductTotalQuantity = (productId) => {
     if (!productDetails.value[productId]) return 0;
@@ -113,7 +118,7 @@ function addImageToDetail(detail) {
         life: 5000
     });
 }
- const selectedImage = ref(null); 
+
 // Hàm mở dialog chọn hình ảnh
 function openImageSelection() {
     // Nếu đã có hình ảnh được chọn, set làm selected
@@ -531,6 +536,7 @@ async function deleteSelectedProducts() {
 }
 
 // Dialog functions for Product Details - Updated for multi-select with images
+// 1. HÀM MỞ DIALOG THÊM MỚI - CHO PHÉP NHIỀU MÀU VÀ SIZE
 function openNewDetail(productId) {
     detail.value = {
         maChiTiet: createId(),
@@ -538,17 +544,60 @@ function openNewDetail(productId) {
         giaGoc: 0.0,
         giaBan: 0.0,
         trangThai: 1,
-        mauSacs: [],
-        kichCos: [],
-        selectedImage: null, // Thay đổi từ selectedImages thành selectedImage
-        sanPham: { id: productId }
+        mauSacs: [], // NHIỀU MÀU SẮC
+        kichCos: [], // NHIỀU KÍCH CỠ
+        selectedImage: null,
+        sanPham: { id: productId },
+        isEditing: false // FLAG ĐỂ PHÂN BIỆT THÊM/SỬA
     };
+    
+    // SỬA: Reset các giá trị select riêng cho edit mode
+    selectedMauSac.value = null;
+    selectedKichCo.value = null;
+    
     submitted.value = false;
     detailDialog.value = true;
 }
 
-
+// 2. HÀM SỬA CHI TIẾT - CHỈ CHO PHÉP 1 MÀU VÀ 1 SIZE - ĐÃ SỬA
 function editDetail(detailData, productId) {
+    console.log('🔍 Edit detail data:', detailData);
+    console.log('🎨 Available mauSacs:', mauSacs.value);
+    console.log('📏 Available kichCos:', kichCos.value);
+    
+    // Tìm object reference đúng từ danh sách options
+    let foundMauSac = null;
+    let foundKichCo = null;
+    
+    if (detailData.mauSac) {
+        // Tìm theo ID trước
+        foundMauSac = mauSacs.value.find(m => m.id === detailData.mauSac.id);
+        
+        // Nếu không tìm thấy, tìm theo tên
+        if (!foundMauSac) {
+            foundMauSac = mauSacs.value.find(m => m.tenMauSac === detailData.mauSac.tenMauSac);
+        }
+        
+        // Debug
+        console.log('🎨 Original mauSac:', detailData.mauSac);
+        console.log('🎨 Found mauSac:', foundMauSac);
+    }
+    
+    if (detailData.kichCo) {
+        // Tìm theo ID trước
+        foundKichCo = kichCos.value.find(k => k.id === detailData.kichCo.id);
+        
+        // Nếu không tìm thấy, tìm theo tên
+        if (!foundKichCo) {
+            foundKichCo = kichCos.value.find(k => k.tenKichCo === detailData.kichCo.tenKichCo);
+        }
+        
+        // Debug
+        console.log('📏 Original kichCo:', detailData.kichCo);
+        console.log('📏 Found kichCo:', foundKichCo);
+    }
+    
+    // ĐẢM BẢO TẠO OBJECT MỚI HOÀN TOÀN
     detail.value = {
         id: detailData.id,
         maChiTiet: detailData.maChiTiet,
@@ -556,18 +605,29 @@ function editDetail(detailData, productId) {
         giaGoc: Math.max(0, detailData.giaGoc || 0),
         giaBan: Math.max(0, detailData.giaBan || 0),
         trangThai: detailData.trangThai,
-        mauSacs: detailData.mauSac ? [detailData.mauSac] : [],
-        kichCos: detailData.kichCo ? [detailData.kichCo] : [],
-        selectedImage: null, // Thay đổi từ selectedImages thành selectedImage
-        sanPham: { id: productId }
+        // QUAN TRỌNG: ĐẢM BẢO LUÔN LÀ MẢNG HỢP LỆ
+        mauSacs: foundMauSac ? [foundMauSac] : [],
+        kichCos: foundKichCo ? [foundKichCo] : [],
+        selectedImage: null,
+        sanPham: { id: productId },
+        isEditing: true
     };
     
-    // Load hình ảnh hiện có của chi tiết sản phẩm
+    // SỬA: Set giá trị cho các ref riêng biệt cho edit mode
+    selectedMauSac.value = foundMauSac;
+    selectedKichCo.value = foundKichCo;
+    
+    console.log('✅ Final detail.value:', detail.value);
+    console.log('✅ selectedMauSac:', selectedMauSac.value);
+    console.log('✅ selectedKichCo:', selectedKichCo.value);
+    
+    // Load hình ảnh hiện có
     loadCurrentImages(detailData.id);
     
     submitted.value = false;
     detailDialog.value = true;
 }
+
 function createImageUrl(duongDan) {
     if (!duongDan) return '/images/placeholder.png';
     
@@ -628,6 +688,9 @@ async function loadCurrentImages(detailId) {
 function hideDetailDialog() {
     detailDialog.value = false;
     submitted.value = false;
+    // SỬA: Reset các ref khi đóng dialog
+    selectedMauSac.value = null;
+    selectedKichCo.value = null;
 }
 
 // Hàm lưu hình ảnh cho chi tiết sản phẩm (ĐƠN GIẢN HÓA)
@@ -650,12 +713,18 @@ async function saveProductDetailImages(detailId, selectedImages) {
     }
 }
 
-
-// Updated saveDetail function to handle multiple variants with images
+// 3. HÀM LƯU CHI TIẾT - XỬ LÝ KHÁC NHAU CHO THÊM/SỬA - ĐÃ SỬA
 async function saveDetail() {
     submitted.value = true;
     
-    // Validation như cũ...
+    // SỬA: Đảm bảo cập nhật mảng từ ref trong chế độ edit
+    if (detail.value.isEditing) {
+        // Cập nhật mảng từ ref riêng
+        detail.value.mauSacs = selectedMauSac.value ? [selectedMauSac.value] : [];
+        detail.value.kichCos = selectedKichCo.value ? [selectedKichCo.value] : [];
+    }
+    
+    // Validation chung
     if (!detail.value.maChiTiet?.trim()) {
         toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Mã chi tiết là bắt buộc', life: 3000 });
         return;
@@ -689,43 +758,50 @@ async function saveDetail() {
     try {
         loading.value = true;
         
-        if (detail.value.id) {
-            // CẬP NHẬT CHI TIẾT HIỆN CÓ
+        if (detail.value.isEditing && detail.value.id) {
+            // CẬP NHẬT CHI TIẾT HIỆN CÓ - CHỈ 1 BIẾN THỂ
             const detailData = {
                 maChiTiet: detail.value.maChiTiet,
                 soLuong: Math.max(0, detail.value.soLuong || 0),
                 giaGoc: Math.max(0, detail.value.giaGoc || 0),
                 giaBan: Math.max(0, detail.value.giaBan || 0),
                 trangThai: detail.value.trangThai,
-                mauSac: detail.value.mauSacs[0],
-                kichCo: detail.value.kichCos[0],
+                mauSac: detail.value.mauSacs[0], // CHỈ LẤY PHẦN TỬ ĐẦU TIÊN
+                kichCo: detail.value.kichCos[0], // CHỈ LẤY PHẦN TỬ ĐẦU TIÊN
                 sanPham: detail.value.sanPham
             };
             
-            // THÊM HÌNH ẢNH VÀO DETAIL DATA
+            // Thêm hình ảnh
             if (detail.value.selectedImage) {
                 detailData.hinhAnh = { id: detail.value.selectedImage.id };
-                console.log('Gửi hình ảnh ID:', detail.value.selectedImage.id);
             } else {
                 detailData.hinhAnh = null;
-                console.log('Không có hình ảnh, set null');
             }
             
-            console.log('Dữ liệu gửi đi:', detailData);
+            console.log('🔄 Updating detail with data:', detailData);
+            console.log('🎨 Màu sắc gửi đi:', detailData.mauSac);
+            console.log('📏 Kích cỡ gửi đi:', detailData.kichCo);
             
             await axios.put(`${API_BASE_URL}/api/san-pham-chi-tiet/update/${detail.value.id}`, detailData);
             
-            toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã cập nhật chi tiết sản phẩm "${detail.value.maChiTiet}"`, life: 3000 });
+            toast.add({ 
+                severity: 'success', 
+                summary: 'Thành công', 
+                detail: `Đã cập nhật chi tiết sản phẩm "${detail.value.maChiTiet}"`, 
+                life: 3000 
+            });
         } else {
-            // TẠO NHIỀU BIẾN THỂ
+            // TẠO NHIỀU BIẾN THỂ MỚI
             const variants = [];
             let successCount = 0;
             let errorCount = 0;
             
+            // Tạo tất cả combination của màu sắc và kích cỡ
             for (const mauSac of detail.value.mauSacs) {
                 for (const kichCo of detail.value.kichCos) {
                     const variantData = {
-                        maChiTiet: `${detail.value.maChiTiet}-${mauSac.tenMauSac}-${kichCo.tenKichCo}`,
+                        // maChiTiet: `${detail.value.maChiTiet}-${mauSac.tenMauSac}-${kichCo.tenKichCo}`,
+                        maChiTiet:  createId(),
                         soLuong: Math.max(0, detail.value.soLuong || 0),
                         giaGoc: Math.max(0, detail.value.giaGoc || 0),
                         giaBan: Math.max(0, detail.value.giaBan || 0),
@@ -735,7 +811,7 @@ async function saveDetail() {
                         sanPham: detail.value.sanPham
                     };
                     
-                    // THÊM HÌNH ẢNH VÀO MỖI BIẾN THỂ
+                    // Thêm hình ảnh cho mỗi biến thể
                     if (detail.value.selectedImage) {
                         variantData.hinhAnh = { id: detail.value.selectedImage.id };
                     }
@@ -744,14 +820,17 @@ async function saveDetail() {
                 }
             }
             
+            console.log(`🆕 Creating ${variants.length} variants:`, variants);
+            
             // Lưu từng biến thể
             for (const variant of variants) {
                 try {
                     await axios.post(`${API_BASE_URL}/api/san-pham-chi-tiet/save`, variant);
                     successCount++;
+                    console.log(`✅ Created variant: ${variant.maChiTiet}`);
                 } catch (error) {
                     errorCount++;
-                    console.error(`Lỗi khi tạo biến thể ${variant.maChiTiet}:`, error);
+                    console.error(`❌ Failed to create variant ${variant.maChiTiet}:`, error);
                 }
             }
             
@@ -767,14 +846,19 @@ async function saveDetail() {
             }
         }
         
+        // Reload dữ liệu
         await loadProductDetails(detail.value.sanPham.id);
         await updateProductTotalQuantity(detail.value.sanPham.id);
         
         detailDialog.value = false;
         detail.value = {};
+        // SỬA: Reset các ref
+        selectedMauSac.value = null;
+        selectedKichCo.value = null;
         submitted.value = false;
+        
     } catch (error) {
-        console.error('Lỗi khi lưu chi tiết sản phẩm:', error.response?.status, error.response?.data);
+        console.error('❌ Lỗi khi lưu chi tiết sản phẩm:', error.response?.status, error.response?.data);
         toast.add({ 
             severity: 'error', 
             summary: 'Lỗi', 
@@ -786,7 +870,56 @@ async function saveDetail() {
     }
 }
 
+// 4. HÀM COMPUTED ĐỂ XEM TRƯỚC BIẾN THỂ - CHỈ HIỆN KHI THÊM MỚI
+const getVariantPreview = computed(() => {
+    // Chỉ hiện preview khi đang thêm mới (không phải edit)
+    if (detail.value.isEditing || !detail.value.mauSacs?.length || !detail.value.kichCos?.length || !detail.value.maChiTiet) {
+        return [];
+    }
+    
+    const variants = [];
+    for (const mauSac of detail.value.mauSacs) {
+        for (const kichCo of detail.value.kichCos) {
+            variants.push({
+                // maChiTiet: `${detail.value.maChiTiet}-${mauSac.tenMauSac}-${kichCo.tenKichCo}`,
+                maChiTiet: createId(),
+                mauSac: mauSac.tenMauSac,
+                kichCo: kichCo.tenKichCo
+            });
+        }
+    }
+    return variants;
+});
 
+// 5. HÀM VALIDATION TRƯỚC KHI EDIT
+function beforeEditDetail(detailData, productId) {
+    console.log('🔍 Before edit - checking data...');
+    
+    if (!detailData.mauSac || !detailData.kichCo) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Dữ liệu chi tiết sản phẩm không đầy đủ', 
+            life: 3000 
+        });
+        return;
+    }
+    
+    const colorExists = mauSacs.value.some(m => m.id === detailData.mauSac.id);
+    const sizeExists = kichCos.value.some(k => k.id === detailData.kichCo.id);
+    
+    if (!colorExists || !sizeExists) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo', 
+            detail: 'Màu sắc hoặc kích cỡ không tồn tại trong danh sách', 
+            life: 3000 
+        });
+        return;
+    }
+    
+    editDetail(detailData, productId);
+}
 
 function confirmDeleteDetail(detailData) {
     detail.value = detailData;
@@ -916,140 +1049,6 @@ function expandAll() {
 function collapseAll() {
     expandedRows.value = [];
 }
-
-// Function to get variant combinations preview
-function getVariantPreview() {
-    if (!detail.value.mauSacs?.length || !detail.value.kichCos?.length) return [];
-    
-    const variants = [];
-    for (const mauSac of detail.value.mauSacs) {
-        for (const kichCo of detail.value.kichCos) {
-            variants.push({
-                maChiTiet: `${detail.value.maChiTiet}-${mauSac.tenMauSac}-${kichCo.tenKichCo}`,
-                mauSac: mauSac.tenMauSac,
-                kichCo: kichCo.tenKichCo
-            });
-        }
-    }
-    return variants;
-}
-
-// 1. Function để test debug endpoint
-async function debugChiTietSanPham(id) {
-    try {
-        const response = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/debug/${id}`);
-        console.log('🔍 Debug Chi Tiết Sản Phẩm:', response.data);
-        
-        if (response.data.hinhAnh) {
-            console.log('🖼️ Hình ảnh info:', response.data.hinhAnh);
-            console.log('🔗 Full URL:', response.data.hinhAnh.fullImageUrl);
-            
-            // Test load hình ảnh
-            testImageUrl(response.data.hinhAnh.fullImageUrl);
-        } else {
-            console.log('❌ Không có hình ảnh');
-        }
-        
-        return response.data;
-    } catch (error) {
-        console.error('❌ Debug error:', error);
-    }
-}
-
-// 2. Function để test load hình ảnh
-function testImageUrl(url) {
-    console.log('🧪 Testing image URL:', url);
-    
-    const img = new Image();
-    img.onload = () => {
-        console.log('✅ Image loaded successfully:', url);
-    };
-    img.onerror = () => {
-        console.log('❌ Image failed to load:', url);
-        console.log('🔍 Trying alternative URLs...');
-        
-        // Test các URL khác
-        const alternatives = [
-            url.replace('/hinh-anh/images/', '/images/'),
-            url.replace('/images/', '/hinh-anh/images/'),
-            url.replace('http://localhost:8080/hinh-anh/images/', 'http://localhost:8080/images/'),
-        ];
-        
-        alternatives.forEach((altUrl, index) => {
-            const testImg = new Image();
-            testImg.onload = () => console.log(`✅ Alternative ${index + 1} works:`, altUrl);
-            testImg.onerror = () => console.log(`❌ Alternative ${index + 1} failed:`, altUrl);
-            testImg.src = altUrl;
-        });
-    };
-    img.src = url;
-}
-
-// 3. Function để lấy danh sách hình ảnh available
-async function getAvailableImages() {
-    try {
-        const response = await axios.get('http://localhost:8080/api/san-pham-chi-tiet/available-images');
-        console.log('📋 Available images:', response.data);
-        
-        // Test load từng hình ảnh
-        response.data.forEach((img, index) => {
-            console.log(`Testing image ${index + 1}:`, img.tenHinhAnh);
-            if (img.fullImageUrl) {
-                testImageUrl(img.fullImageUrl);
-            }
-        });
-        
-        return response.data;
-    } catch (error) {
-        console.error('❌ Error getting available images:', error);
-    }
-}
-
-// 4. Function để load chi tiết sản phẩm với debug
-async function loadChiTietSanPhamWithDebug(id) {
-    try {
-        // Load dữ liệu bình thường
-        const response = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${id}`);
-        console.log('📦 Chi tiết sản phẩm:', response.data);
-        
-        // Debug hình ảnh nếu có
-        if (response.data.hinhAnh) {
-            console.log('🖼️ Hình ảnh data:', response.data.hinhAnh);
-            
-            // Tạo URL và test
-            const imageUrl = getCorrectImageUrl(response.data.hinhAnh.duongDan);
-            console.log('🔗 Generated URL:', imageUrl);
-            testImageUrl(imageUrl);
-        }
-        
-        return response.data;
-    } catch (error) {
-        console.error('❌ Error loading chi tiết:', error);
-    }
-}
-
-// 5. Function để tạo URL hình ảnh đúng
-function getCorrectImageUrl(duongDan) {
-    if (!duongDan) return '/images/placeholder.png';
-    
-    console.log('🔄 Converting duongDan:', duongDan);
-    
-    // Clean path - loại bỏ prefix không cần thiết
-    let cleanPath = duongDan;
-    if (cleanPath.startsWith('/images/')) {
-        cleanPath = cleanPath.replace('/images/', '');
-    }
-    if (cleanPath.startsWith('/hinh-anh/images/')) {
-        cleanPath = cleanPath.replace('/hinh-anh/images/', '');
-    }
-    
-    // Tạo URL đầy đủ
-    const fullUrl = `http://localhost:8080/hinh-anh/images/${cleanPath}`;
-    console.log('✨ Final URL:', fullUrl);
-    
-    return fullUrl;
-}
-
 </script>
 
 <template>
@@ -1238,8 +1237,24 @@ function getCorrectImageUrl(duongDan) {
                             </Column>
                             <Column :exportable="false" style="min-width: 8rem">
                                 <template #body="detailProps">
-                                    <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editDetail(detailProps.data, slotProps.data.id)" v-tooltip.top="'Chỉnh sửa chi tiết'" :disabled="loading" />
-                                    <Button icon="pi pi-trash" outlined rounded severity="danger" @click="confirmDeleteDetail(detailProps.data)" v-tooltip.top="'Xóa chi tiết'" :disabled="loading" />
+                                    <Button 
+                                        icon="pi pi-pencil" 
+                                        outlined 
+                                        rounded 
+                                        class="mr-2" 
+                                        @click="beforeEditDetail(detailProps.data, slotProps.data.id)" 
+                                        v-tooltip.top="'Chỉnh sửa chi tiết'" 
+                                        :disabled="loading" 
+                                    />
+                                    <Button 
+                                        icon="pi pi-trash" 
+                                        outlined 
+                                        rounded 
+                                        severity="danger" 
+                                        @click="confirmDeleteDetail(detailProps.data)" 
+                                        v-tooltip.top="'Xóa chi tiết'" 
+                                        :disabled="loading" 
+                                    />
                                 </template>
                             </Column>
                         </DataTable>
@@ -1263,7 +1278,7 @@ function getCorrectImageUrl(duongDan) {
                     </div>
                     <div class="col-span-4">
                         <label for="maSanPham" class="block font-bold mb-3">Mã sản phẩm</label>
-                        <InputText id="maSanPham" v-model="product.maSanPham" fluid placeholder="Tự động tạo" :disabled="!!product.id" />
+                        <InputText id="maSanPham" v-model="product.maSanPham" fluid readonly="true" placeholder="Tự động tạo" :disabled="!!product.id" />
                     </div>
                 </div>
 
@@ -1307,15 +1322,39 @@ function getCorrectImageUrl(duongDan) {
             </template>
         </Dialog>
 
-        <!-- Dialog thêm/sửa chi tiết sản phẩm với Multi-Select và chọn hình ảnh -->
-        <Dialog v-model:visible="detailDialog" :style="{ width: '900px' }" header="Chi tiết sản phẩm" :modal="true" class="p-fluid">
+        <!-- DIALOG THÊM/SỬA CHI TIẾT SẢN PHẨM - CẬP NHẬT -->
+        <Dialog v-model:visible="detailDialog" :style="{ width: '900px' }" :header="detail.isEditing ? 'Sửa chi tiết sản phẩm' : 'Thêm chi tiết sản phẩm'" :modal="true" class="p-fluid">
             <div class="flex flex-col gap-6">
+                <!-- THÔNG BÁO CHẾ ĐỘ -->
+                <!-- <div v-if="detail.isEditing" class="p-3 bg-blue-50 border border-blue-200 rounded">
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-info-circle text-blue-600"></i>
+                        <span class="text-blue-800 font-medium">Chế độ sửa: Chỉ có thể thay đổi 1 màu sắc và 1 kích cỡ</span>
+                    </div>
+                </div>
+                
+                <div v-else class="p-3 bg-green-50 border border-green-200 rounded">
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-plus-circle text-green-600"></i>
+                        <span class="text-green-800 font-medium">Chế độ thêm: Có thể chọn nhiều màu sắc và kích cỡ để tạo nhiều biến thể</span>
+                    </div>
+                </div> -->
+
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-8">
                         <label for="maChiTiet" class="block font-bold mb-3">
                             Mã chi tiết 
                         </label>
-                        <InputText id="maChiTiet" v-model.trim="detail.maChiTiet" required="true" autofocus :invalid="submitted && !detail.maChiTiet" fluid readonly="true" />
+                        <InputText 
+                            id="maChiTiet" 
+                            v-model.trim="detail.maChiTiet" 
+                            required="true" 
+                            autofocus 
+                            :invalid="submitted && !detail.maChiTiet" 
+                            fluid 
+                            readonly="true"
+                            :readonly="detail.isEditing" 
+                        />
                         <small v-if="submitted && !detail.maChiTiet" class="text-red-500">Mã chi tiết là bắt buộc.</small>
                     </div>
                     <div class="col-span-4">
@@ -1338,12 +1377,31 @@ function getCorrectImageUrl(duongDan) {
                     </div>
                 </div>
 
+                <!-- SỬA: PHẦN MÀU SẮC VÀ KÍCH CỠ -->
                 <div class="grid grid-cols-12 gap-4">
+                    <!-- MÀU SẮC -->
                     <div class="col-span-6">
                         <label for="mauSacs" class="block font-bold mb-3">
                             Màu sắc 
+                            <span v-if="detail.isEditing" class="text-sm font-normal text-gray-500"></span>
+                            <span v-else class="text-sm font-normal text-gray-500"></span>
                         </label>
+                        
+                        <!-- CHẾ ĐỘ SỬA: CHỈ CHỌN 1 - SỬ DỤNG REF RIÊNG -->
+                        <Select 
+                            v-if="detail.isEditing"
+                            id="mauSacSingle" 
+                            v-model="selectedMauSac"
+                            :options="mauSacs" 
+                            optionLabel="tenMauSac" 
+                            placeholder="Chọn màu sắc" 
+                            fluid 
+                            :invalid="submitted && (!selectedMauSac)"
+                        />
+                        
+                        <!-- CHẾ ĐỘ THÊM: CHỌN NHIỀU -->
                         <MultiSelect 
+                            v-else
                             id="mauSacs" 
                             v-model="detail.mauSacs" 
                             :options="mauSacs" 
@@ -1352,14 +1410,37 @@ function getCorrectImageUrl(duongDan) {
                             fluid 
                             :maxSelectedLabels="3"
                             selectedItemsLabel="{0} màu đã chọn"
+                            :invalid="submitted && (!detail.mauSacs || detail.mauSacs.length === 0)"
                         />
-                        <small v-if="submitted && (!detail.mauSacs || detail.mauSacs.length === 0)" class="text-red-500">Phải chọn ít nhất một màu sắc.</small>
+                        
+                        <small v-if="submitted && (detail.isEditing ? !selectedMauSac : (!detail.mauSacs || detail.mauSacs.length === 0))" class="text-red-500">
+                            Phải chọn ít nhất một màu sắc.
+                        </small>
                     </div>
+                    
+                    <!-- KÍCH CỠ -->
                     <div class="col-span-6">
                         <label for="kichCos" class="block font-bold mb-3">
                             Kích cỡ 
+                            <span v-if="detail.isEditing" class="text-sm font-normal text-gray-500"></span>
+                            <span v-else class="text-sm font-normal text-gray-500"></span>
                         </label>
+                        
+                        <!-- CHẾ ĐỘ SỬA: CHỈ CHỌN 1 - SỬ DỤNG REF RIÊNG -->
+                        <Select 
+                            v-if="detail.isEditing"
+                            id="kichCoSingle" 
+                            v-model="selectedKichCo"
+                            :options="kichCos" 
+                            optionLabel="tenKichCo" 
+                            placeholder="Chọn kích cỡ" 
+                            fluid 
+                            :invalid="submitted && (!selectedKichCo)"
+                        />
+                        
+                        <!-- CHẾ ĐỘ THÊM: CHỌN NHIỀU -->
                         <MultiSelect 
+                            v-else
                             id="kichCos" 
                             v-model="detail.kichCos" 
                             :options="kichCos" 
@@ -1368,8 +1449,12 @@ function getCorrectImageUrl(duongDan) {
                             fluid 
                             :maxSelectedLabels="3"
                             selectedItemsLabel="{0} size đã chọn"
+                            :invalid="submitted && (!detail.kichCos || detail.kichCos.length === 0)"
                         />
-                        <small v-if="submitted && (!detail.kichCos || detail.kichCos.length === 0)" class="text-red-500">Phải chọn ít nhất một kích cỡ.</small>
+                        
+                        <small v-if="submitted && (detail.isEditing ? !selectedKichCo : (!detail.kichCos || detail.kichCos.length === 0))" class="text-red-500">
+                            Phải chọn ít nhất một kích cỡ.
+                        </small>
                     </div>
                 </div>
 
@@ -1380,8 +1465,8 @@ function getCorrectImageUrl(duongDan) {
                     </div>
                 </div>
 
-                <!-- Phần chọn hình ảnh -->
-               <div class="mt-4">
+                <!-- PHẦN CHỌN HÌNH ẢNH - GIỐNG NHƯ CŨ -->
+                <div class="mt-4">
                     <div class="flex justify-between items-center mb-3">
                         <label class="block font-bold">Hình ảnh sản phẩm</label>
                         <Button 
@@ -1393,10 +1478,9 @@ function getCorrectImageUrl(duongDan) {
                         />
                     </div>
                     
-                    <!-- Hiển thị hình ảnh đã chọn (CHỈ 1 HÌNH ẢNH) -->
+                    <!-- Hiển thị hình ảnh đã chọn -->
                     <div v-if="detail.selectedImage" class="p-3 border border-gray-200 rounded">
                         <div class="flex items-center gap-4">
-                            <!-- Hình ảnh preview -->
                             <div class="relative group">
                                 <img 
                                     :src="detail.selectedImage.url || detail.selectedImage.preview" 
@@ -1413,8 +1497,6 @@ function getCorrectImageUrl(duongDan) {
                                     @click="removeSelectedImage()"
                                 />
                             </div>
-                            
-                            <!-- Thông tin hình ảnh -->
                             <div class="flex-1">
                                 <div class="font-medium text-gray-900">{{ detail.selectedImage.maHinhAnh }}</div>
                                 <div class="text-sm text-gray-600">{{ detail.selectedImage.tenHinhAnh }}</div>
@@ -1427,8 +1509,6 @@ function getCorrectImageUrl(duongDan) {
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Placeholder khi chưa chọn hình ảnh -->
                     <div v-else class="p-4 border border-dashed border-gray-300 rounded text-center text-gray-500">
                         <i class="pi pi-image text-2xl mb-2"></i>
                         <p>Chưa chọn hình ảnh nào</p>
@@ -1436,19 +1516,29 @@ function getCorrectImageUrl(duongDan) {
                     </div>
                 </div>
 
-                <!-- Preview biến thể sẽ được tạo -->
-                <div v-if="!detail.id && detail.mauSacs?.length && detail.kichCos?.length && detail.maChiTiet" class="mt-4">
+                <!-- PREVIEW BIẾN THỂ SẼ ĐƯỢC TẠO - CHỈ HIỂN THI KHI THÊM MỚI -->
+                <div v-if="!detail.isEditing && getVariantPreview.length > 0" class="mt-4">
                     <label class="block font-bold mb-3">
                         Xem trước các biến thể sẽ được tạo: 
-                        <Badge :value="getVariantPreview().length" severity="info" />
+                        <Badge :value="getVariantPreview.length" severity="info" />
                     </label>
                     <div class="border border-gray-200 rounded p-3 max-h-40 overflow-y-auto">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                            <div v-for="variant in getVariantPreview()" :key="variant.maChiTiet" class="text-sm p-2 bg-gray-50 rounded">
+                            <div v-for="variant in getVariantPreview" :key="variant.maChiTiet" class="text-sm p-2 bg-gray-50 rounded">
                                 <div class="font-medium">{{ variant.maChiTiet }}</div>
                                 <div class="text-gray-600">{{ variant.mauSac }} - {{ variant.kichCo }}</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- HIỆN TẠI ĐANG SỬA GÌ - CHỈ HIỂN THI KHI SỬA -->
+                <div v-if="detail.isEditing" class="mt-4 p-3 bg-gray-50 border rounded">
+                    <label class="block font-bold mb-2">Thông tin hiện tại:</label>
+                    <div class="text-sm">
+                        <div><strong>Mã:</strong> {{ detail.maChiTiet }}</div>
+                        <div><strong>Màu sắc:</strong> {{ selectedMauSac?.tenMauSac || 'Chưa chọn' }}</div>
+                        <div><strong>Kích cỡ:</strong> {{ selectedKichCo?.tenKichCo || 'Chưa chọn' }}</div>
                     </div>
                 </div>
             </div>
@@ -1456,8 +1546,16 @@ function getCorrectImageUrl(duongDan) {
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDetailDialog" :disabled="loading" />
                 <Button 
-                    :label="detail.id ? 'Cập nhật' : `Thêm ${getVariantPreview().length} biến thể`" 
-                    icon="pi pi-check" 
+                    v-if="detail.isEditing"
+                    label="Cập nhật chi tiết" 
+                    icon="pi pi-save" 
+                    @click="saveDetail" 
+                    :loading="loading"
+                />
+                <Button 
+                    v-else
+                    :label="`Thêm ${getVariantPreview.length || 1} biến thể`" 
+                    icon="pi pi-plus" 
                     @click="saveDetail" 
                     :loading="loading"
                 />
@@ -1466,99 +1564,99 @@ function getCorrectImageUrl(duongDan) {
 
         <!-- Dialog chọn hình ảnh -->
         <Dialog v-model:visible="imageSelectionDialog" :style="{ width: '1000px' }" header="Chọn hình ảnh" :modal="true">
-    <div class="flex flex-col gap-4">
-        <!-- Thanh tìm kiếm -->
-        <div class="flex justify-between items-center">
-            <h6 class="m-0">Danh sách hình ảnh có sẵn</h6>
-            <IconField>
-                <InputIcon>
-                    <i class="pi pi-search" />
-                </InputIcon>
-                <InputText v-model="imageFilters['global'].value" placeholder="Tìm kiếm hình ảnh..." />
-            </IconField>
-        </div>
+            <div class="flex flex-col gap-4">
+                <!-- Thanh tìm kiếm -->
+                <div class="flex justify-between items-center">
+                    <h6 class="m-0">Danh sách hình ảnh có sẵn</h6>
+                    <IconField>
+                        <InputIcon>
+                            <i class="pi pi-search" />
+                        </InputIcon>
+                        <InputText v-model="imageFilters['global'].value" placeholder="Tìm kiếm hình ảnh..." />
+                    </IconField>
+                </div>
 
-        <!-- Bảng chọn hình ảnh - SINGLE SELECT -->
-        <DataTable
-            v-model:selection="selectedImage"
-            :value="availableImages"
-            dataKey="id"
-            :paginator="true"
-            :rows="8"
-            :filters="imageFilters"
-            selectionMode="single"
-            tableStyle="min-width: 50rem"
-            class="max-h-96"
-        >
-            <Column selectionMode="single" style="width: 3rem"></Column>
-            <Column header="Hình ảnh" style="width: 120px">
-                <template #body="slotProps">
-                    <img 
-                        :src="slotProps.data.preview" 
-                        :alt="slotProps.data.tenHinhAnh"
-                        class="w-16 h-16 object-cover rounded border shadow-sm cursor-pointer hover:scale-105 transition-transform"
-                        @error="handleImageError($event)"
-                        @click="selectedImage = slotProps.data"
-                    />
-                </template>
-            </Column>
-            <Column field="maHinhAnh" header="Mã hình ảnh" sortable style="min-width: 12rem">
-                <template #body="slotProps">
-                    <span 
-                        class="cursor-pointer hover:text-blue-600"
-                        @click="selectedImage = slotProps.data"
-                    >
-                        {{ slotProps.data.maHinhAnh }}
-                    </span>
-                </template>
-            </Column>
-            <Column field="tenHinhAnh" header="Tên file" sortable style="min-width: 16rem"></Column>
-            <Column field="duongDan" header="Đường dẫn" sortable style="min-width: 20rem">
-                <template #body="slotProps">
-                    <span class="text-sm text-gray-600 truncate block">{{ slotProps.data.duongDan }}</span>
-                </template>
-            </Column>
-            <Column header="Trạng thái" style="min-width: 10rem">
-                <template #body="slotProps">
-                    <Tag :value="slotProps.data.trangThai === 1 ? 'Sẵn sàng' : 'Đang xử lý'" :severity="getStatusLabel(slotProps.data.trangThai)" />
-                </template>
-            </Column>
-        </DataTable>
+                <!-- Bảng chọn hình ảnh - SINGLE SELECT -->
+                <DataTable
+                    v-model:selection="selectedImage"
+                    :value="availableImages"
+                    dataKey="id"
+                    :paginator="true"
+                    :rows="8"
+                    :filters="imageFilters"
+                    selectionMode="single"
+                    tableStyle="min-width: 50rem"
+                    class="max-h-96"
+                >
+                    <Column selectionMode="single" style="width: 3rem"></Column>
+                    <Column header="Hình ảnh" style="width: 120px">
+                        <template #body="slotProps">
+                            <img 
+                                :src="slotProps.data.preview" 
+                                :alt="slotProps.data.tenHinhAnh"
+                                class="w-16 h-16 object-cover rounded border shadow-sm cursor-pointer hover:scale-105 transition-transform"
+                                @error="handleImageError($event)"
+                                @click="selectedImage = slotProps.data"
+                            />
+                        </template>
+                    </Column>
+                    <Column field="maHinhAnh" header="Mã hình ảnh" sortable style="min-width: 12rem">
+                        <template #body="slotProps">
+                            <span 
+                                class="cursor-pointer hover:text-blue-600"
+                                @click="selectedImage = slotProps.data"
+                            >
+                                {{ slotProps.data.maHinhAnh }}
+                            </span>
+                        </template>
+                    </Column>
+                    <Column field="tenHinhAnh" header="Tên file" sortable style="min-width: 16rem"></Column>
+                    <Column field="duongDan" header="Đường dẫn" sortable style="min-width: 20rem">
+                        <template #body="slotProps">
+                            <span class="text-sm text-gray-600 truncate block">{{ slotProps.data.duongDan }}</span>
+                        </template>
+                    </Column>
+                    <Column header="Trạng thái" style="min-width: 10rem">
+                        <template #body="slotProps">
+                            <Tag :value="slotProps.data.trangThai === 1 ? 'Sẵn sàng' : 'Đang xử lý'" :severity="getStatusLabel(slotProps.data.trangThai)" />
+                        </template>
+                    </Column>
+                </DataTable>
 
-        <!-- Thông tin đã chọn -->
-        <div v-if="selectedImage" class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
-            <div class="flex items-center gap-3">
-                <img 
-                    :src="selectedImage.preview" 
-                    :alt="selectedImage.tenHinhAnh"
-                    class="w-12 h-12 object-cover rounded border"
-                    @error="handleImageError($event)"
-                />
-                <div>
-                    <div class="font-medium text-blue-800">{{ selectedImage.maHinhAnh }}</div>
-                    <div class="text-sm text-blue-600">{{ selectedImage.tenHinhAnh }}</div>
+                <!-- Thông tin đã chọn -->
+                <div v-if="selectedImage" class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <div class="flex items-center gap-3">
+                        <img 
+                            :src="selectedImage.preview" 
+                            :alt="selectedImage.tenHinhAnh"
+                            class="w-12 h-12 object-cover rounded border"
+                            @error="handleImageError($event)"
+                        />
+                        <div>
+                            <div class="font-medium text-blue-800">{{ selectedImage.maHinhAnh }}</div>
+                            <div class="text-sm text-blue-600">{{ selectedImage.tenHinhAnh }}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <template #footer>
-        <Button label="Hủy" icon="pi pi-times" text @click="imageSelectionDialog = false" />
-        <Button 
-            label="Bỏ chọn" 
-            icon="pi pi-minus-circle" 
-            severity="secondary"
-            @click="selectedImage = null"
-            v-if="selectedImage"
-        />
-        <Button 
-            :label="selectedImage ? `Xác nhận: ${selectedImage.maHinhAnh}` : 'Chọn hình ảnh'" 
-            icon="pi pi-check" 
-            @click="confirmImageSelection"
-            :disabled="!selectedImage"
-        />
-    </template>
-</Dialog>
+            <template #footer>
+                <Button label="Hủy" icon="pi pi-times" text @click="imageSelectionDialog = false" />
+                <Button 
+                    label="Bỏ chọn" 
+                    icon="pi pi-minus-circle" 
+                    severity="secondary"
+                    @click="selectedImage = null"
+                    v-if="selectedImage"
+                />
+                <Button 
+                    :label="selectedImage ? `Xác nhận: ${selectedImage.maHinhAnh}` : 'Chọn hình ảnh'" 
+                    icon="pi pi-check" 
+                    @click="confirmImageSelection"
+                    :disabled="!selectedImage"
+                />
+            </template>
+        </Dialog>
 
         <!-- Dialog xác nhận xóa sản phẩm -->
         <Dialog v-model:visible="deleteProductDialog" :style="{ width: '450px' }" header="Xác nhận xóa" :modal="true">
