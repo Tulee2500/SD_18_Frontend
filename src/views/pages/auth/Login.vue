@@ -139,7 +139,7 @@ const forgotPassword = () => {
 };
 
 const goToRegister = () => {
-    router.push('/register');
+    router.push('/auth/register');
 };
 
 // Load saved email nếu có "Remember me"
@@ -237,7 +237,7 @@ onMounted(() => {
                             :loading="isLoading"
                         />
                     </form>
-                    
+
               <!-- Register link -->
                     <div class="text-center mt-8">
                         <span class="text-muted-color">Chưa có tài khoản? </span>
