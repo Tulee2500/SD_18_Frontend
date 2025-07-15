@@ -10,26 +10,26 @@ const router = createRouter({
             name: 'user-home',
             component: () => import('@/views/user/UserHome.vue')
         },
-         {
+        {
             path: '/products',
             name: 'products',
             component: () => import('@/views/user/product/ProductList.vue')
-  },
-           {
-            path: '/gioithieu',
-            name: 'gioi-thieu',
-            component: () => import('@/views/user/gioithieu/gioithieu.vue')
-  },
-  {
-            path: '/lienhe',
-            name: 'lien-he',
-            component: () => import('@/views/user/lienhe/Lienhe.vue')
-  },
-  {
-    path: '/product/:id',
-    name: 'product',
-    component: () => import('@/components/user/product/Product.vue')
-  },
+        },
+        //            {
+        //             path: '/gioithieu',
+        //             name: 'gioi-thieu',
+        //             component: () => import('@/views/user/gioithieu/gioithieu.vue')
+        //   },
+        //   {
+        //             path: '/lienhe',
+        //             name: 'lien-he',
+        //             component: () => import('@/views/user/lienhe/Lienhe.vue')
+        //   },
+        {
+            path: '/product/:id',
+            name: 'product',
+            component: () => import('@/components/user/product/Product.vue')
+        },
         // ADMIN ROUTES - CẦN ĐĂNG NHẬP VÀ LÀ ADMIN/NHÂN VIÊN
         {
             path: '/admin',
