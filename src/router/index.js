@@ -1,17 +1,36 @@
 import AppLayout from '@/layout/AppLayout.vue';
-import { createRouter, createWebHistory } from 'vue-router';
 
+import { createRouter, createWebHistory } from 'vue-router';
 const router = createRouter({
     history: createWebHistory(),
     routes: [
         // ROUTE USER - Trang chủ người dùng (KHÔNG CẦN ĐĂNG NHẬP)
         {
-            path: '/',
+            path: '/home',
             name: 'user-home',
             component: () => import('@/views/user/UserHome.vue'),
             meta: { requiresAuth: false }
         },
-
+         {
+            path: '/products',
+            name: 'products',
+            component: () => import('@/views/user/product/ProductList.vue')
+  },
+//            {
+//             path: '/gioithieu',
+//             name: 'gioi-thieu',
+//             component: () => import('@/views/user/gioithieu/gioithieu.vue')
+//   },
+//   {
+//             path: '/lienhe',
+//             name: 'lien-he',
+//             component: () => import('@/views/user/lienhe/Lienhe.vue')
+//   },
+  {
+    path: '/product/:id',
+    name: 'product',
+    component: () => import('@/components/user/product/Product.vue')
+  },
         // ADMIN ROUTES - CẦN ĐĂNG NHẬP VÀ LÀ ADMIN/NHÂN VIÊN
         {
             path: '/adminNhanVien',
@@ -219,8 +238,17 @@ const router = createRouter({
                 {
                     name: 'TaiKhoan',
                     path: '/tai-khoan',
+// <<<<<<< HEAD
                     component: () => import('@/views/TaiKhoan/TaiKhoanManagement.vue'),
                     meta: { requiresAuth: true, roles: ['ADMIN'] } // Chỉ admin mới được quản lý tài khoản
+
+                    // component: () => import('@/views/TaiKhoan/TaiKhoanManagement.vue')
+                },
+                {
+                    name: 'BanHang',
+                    path: '/ban-hang',
+                    component: () => import('@/views/BanHang/BanHangView.vue')
+// >>>>>>> 7d7a58ff60c379d799e175708c0f01d6978a670f
                 }
             ]
         },

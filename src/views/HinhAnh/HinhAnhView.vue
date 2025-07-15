@@ -36,43 +36,94 @@
             </template>
 
             <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
-            <Column field="id" header="ID" sortable style="min-width: 8rem"></Column>
-            <Column field="maHinhAnh" header="Mã Hình Ảnh" sortable style="min-width: 12rem"></Column>
-            <Column field="tenHinhAnh" header="Tên Hình Ảnh" sortable style="min-width: 16rem"></Column>
-            <Column field="chiTietSanPham" header="Chi Tiết Sản Phẩm" sortable style="min-width: 16rem"></Column>
-            <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
+            <Column field="id" header="ID" sortable style="min-width: 6rem"></Column>
+            
+            <!-- CỘT HÌNH ẢNH -->
+            <Column header="Hình ảnh" style="min-width: 12rem">
                 <template #body="slotProps">
-                    <Tag :value="slotProps.data.trangThai === 1 ? 'Đang tải' : 'Đã tải'" :severity="getStatusLabel(slotProps.data.trangThai)" />
+                    <div class="flex justify-center">
+                        <img 
+                            :src="`http://localhost:8080${slotProps.data.duongDan}`" 
+                            :alt="slotProps.data.tenHinhAnh"
+                            class="w-20 h-20 object-cover rounded border shadow-sm cursor-pointer hover:scale-105 transition-transform"
+                            @click="previewImage(slotProps.data)"
+                            @error="handleImageError($event)"
+                        />
+                    </div>
                 </template>
             </Column>
-            <Column :exportable="false" style="width: 10rem">
+            
+            <Column field="maHinhAnh" header="Mã Hình Ảnh" sortable style="min-width: 12rem"></Column>
+            <Column field="tenHinhAnh" header="Tên File" sortable style="min-width: 20rem"></Column>
+            <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
                 <template #body="slotProps">
-                    <div class="flex justify-between gap-2">
-                        <Button icon="pi pi-pencil" outlined rounded size="small" @click="editHinhAnh(slotProps.data)" />
-                        <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteHinhAnh(slotProps.data)" />
-                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" />
+                    <Tag :value="slotProps.data.trangThai === 1 ? 'Đã load' : 'Đang load'" :severity="getStatusLabel(slotProps.data.trangThai)" />
+                </template>
+            </Column>
+            <Column :exportable="false" style="width: 12rem">
+                <template #body="slotProps">
+                    <div class="flex justify-center gap-2">
+                        <Button icon="pi pi-pencil" outlined rounded size="small" @click="editHinhAnh(slotProps.data)" v-tooltip.top="'Chỉnh sửa'" />
+                        <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteHinhAnh(slotProps.data)" v-tooltip.top="'Xóa'" />
+                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" v-tooltip.top="'Đổi trạng thái'" />
                     </div>
                 </template>
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="hinhAnhDialog" :style="{ width: '450px' }" header="Chi tiết Hình Ảnh" :modal="true">
+        <!-- DIALOG THÊM/SỬA HÌNH ẢNH ĐƠN GIẢN -->
+        <Dialog v-model:visible="hinhAnhDialog" :style="{ width: '500px' }" header="Chi tiết Hình Ảnh" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maHinhAnh" class="block font-bold mb-3">Mã Hình Ảnh</label>
-                    <InputText id="maHinhAnh" v-model.trim="hinhAnh.maHinhAnh" required="true" autofocus :invalid="submitted && !hinhAnh.maHinhAnh" fluid />
+                    <InputText id="maHinhAnh" v-model.trim="hinhAnh.maHinhAnh" required="true" autofocus :invalid="submitted && !hinhAnh.maHinhAnh" fluid readonly="true" />
                     <small v-if="submitted && !hinhAnh.maHinhAnh" class="text-red-500">Mã Hình Ảnh là bắt buộc.</small>
                 </div>
+                
+                <!-- PHẦN UPLOAD FILE -->
                 <div>
-                    <label for="tenHinhAnh" class="block font-bold mb-3">Tên Hình Ảnh</label>
-                    <InputText id="tenHinhAnh" v-model.trim="hinhAnh.tenHinhAnh" required="true" :invalid="submitted && !hinhAnh.tenHinhAnh" fluid />
-                    <small v-if="submitted && !hinhAnh.tenHinhAnh" class="text-red-500">Tên Hình Ảnh là bắt buộc.</small>
+                    <label class="block font-bold mb-3">Chọn hình ảnh</label>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer" @click="$refs.fileInput.click()">
+                        <input 
+                            type="file" 
+                            ref="fileInput"
+                            @change="handleFileSelect"
+                            accept="image/*"
+                            class="hidden"
+                        />
+                        
+                        <!-- Hiển thị hình ảnh preview -->
+                        <div v-if="imagePreview" class="mb-4">
+                            <img :src="imagePreview" alt="Preview" class="max-w-full max-h-48 mx-auto rounded border shadow-sm" />
+                            <p class="text-sm text-gray-600 mt-2">{{ selectedFileName }}</p>
+                        </div>
+                        
+                        <!-- Nút chọn file -->
+                        <div v-else class="mb-4">
+                            <i class="pi pi-cloud-upload text-4xl text-gray-400 mb-4"></i>
+                            <p class="text-gray-600">Nhấn để chọn hình ảnh</p>
+                            <p class="text-sm text-gray-400">JPG, PNG, GIF (Tối đa 5MB)</p>
+                        </div>
+                        
+                        <div class="flex gap-2 justify-center" @click.stop>
+                            <Button 
+                                label="Chọn file" 
+                                icon="pi pi-upload" 
+                                @click="$refs.fileInput.click()"
+                                severity="secondary"
+                            />
+                            <Button 
+                                v-if="imagePreview"
+                                label="Xóa" 
+                                icon="pi pi-times" 
+                                @click="clearFile"
+                                severity="danger"
+                                outlined
+                            />
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label for="chiTietSanPham" class="block font-bold mb-3">Chi Tiết Sản Phẩm</label>
-                    <InputText id="chiTietSanPham" v-model.trim="hinhAnh.chiTietSanPham" required="true" :invalid="submitted && !hinhAnh.chiTietSanPham" fluid />
-                    <small v-if="submitted && !hinhAnh.chiTietSanPham" class="text-red-500">Chi Tiết Sản Phẩm là bắt buộc.</small>
-                </div>
+
                 <div>
                     <label for="trangThai" class="block font-bold mb-3">Trạng Thái</label>
                     <Select id="trangThai" v-model="hinhAnh.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
@@ -80,7 +131,25 @@
             </div>
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveChatLieu" />
+                <Button label="Lưu" icon="pi pi-check" @click="saveHinhAnh" :loading="uploading" />
+            </template>
+        </Dialog>
+
+        <!-- DIALOG XEM HÌNH ẢNH FULL SIZE -->
+        <Dialog v-model:visible="imagePreviewDialog" :style="{ width: '800px' }" header="Xem hình ảnh" :modal="true">
+            <div class="text-center">
+                <img 
+                    :src="previewImageSrc" 
+                    :alt="previewImageName"
+                    class="max-w-full max-h-96 object-contain rounded shadow"
+                />
+                <div class="mt-4 text-sm text-gray-600">
+                    <p><strong>Tên file:</strong> {{ previewImageName }}</p>
+                    <p><strong>Đường dẫn:</strong> {{ previewImagePath }}</p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Đóng" icon="pi pi-times" @click="imagePreviewDialog = false" />
             </template>
         </Dialog>
 
@@ -130,9 +199,22 @@ const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
 const statuses = ref([
-    { label: 'Đã tải', value: 1 },
-    { label: 'Đang tải', value: 0 }
+    { label: 'Đã load', value: 1 },
+    { label: 'Đang load', value: 0 }
 ]);
+
+// CÁC REF CHO UPLOAD FILE
+const fileInput = ref();
+const selectedFile = ref(null);
+const selectedFileName = ref('');
+const imagePreview = ref('');
+const uploading = ref(false);
+
+// CÁC REF CHO PREVIEW HÌNH ẢNH
+const imagePreviewDialog = ref(false);
+const previewImageSrc = ref('');
+const previewImageName = ref('');
+const previewImagePath = ref('');
 
 onMounted(() => {
     fetchData();
@@ -153,8 +235,24 @@ async function fetchData() {
     }
 }
 
+function createId() {
+    let id = '';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return 'HA' + id;
+}
+
+// HÀM openNew ĐƠN GIẢN
 function openNew() {
-    hinhAnh.value = { trangThai: 1 };
+    hinhAnh.value = {
+        maHinhAnh: createId(),
+        tenHinhAnh: '',
+        trangThai: 1
+    };
+    
+    clearFile();
     submitted.value = false;
     hinhAnhDialog.value = true;
 }
@@ -162,54 +260,192 @@ function openNew() {
 function hideDialog() {
     hinhAnhDialog.value = false;
     submitted.value = false;
+    clearFile();
 }
 
-async function saveHinhAnh() {
-    submitted.value = true;
-
-    if (hinhAnh.value.maHinhAnh?.trim() && hinhAnh.value.tenHinhAnh?.trim()) {
-        try {
-            if (hinhAnh.value.id) {
-                await axios.put(`http://localhost:8080/hinh-anh/${hinhAnh.value.id}`, hinhAnh.value);
-                toast.add({
-                    severity: 'success',
-                    summary: 'Thành công',
-                    detail: 'Cập nhật hình ảnh thành công',
-                    life: 3000
-                });
-            } else {
-                await axios.post('http://localhost:8080/hinh-anh', hinhAnh.value);
-                toast.add({
-                    severity: 'success',
-                    summary: 'Thành công',
-                    detail: 'Tạo hình ảnh thành công',
-                    life: 3000
-                });
-            }
-            fetchData();
-            hinhAnhDialog.value = false;
-            hinhAnh.value = {};
-        } catch (error) {
-            console.error('Error saving hình ảnh:', error);
-            toast.add({
-                severity: 'error',
-                summary: 'Lỗi',
-                detail: error.response?.data?.message || 'Lưu hình ảnh thất bại',
-                life: 3000
-            });
-        }
-    } else {
+// XỬ LÝ FILE
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Kiểm tra loại file
+    if (!file.type.startsWith('image/')) {
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+            detail: 'Vui lòng chọn file hình ảnh (JPG, PNG, GIF)',
             life: 3000
         });
+        return;
+    }
+    
+    // Kiểm tra kích thước file (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'File không được vượt quá 5MB',
+            life: 3000
+        });
+        return;
+    }
+    
+    selectedFile.value = file;
+    selectedFileName.value = file.name;
+    
+    // CHỈ TỰ ĐỘNG ĐIỀN TÊN FILE
+    hinhAnh.value.tenHinhAnh = file.name;
+    
+    // Tạo preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        imagePreview.value = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearFile() {
+    selectedFile.value = null;
+    selectedFileName.value = '';
+    imagePreview.value = '';
+    hinhAnh.value.tenHinhAnh = '';
+    if (fileInput.value) {
+        fileInput.value.value = '';
     }
 }
 
+// UPLOAD FILE
+async function uploadFile(file) {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await axios.post('http://localhost:8080/hinh-anh/upload', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        
+        return response.data.path;
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Upload file thất bại',
+            life: 3000
+        });
+        return null;
+    }
+}
+
+// SAVE ĐƠN GIẢN HÓA
+async function saveHinhAnh() {
+    submitted.value = true;
+
+    // KIỂM TRA CƠ BẢN
+    if (!hinhAnh.value.maHinhAnh?.trim()) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Mã hình ảnh là bắt buộc',
+            life: 3000
+        });
+        return;
+    }
+
+    if (!hinhAnh.value.tenHinhAnh?.trim()) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Tên hình ảnh là bắt buộc',
+            life: 3000
+        });
+        return;
+    }
+
+    // NẾU LÀ THÊM MỚI, BẮT BUỘC PHẢI CÓ FILE
+    if (!hinhAnh.value.id && !selectedFile.value) {
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Vui lòng chọn file hình ảnh',
+            life: 3000
+        });
+        return;
+    }
+
+    try {
+        uploading.value = true;
+        
+        // NẾU CÓ FILE MỚI, UPLOAD TRƯỚC
+        if (selectedFile.value) {
+            const uploadedPath = await uploadFile(selectedFile.value);
+            if (uploadedPath) {
+                hinhAnh.value.duongDan = uploadedPath;
+            } else {
+                toast.add({
+                    severity: 'error',
+                    summary: 'Lỗi',
+                    detail: 'Upload file thất bại',
+                    life: 3000
+                });
+                return;
+            }
+        }
+        
+        if (hinhAnh.value.id) {
+            // CẬP NHẬT
+            await axios.put(`http://localhost:8080/hinh-anh/${hinhAnh.value.id}`, hinhAnh.value);
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Cập nhật hình ảnh thành công',
+                life: 3000
+            });
+        } else {
+            // THÊM MỚI
+            await axios.post('http://localhost:8080/hinh-anh', hinhAnh.value);
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Tạo hình ảnh thành công',
+                life: 3000
+            });
+        }
+        
+        fetchData();
+        hinhAnhDialog.value = false;
+        hinhAnh.value = {};
+        clearFile();
+    } catch (error) {
+        console.error('Error saving hình ảnh:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: error.response?.data?.message || 'Lưu hình ảnh thất bại',
+            life: 3000
+        });
+    } finally {
+        uploading.value = false;
+    }
+}
+
+// EDIT ĐƠN GIẢN
 function editHinhAnh(ha) {
     hinhAnh.value = { ...ha };
+    
+    // Reset file upload khi edit
+    selectedFile.value = null;
+    selectedFileName.value = '';
+    imagePreview.value = '';
+    
+    // Hiển thị hình ảnh hiện có nếu có
+    if (ha.duongDan) {
+        imagePreview.value = `http://localhost:8080${ha.duongDan}`;
+        selectedFileName.value = ha.tenHinhAnh;
+    }
+    
     hinhAnhDialog.value = true;
 }
 
@@ -247,12 +483,12 @@ function confirmDeleteSelected() {
 
 async function deleteSelectedHinhAnhs() {
     try {
-        for (const ha of selectedHinhAnhs.value) {
+        for (const ha of selectedHinhAnh.value) {
             await axios.delete(`http://localhost:8080/hinh-anh/${ha.id}`);
         }
         fetchData();
         deleteHinhAnhsDialog.value = false;
-        selectedHinhAnhs.value = null;
+        selectedHinhAnh.value = null;
         toast.add({
             severity: 'success',
             summary: 'Thành công',
@@ -292,9 +528,18 @@ async function changeStatus(ha) {
     }
 }
 
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
+// XEM HÌNH ẢNH FULL SIZE
+function previewImage(imageData) {
+    previewImageSrc.value = `http://localhost:8080${imageData.duongDan}`;
+    previewImageName.value = imageData.tenHinhAnh;
+    previewImagePath.value = imageData.duongDan;
+    imagePreviewDialog.value = true;
+}
+
+function handleImageError(event) {
+    event.target.src = '/images/placeholder.png';
+    event.target.onerror = null;
+}
 
 function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
@@ -302,7 +547,6 @@ function getStatusLabel(status) {
 
 function exportCSV() {
     try {
-        // If no data, show warning
         if (!ListHinhAnh.value || ListHinhAnh.value.length === 0) {
             toast.add({
                 severity: 'warn',
@@ -313,25 +557,19 @@ function exportCSV() {
             return;
         }
 
-        // Create CSV headers with Vietnamese labels
-        const headers = ['ID', 'Mã Hình Ảnh', 'Tên Hình Ảnh', 'Trạng Thái', 'Chi Tiết Sản Phẩm'];
+        const headers = ['ID', 'Mã Hình Ảnh', 'Tên File', 'Trạng Thái'];
 
-        // Convert data to CSV format
         const csvData = ListHinhAnh.value.map(item => {
             return [
                 item.id || '',
                 item.maHinhAnh || '',
                 item.tenHinhAnh || '',
-                item.trangThai === 1 ? 'Đã tải' : 'Đang tải',
-                item.chiTietSanPham || '',
-
+                item.trangThai === 1 ? 'Đã load' : 'Đang load'
             ];
         });
 
-        // Combine headers and data
         const csvContent = [headers, ...csvData]
             .map(row => row.map(field => {
-                // Handle fields that might contain commas or quotes
                 const stringField = String(field);
                 if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
                     return `"${stringField.replace(/"/g, '""')}"`;
@@ -340,11 +578,9 @@ function exportCSV() {
             }).join(','))
             .join('\n');
 
-        // Add BOM for proper UTF-8 encoding in Excel
         const BOM = '\uFEFF';
         const csvWithBOM = BOM + csvContent;
 
-        // Create and download file
         const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         
@@ -352,9 +588,8 @@ function exportCSV() {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
             
-            // Generate filename with current date
             const now = new Date();
-            const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+            const dateStr = now.toISOString().split('T')[0];
             const filename = `HinhAnh-${dateStr}.csv`;
 
             link.setAttribute('download', filename);
@@ -363,7 +598,6 @@ function exportCSV() {
             link.click();
             document.body.removeChild(link);
             
-            // Show success message
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
@@ -388,4 +622,4 @@ function exportCSV() {
     border: none;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
-    </style>
+</style>

@@ -1,3 +1,4 @@
+
 // composables/useAuth.js
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
@@ -246,3 +247,4 @@ export const hasPermission = (userRole, permission) => {
     const rolePermissions = ROLE_PERMISSIONS[userRole] || [];
     return rolePermissions.includes(permission);
 };
+

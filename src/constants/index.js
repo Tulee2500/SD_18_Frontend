@@ -1,22 +1,22 @@
+import { facebook, instagram, shieldTick as shieldTickIcon, support as supportIcon, truckFast as truckFastIcon, twitter } from "../assets/icons";
+import { customer1, customer2 } from "../assets/images";
+import bigShoe11 from "../assets/images/1.png";
 import bigShoe1 from "../assets/images/big-shoe1.png";
 import bigShoe2 from "../assets/images/big-shoe2.png";
 import bigShoe3 from "../assets/images/big-shoe3.png";
-import bigShoe4 from "../assets/images/product12.png";
+import bigShoe12 from "../assets/images/hero.png";
 import bigShoe5 from "../assets/images/product1.png";
+import bigShoe4 from "../assets/images/product12.png";
 import bigShoe6 from "../assets/images/product2.png";
 import bigShoe7 from "../assets/images/product3.png";
 import bigShoe8 from "../assets/images/product5.png";
 import bigShoe9 from "../assets/images/product6.png";
 import bigShoe10 from "../assets/images/product8(1).png";
-import bigShoe11 from "../assets/images/1.png";
-import bigShoe12 from "../assets/images/hero.png";
-import { facebook, instagram, shieldTick as shieldTickIcon, support as supportIcon, truckFast as truckFastIcon, twitter } from "../assets/icons";
-import { customer1, customer2 } from "../assets/images";
 export const navLinks = [
-    { href: "#home", label: "Trang Chủ" },
-    { href: "#about-us", label: "Giới Thiệu" },
-    { href: "#products", label: "Sản Phẩm" },
-    { href: "#contact-us", label: "Liên Hệ" },
+    { href: "home", label: "Trang Chủ" },
+    { href: "gioithieu", label: "Giới Thiệu" },
+    { href: "products", label: "Sản Phẩm" },
+    { href: "lienhe", label: "Liên Hệ" },
 ];
 
 export const statistics = [

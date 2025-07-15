@@ -59,7 +59,7 @@
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maKichCo" class="block font-bold mb-3">Mã Kích Cỡ</label>
-                    <InputText id="maKichCo" v-model.trim="kichCo.maKichCo" required="true" autofocus :invalid="submitted && !kichCo.maKichCo" fluid />
+                    <InputText id="maKichCo" v-model.trim="kichCo.maKichCo" required="true" autofocus :invalid="submitted && !kichCo.maKichCo" fluid readonly="true"/>
                     <small v-if="submitted && !kichCo.maKichCo" class="text-red-500">Mã Kích Cỡ là bắt buộc.</small>
                 </div>
                 <div>

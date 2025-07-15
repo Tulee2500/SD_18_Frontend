@@ -1,7 +1,7 @@
 <script setup>
-import { socialMedia, footerLinks } from "@/constants";
-import { footerLogo } from "@/assets/images";
 import { copyrightSign } from "@/assets/icons";
+import { footerLogo } from "@/assets/images";
+import { footerLinks, socialMedia } from "@/constants";
 </script>
 <template>
   <footer class="max-container">

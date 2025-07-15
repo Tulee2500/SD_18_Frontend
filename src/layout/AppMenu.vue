@@ -10,6 +10,7 @@ const model = ref([
                 label: 'Home',
                 items: [{ label: 'Dashboard', icon: 'pi pi-fw pi-home', to: '/' }]
             },
+            { label: 'Bán Hàng Tại Quầy', icon: 'pi pi-fw pi-id-card', to: '/ban-hang' },
             { label: 'Sản Phẩm', icon: 'pi pi-fw pi-id-card', to: '/san-pham' },
             {
                 label: 'Quản lý tài khoản',

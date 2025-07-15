@@ -86,7 +86,7 @@
       <div class="flex flex-col gap-6">
         <div>
           <label for="maVoucher" class="block font-bold mb-3">Mã Voucher</label>
-          <InputText id="maVoucher" v-model.trim="voucher.maVoucher" required="true" autofocus :invalid="submitted && !voucher.maVoucher" fluid />
+          <InputText id="maVoucher" v-model.trim="voucher.maVoucher" required="true" autofocus :invalid="submitted && !voucher.maVoucher" fluid readonly="true" />
           <small v-if="submitted && !voucher.maVoucher" class="text-red-500">Mã Voucher là bắt buộc.</small>
         </div>
         <div>
