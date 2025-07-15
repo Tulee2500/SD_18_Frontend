@@ -219,6 +219,7 @@
 
 <script>
 import Nav from '@/components/user/Nav.vue';
+import ScrollToggler from '@/components/user/ScrollToggler.vue';
 import Footer from '@/views/user/Footer.vue';
 import axios from 'axios';
 import Hero from '../Hero.vue';
@@ -230,6 +231,7 @@ export default {
     Nav,
     Footer,
     Hero,
+    ScrollToggler
   },
   
   data() {
@@ -275,7 +277,9 @@ export default {
     },
     
     scrollToProducts() {
-      this.$refs.productsSection.scrollIntoView({ behavior: 'smooth' });
+      if (this.$refs.productsSection) {
+        this.$refs.productsSection.scrollIntoView({ behavior: 'smooth' });
+      }
     },
     
     goToProductDetail(product) {
@@ -289,11 +293,20 @@ export default {
       this.cartItems++;
       console.log('Added to cart:', product);
       this.$emit('add-to-cart', product);
+      
+      // Hiển thị thông báo thành công
+      this.$toast?.success(`Đã thêm ${product.label} vào giỏ hàng!`) || 
       alert(`Đã thêm ${product.label} vào giỏ hàng!`);
     },
     
     handleImageError(event) {
+      // Ẩn ảnh lỗi và hiển thị placeholder
       event.target.style.display = 'none';
+      // Tìm và hiển thị placeholder nếu có
+      const placeholder = event.target.parentElement.querySelector('.product-placeholder');
+      if (placeholder) {
+        placeholder.style.display = 'flex';
+      }
     },
     
     formatPrice(price) {
@@ -306,8 +319,10 @@ export default {
         this.loadingCategories = true;
         const response = await axios.get('http://localhost:8080/danh-muc');
         this.categories = response.data.filter(cat => cat.trangThai === 1);
+        console.log('Categories loaded:', this.categories.length);
       } catch (error) {
         console.error("Lỗi khi gọi API danh mục:", error);
+        this.categories = [];
       } finally {
         this.loadingCategories = false;
       }
@@ -317,19 +332,96 @@ export default {
       try {
         this.loading = true;
         const response = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
-        this.products = response.data.map(p => ({
-          id: p.id,
-          imgUrl: p.hinhAnh?.duongDan ?? '',
-          label: p.sanPham?.tenSanPham ?? '',
-          price: p.giaBan,
-          rating: 4.8,
-          colorId: p.mauSac?.id,
-          sizeId: p.kichCo?.id,
-          productId: p.sanPham?.id,
-          categoryId: p.sanPham?.danhMuc?.id
-        }));
+        console.log('API Response:', response.data); // Debug toàn bộ response
+        
+        // Kiểm tra xem có dữ liệu không
+        if (!response.data || response.data.length === 0) {
+          console.warn('No products data received from API');
+          this.products = [];
+          return;
+        }
+        
+        // Log chi tiết sản phẩm đầu tiên để xem cấu trúc
+        console.log('First product detail:', response.data[0]);
+        
+        this.products = response.data.map((p, index) => {
+          // Log chi tiết cho vài sản phẩm đầu
+          if (index < 3) {
+            console.log(`Product ${index + 1} full data:`, p);
+            console.log(`Product ${index + 1} image data:`, {
+              hinhAnh: p.hinhAnh,
+              hinhAnhType: typeof p.hinhAnh,
+              hinhAnhKeys: p.hinhAnh ? Object.keys(p.hinhAnh) : null
+            });
+          }
+          
+          // Thử các cách khác nhau để lấy URL ảnh
+          let imageUrl = '';
+          if (p.hinhAnh) {
+            // Nếu hinhAnh là object
+            if (typeof p.hinhAnh === 'object') {
+              imageUrl = p.hinhAnh.url || 
+                        p.hinhAnh.duongDan || 
+                        p.hinhAnh.path ||
+                        p.hinhAnh.link ||
+                        p.hinhAnh.src ||
+                        '';
+            } 
+            // Nếu hinhAnh là string (URL trực tiếp)
+            else if (typeof p.hinhAnh === 'string') {
+              imageUrl = p.hinhAnh;
+            }
+          }
+          
+          // Đảm bảo URL đầy đủ nếu là relative path
+          if (imageUrl && !imageUrl.startsWith('http')) {
+            imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
+          }
+          
+          const product = {
+            id: p.id,
+            imgUrl: imageUrl,
+            label: p.sanPham?.tenSanPham || 'Sản phẩm không tên',
+            price: p.giaBan || 0,
+            originalPrice: p.giaGoc || 0,
+            rating: 4.8,
+            colorId: p.mauSac?.id,
+            colorName: p.mauSac?.tenMauSac || '',
+            sizeId: p.kichCo?.id,
+            sizeName: p.kichCo?.tenKichCo || '',
+            productId: p.sanPham?.id,
+            categoryId: p.sanPham?.danhMuc?.id,
+            categoryName: p.sanPham?.danhMuc?.tenDanhMuc || '',
+            maChiTiet: p.maChiTiet,
+            soLuong: p.soLuong || 0,
+            trangThai: p.trangThai
+          };
+          
+          // Log sản phẩm đã xử lý
+          if (index < 3) {
+            console.log(`Processed product ${index + 1}:`, product);
+          }
+          
+          return product;
+        });
+        
+        console.log('Total processed products:', this.products.length);
+        console.log('Products with images:', this.products.filter(p => p.imgUrl).length);
+        console.log('Products without images:', this.products.filter(p => !p.imgUrl).length);
+        
+        // Log một vài sản phẩm có ảnh
+        const productsWithImages = this.products.filter(p => p.imgUrl).slice(0, 3);
+        console.log('Sample products with images:', productsWithImages);
+        
       } catch (error) {
-        console.error("Lỗi khi gọi API sản phẩm:", error);
+        console.error("Error fetching products:", error);
+        console.error("Error details:", {
+          message: error.message,
+          response: error.response,
+          request: error.request,
+          stack: error.stack
+        });
+        this.products = [];
       } finally {
         this.loading = false;
       }
@@ -337,12 +429,16 @@ export default {
   },
 
   mounted() {
+    console.log('ProductList component mounted');
     this.fetchCategories();
     this.fetchProducts();
+  },
+  
+  beforeUnmount() {
+    console.log('ProductList component unmounting');
   }
 }
 </script>
-
 <style lang="scss" scoped>
 .nike-complete-layout {
   font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -708,9 +804,14 @@ export default {
     transform: translateY(-12px) scale(1.02);
     box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
     
-    .product-image {
-      transform: scale(1.1) rotate(2deg);
-    }
+   .product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
+  transition: all 0.3s ease;
+}
+
     
     .product-overlay {
       opacity: 1;
@@ -726,7 +827,7 @@ export default {
 
 .product-image-container {
   position: relative;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: transparent; // bỏ nền
   padding: 2.5rem;
   display: flex;
   justify-content: center;
@@ -734,7 +835,6 @@ export default {
   height: 280px;
   overflow: hidden;
 }
-
 .product-image-wrapper {
   width: 100%;
   height: 100%;
