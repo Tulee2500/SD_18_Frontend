@@ -6,44 +6,31 @@ const router = createRouter({
     routes: [
         // ROUTE USER - Trang chủ người dùng (KHÔNG CẦN ĐĂNG NHẬP)
         {
-            path: '/home',
+            path: '/',
             name: 'user-home',
             component: () => import('@/views/user/UserHome.vue'),
             meta: { requiresAuth: false }
         },
-         {
+        {
             path: '/products',
             name: 'products',
             component: () => import('@/views/user/product/ProductList.vue')
-  },
-<<<<<<< Updated upstream
-//            {
-//             path: '/gioithieu',
-//             name: 'gioi-thieu',
-//             component: () => import('@/views/user/gioithieu/gioithieu.vue')
-//   },
-//   {
-//             path: '/lienhe',
-//             name: 'lien-he',
-//             component: () => import('@/views/user/lienhe/Lienhe.vue')
-//   },
-=======
-           {
+        },
+        {
             path: '/gioithieu',
             name: 'gioi-thieu',
             component: () => import('@/views/user/gioithieu/Gioithieu.vue')
-  },
-  {
+        },
+        {
             path: '/lienhe',
             name: 'lien-he',
             component: () => import('@/views/user/lienhe/LienHe.vue')
-  },
->>>>>>> Stashed changes
-  {
-    path: '/product/:id',
-    name: 'product',
-    component: () => import('@/components/user/product/Product.vue')
-  },
+        },
+        {
+            path: '/product/:id',
+            name: 'product',
+            component: () => import('@/components/user/product/Product.vue')
+        },
         // ADMIN ROUTES - CẦN ĐĂNG NHẬP VÀ LÀ ADMIN/NHÂN VIÊN
         {
             path: '/adminNhanVien',
@@ -251,7 +238,7 @@ const router = createRouter({
                 {
                     name: 'TaiKhoan',
                     path: '/tai-khoan',
-// <<<<<<< HEAD
+                    // <<<<<<< HEAD
                     component: () => import('@/views/TaiKhoan/TaiKhoanManagement.vue'),
                     meta: { requiresAuth: true, roles: ['ADMIN'] } // Chỉ admin mới được quản lý tài khoản
 
@@ -261,7 +248,7 @@ const router = createRouter({
                     name: 'BanHang',
                     path: '/ban-hang',
                     component: () => import('@/views/BanHang/BanHangView.vue')
-// >>>>>>> 7d7a58ff60c379d799e175708c0f01d6978a670f
+                    // >>>>>>> 7d7a58ff60c379d799e175708c0f01d6978a670f
                 }
             ]
         },
@@ -304,7 +291,7 @@ const router = createRouter({
         },
 
         {
-            path:'/auth/register',
+            path: '/auth/register',
             name: 'register',
             component: () => import('@/views/pages/auth/Register.vue'),
             meta: { requiresAuth: false }
@@ -449,10 +436,10 @@ export const useAuthUtils = () => {
         fetch('/api/auth/logout', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${getToken()}`,
+                Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json'
             }
-        }).catch(e => console.warn('Logout API call failed:', e));
+        }).catch((e) => console.warn('Logout API call failed:', e));
 
         // Chuyển hướng về login
         router.push('/auth/login');
