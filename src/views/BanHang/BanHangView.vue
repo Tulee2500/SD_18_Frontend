@@ -1001,7 +1001,7 @@ export default {
             ghiChu: '',
             diemSuDung: 0
         });
-        const quickAmounts = ref([200000, 500000, 1000000, 2000000, 5000000]);
+        const quickAmounts = ref([1000000, 2000000, 3000000, 5000000, 10000000]);
 
         // Invoice print data
         const hoaDonDaThanhToan = ref(null);
