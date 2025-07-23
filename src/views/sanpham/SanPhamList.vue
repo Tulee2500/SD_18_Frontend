@@ -2,7 +2,7 @@
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref , watch } from 'vue';
 
 // Cấu hình API base URL
 const API_BASE_URL = 'http://localhost:8080';
@@ -23,6 +23,12 @@ const loadingDetails = ref({});
 const detailDialog = ref(false);
 const deleteDetailDialog = ref(false);
 const detail = ref({});
+
+// QR Code dialogs
+const qrDialog = ref(false);
+const qrDetailDialog = ref(false);
+const currentQRData = ref('');
+const currentQRTitle = ref('');
 
 // Dữ liệu cho dropdown
 const danhMucs = ref([]);
@@ -57,6 +63,222 @@ const selectedImageDetail = ref({});
 const selectedMauSac = ref(null);
 const selectedKichCo = ref(null);
 const selectedImage = ref(null); 
+
+// ===== THÊM CÁC HÀM KIỂM TRA TRÙNG LẶP =====
+
+// Hàm kiểm tra trùng lặp chi tiết sản phẩm
+function checkDuplicateDetail(productId, mauSacId, kichCoId, excludeDetailId = null) {
+    const existingDetails = productDetails.value[productId] || [];
+    
+    return existingDetails.some(detail => {
+        // Bỏ qua chính detail đang được sửa
+        if (excludeDetailId && detail.id === excludeDetailId) {
+            return false;
+        }
+        
+        // Kiểm tra trùng màu sắc và kích cỡ
+        const sameColor = detail.mauSac?.id === mauSacId;
+        const sameSize = detail.kichCo?.id === kichCoId;
+        
+        return sameColor && sameSize;
+    });
+}
+
+// Hàm kiểm tra trùng lặp batch khi thêm nhiều biến thể
+function checkBatchDuplicates(productId, variants, excludeDetailId = null) {
+    const duplicates = [];
+    const existingDetails = productDetails.value[productId] || [];
+    
+    // Kiểm tra trùng với dữ liệu hiện có
+    variants.forEach((variant, index) => {
+        const isDuplicate = existingDetails.some(detail => {
+            if (excludeDetailId && detail.id === excludeDetailId) {
+                return false;
+            }
+            
+            const sameColor = detail.mauSac?.id === variant.mauSac.id;
+            const sameSize = detail.kichCo?.id === variant.kichCo.id;
+            
+            return sameColor && sameSize;
+        });
+        
+        if (isDuplicate) {
+            duplicates.push({
+                index: index,
+                mauSac: variant.mauSac.tenMauSac,
+                kichCo: variant.kichCo.tenKichCo
+            });
+        }
+    });
+    
+    // Kiểm tra trùng trong chính batch variants
+    const variantMap = new Map();
+    variants.forEach((variant, index) => {
+        const key = `${variant.mauSac.id}-${variant.kichCo.id}`;
+        
+        if (variantMap.has(key)) {
+            // Tìm duplicate trong cùng batch
+            const existingIndex = variantMap.get(key);
+            if (!duplicates.find(d => d.index === index)) {
+                duplicates.push({
+                    index: index,
+                    mauSac: variant.mauSac.tenMauSac,
+                    kichCo: variant.kichCo.tenKichCo,
+                    duplicateWith: existingIndex
+                });
+            }
+        } else {
+            variantMap.set(key, index);
+        }
+    });
+    
+    return duplicates;
+}
+
+// Hàm hiển thị thông báo lỗi trùng lặp
+function showDuplicateError(duplicates, isEdit = false) {
+    if (duplicates.length === 0) return;
+    
+    if (isEdit) {
+        // Trường hợp sửa - chỉ có 1 duplicate
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Cảnh báo ', 
+            detail: `Đã tồn tại chi tiết sản phẩm với màu sắc "${duplicates[0].mauSac}" và kích cỡ "${duplicates[0].kichCo}"`, 
+            life: 5000 
+        });
+    } else {
+        // Trường hợp thêm mới - có thể có nhiều duplicates
+        if (duplicates.length === 1) {
+            toast.add({ 
+                severity: 'warn', 
+                summary: 'Cảnh báo', 
+                detail: `Chi tiết với màu sắc "${duplicates[0].mauSac}" và kích cỡ "${duplicates[0].kichCo}" đã tồn tại`, 
+                life: 5000 
+            });
+        } else {
+            const duplicateList = duplicates.map(d => `${d.mauSac} - ${d.kichCo}`).join(', ');
+            toast.add({ 
+                severity: 'warn', 
+                summary: 'Trùng lặp nhiều chi tiết', 
+                detail: `Các chi tiết sau đã tồn tại: ${duplicateList}`, 
+                life: 7000 
+            });
+        }
+    }
+}
+
+// QR Code functions
+function generateQRCode(data) {
+    // Sử dụng API QR Code online hoặc thư viện QR
+    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}`;
+}
+
+function showProductQR(prod) {
+    const qrData = JSON.stringify({
+        type: 'Sản phẩm',
+        id: prod.id,
+        code: prod.maSanPham,
+        name: prod.tenSanPham,
+        category: prod.category,
+        brand: prod.brand,
+        status: prod.trangThai
+    });
+    
+    currentQRData.value = generateQRCode(qrData);
+    currentQRTitle.value = `QR Code - Sản phẩm: ${prod.tenSanPham}`;
+    qrDialog.value = true;
+}
+
+function showDetailQR(detailData, productName) {
+    const qrData = JSON.stringify({
+        type: 'Chi tiết sản phẩm',
+        id: detailData.id,
+        code: detailData.maChiTiet,
+        productName: productName,
+        size: detailData.size,
+        color: detailData.color,
+        quantity: detailData.soLuong,
+        price: detailData.giaBan,
+        status: detailData.trangThai
+    });
+    
+    currentQRData.value = generateQRCode(qrData);
+    currentQRTitle.value = `QR Code - Chi tiết: ${detailData.maChiTiet}`;
+    qrDetailDialog.value = true;
+}
+
+function downloadQR(filename) {
+    const link = document.createElement('a');
+    link.href = currentQRData.value;
+    link.download = `${filename}_QR.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Hàm xóa tất cả biến thể trùng lặp
+function removeAllDuplicateVariants() {
+    console.log('🗑️ Removing all duplicate variants');
+    
+    const duplicateVariants = getVariantPreview.value.filter(v => v.isDuplicate);
+    
+    if (duplicateVariants.length === 0) {
+        toast.add({
+            severity: 'info',
+            summary: 'Thông báo',
+            detail: 'Không có biến thể trùng lặp nào để xóa',
+            life: 2000
+        });
+        return;
+    }
+    
+    // Tạo danh sách màu sắc và kích cỡ mới (loại bỏ những cái chỉ tạo ra duplicate)
+    const newMauSacs = [];
+    const newKichCos = [];
+    const newVariantImages = {};
+    
+    // Duyệt qua tất cả combination và chỉ giữ lại những cái không duplicate
+    for (const mauSac of detail.value.mauSacs) {
+        for (const kichCo of detail.value.kichCos) {
+            const isDuplicate = checkDuplicateDetail(
+                detail.value.sanPham.id, 
+                mauSac.id, 
+                kichCo.id
+            );
+            
+            if (!isDuplicate) {
+                // Thêm màu sắc nếu chưa có
+                if (!newMauSacs.find(m => m.id === mauSac.id)) {
+                    newMauSacs.push(mauSac);
+                }
+                
+                // Thêm kích cỡ nếu chưa có
+                if (!newKichCos.find(k => k.id === kichCo.id)) {
+                    newKichCos.push(kichCo);
+                }
+                
+                // Giữ lại hình ảnh của biến thể hợp lệ
+                const variantKey = getVariantKey(mauSac, kichCo);
+                if (detail.value.variantImages[variantKey]) {
+                    newVariantImages[variantKey] = detail.value.variantImages[variantKey];
+                }
+            }
+        }
+    }
+    
+    // Cập nhật lại selection
+    detail.value.mauSacs = newMauSacs;
+    detail.value.kichCos = newKichCos;
+    detail.value.variantImages = newVariantImages;
+    
+    toast.add({
+        severity: 'success',
+        summary: 'Đã xóa',
+        detail: `Đã xóa ${duplicateVariants.length} biến thể trùng lặp`,
+        life: 3000
+    });
+}
 
 // Thêm computed để tính tổng số lượng từ chi tiết sản phẩm
 const getProductTotalQuantity = (productId) => {
@@ -166,6 +388,18 @@ onMounted(async () => {
         loadHinhAnhs() // Thêm load hình ảnh
     ]);
 });
+// SỬA: Theo dõi sự thay đổi của giá gốc và cập nhật giá bán nếu cần
+watch(() => detail.value.giaGoc, (newGiaGoc) => {
+    console.log('🔄 Giá gốc thay đổi:', newGiaGoc);
+    console.log('📊 Giá bán hiện tại:', detail.value.giaBan);
+    console.log('🔍 isEditing:', detail.value.isEditing);
+    
+    // Đơn giản hóa: chỉ sync khi KHÔNG edit và có giá gốc
+    if (newGiaGoc && newGiaGoc > 0 && !detail.value.isEditing) {
+        detail.value.giaBan = newGiaGoc;
+        console.log('✅ Đã cập nhật giá bán:', detail.value.giaBan);
+    }
+}, { immediate: false, deep: true });
 
 // API calls
 async function loadProducts() {
@@ -541,22 +775,106 @@ function openNewDetail(productId) {
     detail.value = {
         maChiTiet: createId(),
         soLuong: 0,
-        giaGoc: 0.0,
-        giaBan: 0.0,
+        giaGoc: null,
+        giaBan: null,
         trangThai: 1,
         mauSacs: [], // NHIỀU MÀU SẮC
         kichCos: [], // NHIỀU KÍCH CỠ
-        selectedImage: null,
+        variantImages: {}, // THAY ĐỔI: Object chứa hình ảnh cho từng biến thể
         sanPham: { id: productId },
-        isEditing: false // FLAG ĐỂ PHÂN BIỆT THÊM/SỬA
+        isEditing: false
     };
     
-    // SỬA: Reset các giá trị select riêng cho edit mode
     selectedMauSac.value = null;
     selectedKichCo.value = null;
+    selectedImage.value = null;
     
     submitted.value = false;
     detailDialog.value = true;
+}
+
+// Hàm tạo key cho biến thể
+function getVariantKey(mauSac, kichCo) {
+    return `${mauSac.id}-${kichCo.id}`;
+}
+
+// Hàm mở dialog chọn hình ảnh cho biến thể cụ thể - CẬP NHẬT
+function openImageSelectionForVariant(variant) {
+    // KIỂM TRA NẾU BIẾN THỂ TRÙNG LẶP THÌ KHÔNG CHO CHỌN HÌNH
+    if (variant.isDuplicate) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không thể chọn hình ảnh',
+            detail: `Biến thể ${variant.mauSac.tenMauSac} - ${variant.kichCo.tenKichCo} đã tồn tại. Không thể chọn hình ảnh cho biến thể trùng lặp.`,
+            life: 4000
+        });
+        return; // DỪNG LẠI, KHÔNG MỞ DIALOG
+    }
+    
+    detail.value.currentVariant = variant; // Lưu biến thể đang chọn hình
+    const variantKey = getVariantKey(variant.mauSac, variant.kichCo);
+    selectedImage.value = detail.value.variantImages[variantKey] || null;
+    imageSelectionDialog.value = true;
+}
+
+// Hàm xác nhận chọn hình ảnh cho biến thể - CẬP NHẬT
+function confirmImageSelectionForVariant() {
+    if (detail.value.currentVariant) {
+        // KIỂM TRA LẠI LẦN CUỐI TRƯỚC KHI LƯU HÌNH ẢNH
+        if (detail.value.currentVariant.isDuplicate) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Không thể lưu hình ảnh cho biến thể trùng lặp',
+                life: 3000
+            });
+            imageSelectionDialog.value = false;
+            detail.value.currentVariant = null;
+            return;
+        }
+        
+        const variantKey = getVariantKey(detail.value.currentVariant.mauSac, detail.value.currentVariant.kichCo);
+        
+        if (selectedImage.value) {
+            detail.value.variantImages[variantKey] = selectedImage.value;
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã chọn hình ảnh cho ${detail.value.currentVariant.mauSac.tenMauSac} - ${detail.value.currentVariant.kichCo.tenKichCo}`,
+                life: 3000
+            });
+        } else {
+            // Xóa hình ảnh nếu không chọn
+            delete detail.value.variantImages[variantKey];
+        }
+    }
+    
+    imageSelectionDialog.value = false;
+    detail.value.currentVariant = null;
+}
+
+// Hàm xóa hình ảnh của biến thể - CẬP NHẬT
+function removeVariantImage(variant) {
+    // KIỂM TRA NẾU BIẾN THỂ TRÙNG LẶP THÌ KHÔNG CHO XÓA
+    if (variant.isDuplicate) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không thể thao tác',
+            detail: `Biến thể ${variant.mauSac.tenMauSac} - ${variant.kichCo.tenKichCo} đã tồn tại. Không thể xóa hình ảnh.`,
+            life: 3000
+        });
+        return;
+    }
+    
+    const variantKey = getVariantKey(variant.mauSac, variant.kichCo);
+    delete detail.value.variantImages[variantKey];
+    
+    toast.add({
+        severity: 'info',
+        summary: 'Đã xóa',
+        detail: `Đã xóa hình ảnh của biến thể ${variant.mauSac.tenMauSac} - ${variant.kichCo.tenKichCo}`,
+        life: 2000
+    });
 }
 
 // 2. HÀM SỬA CHI TIẾT - CHỈ CHO PHÉP 1 MÀU VÀ 1 SIZE - ĐÃ SỬA
@@ -684,7 +1002,6 @@ async function loadCurrentImages(detailId) {
     }
 }
 
-
 function hideDetailDialog() {
     detailDialog.value = false;
     submitted.value = false;
@@ -759,6 +1076,26 @@ async function saveDetail() {
         loading.value = true;
         
         if (detail.value.isEditing && detail.value.id) {
+            // ===== KIỂM TRA TRÙNG LẶP CHO CHẾ ĐỘ SỬA =====
+            const mauSacId = detail.value.mauSacs[0].id;
+            const kichCoId = detail.value.kichCos[0].id;
+            
+            const isDuplicate = checkDuplicateDetail(
+                detail.value.sanPham.id, 
+                mauSacId, 
+                kichCoId, 
+                detail.value.id // Loại trừ chính nó
+            );
+            
+            if (isDuplicate) {
+                const duplicateInfo = [{
+                    mauSac: detail.value.mauSacs[0].tenMauSac,
+                    kichCo: detail.value.kichCos[0].tenKichCo
+                }];
+                showDuplicateError(duplicateInfo, true);
+                return;
+            }
+            
             // CẬP NHẬT CHI TIẾT HIỆN CÓ - CHỈ 1 BIẾN THỂ
             const detailData = {
                 maChiTiet: detail.value.maChiTiet,
@@ -791,17 +1128,33 @@ async function saveDetail() {
                 life: 3000 
             });
         } else {
-            // TẠO NHIỀU BIẾN THỂ MỚI
-            const variants = [];
+            // ===== CHẾ ĐỘ THÊM MỚI - CHỈ LƯU CÁC BIẾN THỂ HỢP LỆ =====
+            const validVariants = [];
             let successCount = 0;
             let errorCount = 0;
+            let skippedCount = 0;
             
-            // Tạo tất cả combination của màu sắc và kích cỡ
+            // Tạo tất cả combination của màu sắc và kích cỡ NHƯNG CHỈ LẤY CÁC BIẾN THỂ HỢP LỆ
             for (const mauSac of detail.value.mauSacs) {
                 for (const kichCo of detail.value.kichCos) {
+                    // KIỂM TRA TRÙNG LẶP TRƯỚC KHI THÊM VÀO DANH SÁCH
+                    const isDuplicate = checkDuplicateDetail(
+                        detail.value.sanPham.id, 
+                        mauSac.id, 
+                        kichCo.id
+                    );
+                    
+                    if (isDuplicate) {
+                        skippedCount++;
+                        console.log(`⏭️ Skipping duplicate variant: ${mauSac.tenMauSac} - ${kichCo.tenKichCo}`);
+                        continue; // BỎ QUA BIẾN THỂ TRÙNG LẶP
+                    }
+                    
+                    const variantKey = getVariantKey(mauSac, kichCo);
+                    const variantImage = detail.value.variantImages[variantKey];
+                    
                     const variantData = {
-                        // maChiTiet: `${detail.value.maChiTiet}-${mauSac.tenMauSac}-${kichCo.tenKichCo}`,
-                        maChiTiet:  createId(),
+                        maChiTiet: createId(),
                         soLuong: Math.max(0, detail.value.soLuong || 0),
                         giaGoc: Math.max(0, detail.value.giaGoc || 0),
                         giaBan: Math.max(0, detail.value.giaBan || 0),
@@ -811,19 +1164,30 @@ async function saveDetail() {
                         sanPham: detail.value.sanPham
                     };
                     
-                    // Thêm hình ảnh cho mỗi biến thể
-                    if (detail.value.selectedImage) {
-                        variantData.hinhAnh = { id: detail.value.selectedImage.id };
+                    // Thêm hình ảnh riêng cho từng biến thể
+                    if (variantImage) {
+                        variantData.hinhAnh = { id: variantImage.id };
                     }
                     
-                    variants.push(variantData);
+                    validVariants.push(variantData);
                 }
             }
             
-            console.log(`🆕 Creating ${variants.length} variants:`, variants);
+            // KIỂM TRA NẾU KHÔNG CÓ BIẾN THỂ HỢP LỆ NÀO
+            if (validVariants.length === 0) {
+                toast.add({ 
+                    severity: 'warn', 
+                    summary: 'Cảnh báo', 
+                    detail: `Tất cả ${skippedCount} biến thể đều đã tồn tại. Không có biến thể mới nào được tạo.`, 
+                    life: 4000 
+                });
+                return;
+            }
             
-            // Lưu từng biến thể
-            for (const variant of variants) {
+            console.log(`🆕 Creating ${validVariants.length} valid variants, skipping ${skippedCount} duplicates:`, validVariants);
+            
+            // Lưu từng biến thể hợp lệ
+            for (const variant of validVariants) {
                 try {
                     await axios.post(`${API_BASE_URL}/api/san-pham-chi-tiet/save`, variant);
                     successCount++;
@@ -834,12 +1198,21 @@ async function saveDetail() {
                 }
             }
             
+            // THÔNG BÁO KẾT QUẢ CHI TIẾT
             if (successCount > 0) {
+                let message = `Đã tạo ${successCount} biến thể mới`;
+                if (skippedCount > 0) {
+                    message += `, bỏ qua ${skippedCount} biến thể trùng lặp`;
+                }
+                if (errorCount > 0) {
+                    message += `, ${errorCount} biến thể thất bại`;
+                }
+                
                 toast.add({ 
                     severity: 'success', 
                     summary: 'Thành công', 
-                    detail: `Đã tạo ${successCount} biến thể sản phẩm${errorCount > 0 ? `, ${errorCount} biến thể thất bại` : ''}`, 
-                    life: 3000 
+                    detail: message, 
+                    life: 4000 
                 });
             } else {
                 toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tạo biến thể nào', life: 3000 });
@@ -870,9 +1243,8 @@ async function saveDetail() {
     }
 }
 
-// 4. HÀM COMPUTED ĐỂ XEM TRƯỚC BIẾN THỂ - CHỈ HIỆN KHI THÊM MỚI
+// 4. HÀM COMPUTED ĐỂ XEM TRƯỚC BIẾN THỂ - CẬP NHẬT VỚI THỐNG KÊ
 const getVariantPreview = computed(() => {
-    // Chỉ hiện preview khi đang thêm mới (không phải edit)
     if (detail.value.isEditing || !detail.value.mauSacs?.length || !detail.value.kichCos?.length || !detail.value.maChiTiet) {
         return [];
     }
@@ -880,15 +1252,45 @@ const getVariantPreview = computed(() => {
     const variants = [];
     for (const mauSac of detail.value.mauSacs) {
         for (const kichCo of detail.value.kichCos) {
+            const variantKey = getVariantKey(mauSac, kichCo);
+            const isDuplicate = checkDuplicateDetail(
+                detail.value.sanPham.id, 
+                mauSac.id, 
+                kichCo.id
+            );
+            
             variants.push({
-                // maChiTiet: `${detail.value.maChiTiet}-${mauSac.tenMauSac}-${kichCo.tenKichCo}`,
                 maChiTiet: createId(),
-                mauSac: mauSac.tenMauSac,
-                kichCo: kichCo.tenKichCo
+                mauSac: mauSac,
+                kichCo: kichCo,
+                isDuplicate: isDuplicate,
+                // CHỈ HIỂN THỊ HÌNH ẢNH NẾU KHÔNG TRÙNG LẶP
+                selectedImage: isDuplicate ? null : (detail.value.variantImages[variantKey] || null)
             });
         }
     }
     return variants;
+});
+
+// HÀM THỐNG KÊ BIẾN THỂ HỢP LỆ
+const getValidVariantsCount = computed(() => {
+    return getVariantPreview.value.filter(v => !v.isDuplicate).length;
+});
+
+const getDuplicateVariantsCount = computed(() => {
+    return getVariantPreview.value.filter(v => v.isDuplicate).length;
+});
+
+// Computed kiểm tra có thể lưu được không
+const canSaveVariants = computed(() => {
+    if (detail.value.isEditing) return true;
+    return getValidVariantsCount.value > 0;
+});
+
+// Computed để hiển thị thông báo khi tất cả biến thể đều trùng lặp
+const allVariantsDuplicate = computed(() => {
+    const preview = getVariantPreview.value;
+    return preview.length > 0 && preview.every(v => v.isDuplicate);
 });
 
 // 5. HÀM VALIDATION TRƯỚC KHI EDIT
@@ -970,7 +1372,7 @@ function exportCSV() {
             return;
         }
 
-        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Tổng Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
+        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
 
         const csvData = productsWithTotalQuantity.value.map(item => {
             return [
@@ -1106,7 +1508,7 @@ function collapseAll() {
                 <Column expander style="width: 3rem"></Column>
                 <Column field="maSanPham" header="Mã SP" sortable style="min-width: 10rem"></Column>
                 <Column field="tenSanPham" header="Tên sản phẩm" sortable style="min-width: 16rem"></Column>
-                <Column header="Tổng số lượng" sortable style="min-width: 8rem">
+                <Column header="Số lượng" sortable style="min-width: 8rem">
                     <template #body="slotProps">
                         <div class="flex items-center gap-2">
                             <Badge :value="slotProps.data.displayQuantity" :severity="getStockSeverity(slotProps.data)" />
@@ -1143,10 +1545,13 @@ function collapseAll() {
                         {{ slotProps.data.createdAt }}
                     </template>
                 </Column>
-                <Column :exportable="false" style="min-width: 8rem">
+                <Column :exportable="false" style="min-width: 12rem">
                     <template #body="slotProps">
-                        <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editProduct(slotProps.data)" v-tooltip.top="'Chỉnh sửa'" :disabled="loading" />
-                        <Button icon="pi pi-trash" outlined rounded severity="danger" @click="confirmDeleteProduct(slotProps.data)" v-tooltip.top="'Xóa'" :disabled="loading" />
+                        <div class="flex gap-1">
+                            <Button icon="pi pi-pencil" outlined rounded size="small" @click="editProduct(slotProps.data)" v-tooltip.top="'Chỉnh sửa'" :disabled="loading" />
+                            <Button icon="pi pi-trash" outlined rounded size="small" severity="danger" @click="confirmDeleteProduct(slotProps.data)" v-tooltip.top="'Xóa'" :disabled="loading" />
+                            <Button icon="pi pi-qrcode" outlined rounded size="small" severity="info" @click="showProductQR(slotProps.data)" v-tooltip.top="'QR Code'" :disabled="loading" />
+                        </div>
                     </template>
                 </Column>
 
@@ -1235,26 +1640,39 @@ function collapseAll() {
                                     {{ detailProps.data.createdAt }}
                                 </template>
                             </Column>
-                            <Column :exportable="false" style="min-width: 8rem">
+                            <Column :exportable="false" style="min-width: 12rem">
                                 <template #body="detailProps">
-                                    <Button 
-                                        icon="pi pi-pencil" 
-                                        outlined 
-                                        rounded 
-                                        class="mr-2" 
-                                        @click="beforeEditDetail(detailProps.data, slotProps.data.id)" 
-                                        v-tooltip.top="'Chỉnh sửa chi tiết'" 
-                                        :disabled="loading" 
-                                    />
-                                    <Button 
-                                        icon="pi pi-trash" 
-                                        outlined 
-                                        rounded 
-                                        severity="danger" 
-                                        @click="confirmDeleteDetail(detailProps.data)" 
-                                        v-tooltip.top="'Xóa chi tiết'" 
-                                        :disabled="loading" 
-                                    />
+                                    <div class="flex gap-1">
+                                        <Button 
+                                            icon="pi pi-pencil" 
+                                            outlined 
+                                            rounded 
+                                            size="small"
+                                            @click="beforeEditDetail(detailProps.data, slotProps.data.id)" 
+                                            v-tooltip.top="'Chỉnh sửa chi tiết'" 
+                                            :disabled="loading" 
+                                        />
+                                        <Button 
+                                            icon="pi pi-trash" 
+                                            outlined 
+                                            rounded 
+                                            size="small"
+                                            severity="danger" 
+                                            @click="confirmDeleteDetail(detailProps.data)" 
+                                            v-tooltip.top="'Xóa chi tiết'" 
+                                            :disabled="loading" 
+                                        />
+                                        <Button 
+                                            icon="pi pi-qrcode" 
+                                            outlined 
+                                            rounded 
+                                            size="small"
+                                            severity="info" 
+                                            @click="showDetailQR(detailProps.data, slotProps.data.tenSanPham)" 
+                                            v-tooltip.top="'QR Code chi tiết'" 
+                                            :disabled="loading" 
+                                        />
+                                    </div>
                                 </template>
                             </Column>
                         </DataTable>
@@ -1325,21 +1743,6 @@ function collapseAll() {
         <!-- DIALOG THÊM/SỬA CHI TIẾT SẢN PHẨM - CẬP NHẬT -->
         <Dialog v-model:visible="detailDialog" :style="{ width: '900px' }" :header="detail.isEditing ? 'Sửa chi tiết sản phẩm' : 'Thêm chi tiết sản phẩm'" :modal="true" class="p-fluid">
             <div class="flex flex-col gap-6">
-                <!-- THÔNG BÁO CHẾ ĐỘ -->
-                <!-- <div v-if="detail.isEditing" class="p-3 bg-blue-50 border border-blue-200 rounded">
-                    <div class="flex items-center gap-2">
-                        <i class="pi pi-info-circle text-blue-600"></i>
-                        <span class="text-blue-800 font-medium">Chế độ sửa: Chỉ có thể thay đổi 1 màu sắc và 1 kích cỡ</span>
-                    </div>
-                </div>
-                
-                <div v-else class="p-3 bg-green-50 border border-green-200 rounded">
-                    <div class="flex items-center gap-2">
-                        <i class="pi pi-plus-circle text-green-600"></i>
-                        <span class="text-green-800 font-medium">Chế độ thêm: Có thể chọn nhiều màu sắc và kích cỡ để tạo nhiều biến thể</span>
-                    </div>
-                </div> -->
-
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-8">
                         <label for="maChiTiet" class="block font-bold mb-3">
@@ -1370,11 +1773,11 @@ function collapseAll() {
                         <InputText id="giaGoc" v-model.number="detail.giaGoc" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" />
                         <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" class="text-red-500">Giá nhập phải lớn hơn 0.</small>
                     </div>
-                    <div class="col-span-6">
+                    <!-- <div class="col-span-6">
                         <label for="giaBan" class="block font-bold mb-3">Giá bán </label>
                         <InputText id="giaBan" v-model.number="detail.giaBan" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaBan == null || detail.giaBan <= 0)" />
                         <small v-if="submitted && (detail.giaBan == null || detail.giaBan <= 0)" class="text-red-500">Giá bán phải lớn hơn 0.</small>
-                    </div>
+                    </div> -->
                 </div>
 
                 <!-- SỬA: PHẦN MÀU SẮC VÀ KÍCH CỠ -->
@@ -1516,19 +1919,128 @@ function collapseAll() {
                     </div>
                 </div>
 
-                <!-- PREVIEW BIẾN THỂ SẼ ĐƯỢC TẠO - CHỈ HIỂN THI KHI THÊM MỚI -->
+              <!-- PREVIEW BIẾN THỂ SẼ ĐƯỢC TẠO - CHỈ HIỂN THI KHI THÊM MỚI -->
                 <div v-if="!detail.isEditing && getVariantPreview.length > 0" class="mt-4">
-                    <label class="block font-bold mb-3">
-                        Xem trước các biến thể sẽ được tạo: 
-                        <Badge :value="getVariantPreview.length" severity="info" />
-                    </label>
-                    <div class="border border-gray-200 rounded p-3 max-h-40 overflow-y-auto">
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                            <div v-for="variant in getVariantPreview" :key="variant.maChiTiet" class="text-sm p-2 bg-gray-50 rounded">
-                                <div class="font-medium">{{ variant.maChiTiet }}</div>
-                                <div class="text-gray-600">{{ variant.mauSac }} - {{ variant.kichCo }}</div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <label class="block font-bold">
+                                Các biến thể sẽ được tạo : 
+                            </label>
+                            <!-- <Badge :value="getValidVariantsCount" severity="success" /> -->
+                            <!-- <Badge v-if="getDuplicateVariantsCount > 0" :value="getDuplicateVariantsCount" severity="danger" /> -->
+                        </div>
+                        
+                        <!-- Nút xóa tất cả duplicate -->
+                        <Button 
+                            v-if="getDuplicateVariantsCount > 0"
+                            label="Xóa tất cả trùng lặp" 
+                            icon="pi pi-trash" 
+                            size="small"
+                            severity="danger"
+                            outlined
+                            @click="removeAllDuplicateVariants"
+                            v-tooltip.top="'Xóa tất cả biến thể trùng lặp khỏi danh sách'"
+                        />
+                    </div>
+                    
+                    <div class="border border-gray-200 rounded p-3 max-h-96 overflow-y-auto">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div 
+                                v-for="variant in getVariantPreview" 
+                                :key="variant.maChiTiet" 
+                                :class="[
+                                    'p-3 rounded border relative',
+                                    variant.isDuplicate 
+                                        ? 'bg-red-50 border-red-200 text-red-700 opacity-75' 
+                                        : 'bg-gray-50 border-gray-200'
+                                ]"
+                            >
+                           <!-- Nút xóa biến thể trùng lặp -->
+                            <!-- <Button 
+                                v-if="variant.isDuplicate"
+                                icon="pi pi-times" 
+                                class="absolute -top-2 -right-2 z-10"
+                                size="small" 
+                                rounded 
+                                severity="danger"
+                                @click.stop="() => { console.log('Clicking X for variant:', variant); removeSingleVariant(variant); debugCurrentState(); }"
+                                v-tooltip.top="'Xóa biến thể trùng lặp này'"
+                            /> -->
+                                <!-- Thông tin biến thể -->
+                                <div class="flex items-center gap-2 mb-2">
+                                    <i v-if="variant.isDuplicate" class="pi pi-times-circle text-red-500"></i>
+                                    <i v-else class="pi pi-check-circle text-green-500"></i>
+                                    <div class="font-medium text-sm">{{ variant.maChiTiet }}</div>
+                                </div>
+                                
+                                <div :class="variant.isDuplicate ? 'text-red-600' : 'text-gray-600'" class="text-sm mb-2">
+                                    {{ variant.mauSac.tenMauSac }} - {{ variant.kichCo.tenKichCo }}
+                                </div>
+                                
+                                <!-- Hình ảnh của biến thể -->
+                                <div class="mb-2">
+                                    <!-- BIẾN THỂ TRÙNG LẶP - KHÔNG ĐƯỢC CHỌN HÌNH ẢNH -->
+                                    <div v-if="variant.isDuplicate" class="w-full h-20 border-2 border-dashed border-red-300 rounded flex items-center justify-center bg-red-50">
+                                        <div class="text-center">
+                                            <i class="pi pi-ban text-red-400 text-lg mb-1"></i>
+                                            <div class="text-xs text-red-500">Không thể chọn hình</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- BIẾN THỂ HỢP LỆ - CÓ THỂ CHỌN HÌNH ẢNH -->
+                                    <div v-else>
+                                        <div v-if="variant.selectedImage" class="relative">
+                                            <img 
+                                                :src="variant.selectedImage.url || variant.selectedImage.preview" 
+                                                :alt="variant.selectedImage.tenHinhAnh"
+                                                class="w-full h-20 object-cover rounded border"
+                                                @error="handleImageError($event)"
+                                            />
+                                            <Button 
+                                                icon="pi pi-times" 
+                                                class="absolute -top-1 -right-1"
+                                                size="small" 
+                                                rounded 
+                                                severity="danger"
+                                                @click="removeVariantImage(variant)"
+                                                v-tooltip.top="'Xóa hình ảnh'"
+                                            />
+                                        </div>
+                                        <div v-else class="w-full h-20 border-2 border-dashed border-gray-300 rounded flex items-center justify-center hover:border-blue-400 transition-colors">
+                                            <Button 
+                                                icon="pi pi-plus" 
+                                                label="Chọn hình"
+                                                size="small" 
+                                                text
+                                                @click="openImageSelectionForVariant(variant)"
+                                                class="text-gray-600 hover:text-blue-600"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Trạng thái biến thể -->
+                                <div v-if="variant.isDuplicate" class="text-xs text-red-500 font-medium">
+                                    ⚠️ Đã tồn tại
+                                </div>
+                                <div v-else class="text-xs text-green-600 font-medium">
+                                </div>
                             </div>
                         </div>
+                    
+                        
+                        <!-- Thông báo tổng quan -->
+                        <!-- <div v-if="getVariantPreview.filter(v => v.isDuplicate).length > 0" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                            <div class="flex items-center gap-2 text-yellow-800">
+                                <i class="pi pi-exclamation-triangle"></i>
+                                <span class="font-medium">Lưu ý:</span>
+                            </div>
+                            <ul class="mt-2 text-sm text-yellow-700 list-disc ml-6">
+                                <li>Các biến thể màu đỏ đã tồn tại và sẽ bị bỏ qua khi lưu</li>
+                                <li>Không thể chọn hình ảnh cho các biến thể trùng lặp</li>
+                                <li>Chỉ {{ getVariantPreview.filter(v => !v.isDuplicate).length }} biến thể mới sẽ được tạo</li>
+                            </ul>
+                        </div> -->
                     </div>
                 </div>
 
@@ -1554,10 +2066,12 @@ function collapseAll() {
                 />
                 <Button 
                     v-else
-                    :label="`Thêm ${getVariantPreview.length || 1} biến thể`" 
+                    :label="getValidVariantsCount > 0 ? 'Thêm' : 'Không có biến thể hợp lệ'" 
                     icon="pi pi-plus" 
                     @click="saveDetail" 
                     :loading="loading"
+                    :disabled="getValidVariantsCount === 0"
+                    :severity="getValidVariantsCount > 0 ? 'primary' : 'secondary'"
                 />
             </template>
         </Dialog>
@@ -1640,6 +2154,7 @@ function collapseAll() {
                 </div>
             </div>
 
+           <!-- Trong Dialog chọn hình ảnh, cập nhật footer -->
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="imageSelectionDialog = false" />
                 <Button 
@@ -1652,7 +2167,7 @@ function collapseAll() {
                 <Button 
                     :label="selectedImage ? `Xác nhận: ${selectedImage.maHinhAnh}` : 'Chọn hình ảnh'" 
                     icon="pi pi-check" 
-                    @click="confirmImageSelection"
+                    @click="detail.currentVariant ? confirmImageSelectionForVariant() : confirmImageSelection()"
                     :disabled="!selectedImage"
                 />
             </template>
@@ -1743,6 +2258,60 @@ function collapseAll() {
             
             <template #footer>
                 <Button label="Đóng" icon="pi pi-times" @click="imagePreviewDialog = false" />
+            </template>
+        </Dialog>
+
+        <!-- Dialog QR Code cho sản phẩm -->
+        <Dialog v-model:visible="qrDialog" :style="{ width: '500px' }" :header="currentQRTitle" :modal="true">
+            <div class="flex flex-col items-center gap-4">
+                <div class="text-center">
+                    <img 
+                        :src="currentQRData" 
+                        alt="QR Code"
+                        class="w-64 h-64 border rounded shadow-lg mx-auto"
+                    />
+                </div>
+                <div class="text-sm text-gray-600 text-center">
+                    <p>Quét mã QR để xem thông tin sản phẩm</p>
+                    <small>Mã QR chứa thông tin: ID, mã sản phẩm, tên, danh mục, thương hiệu và trạng thái</small>
+                </div>
+            </div>
+            
+            <template #footer>
+                <Button 
+                    label="Tải xuống" 
+                    icon="pi pi-download" 
+                    @click="downloadQR('SanPham_' + (product.maSanPham || 'SP'))"
+                    severity="secondary"
+                />
+                <Button label="Đóng" icon="pi pi-times" @click="qrDialog = false" />
+            </template>
+        </Dialog>
+
+        <!-- Dialog QR Code cho chi tiết sản phẩm -->
+        <Dialog v-model:visible="qrDetailDialog" :style="{ width: '500px' }" :header="currentQRTitle" :modal="true">
+            <div class="flex flex-col items-center gap-4">
+                <div class="text-center">
+                    <img 
+                        :src="currentQRData" 
+                        alt="QR Code"
+                        class="w-64 h-64 border rounded shadow-lg mx-auto"
+                    />
+                </div>
+                <div class="text-sm text-gray-600 text-center">
+                    <p>Quét mã QR để xem thông tin chi tiết sản phẩm</p>
+                    <small>Mã QR chứa thông tin: ID chi tiết, mã chi tiết, tên sản phẩm, màu sắc, kích cỡ, số lượng, giá bán và trạng thái</small>
+                </div>
+            </div>
+            
+            <template #footer>
+                <Button 
+                    label="Tải xuống" 
+                    icon="pi pi-download" 
+                    @click="downloadQR('ChiTiet_' + (detail.maChiTiet || 'CTSP'))"
+                    severity="secondary"
+                />
+                <Button label="Đóng" icon="pi pi-times" @click="qrDetailDialog = false" />
             </template>
         </Dialog>
     </div>
