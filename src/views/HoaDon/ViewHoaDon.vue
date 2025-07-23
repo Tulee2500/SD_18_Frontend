@@ -370,14 +370,16 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div v-for="(step, index) in getWorkflowSteps(selectedHoaDon.loaiHoaDon)" :key="step" class="d-flex flex-fill align-items-center">
                                         <div class="d-flex flex-column align-items-center flex-fill">
-                                            <div :class="['rounded-circle', 'd-flex', 'align-items-center', 'justify-content-center', 'border', 'border-2', getDetailStepBootstrapClass(selectedHoaDon, step)]" style="width: 40px; height: 40px">
+                                            <div :class="['workflow-step-detail', 'rounded-circle', 'd-flex', 'align-items-center', 'justify-content-center', 'border', 'border-2', getDetailStepBootstrapClass(selectedHoaDon, step)]">
                                                 <i :class="getStepIcon(step)" style="font-size: 14px"></i>
                                             </div>
-                                            <small class="mt-2 text-center">{{ getStepLabel(step) }}</small>
+                                            <small class="mt-2 text-center fw-medium">{{ getStepLabel(step) }}</small>
+                                            <small v-if="isStepActive(selectedHoaDon, step)" class="text-primary">Đang thực hiện</small>
+                                            <small v-else-if="isStepCompleted(selectedHoaDon, step)" class="text-success">Hoàn thành</small>
                                         </div>
                                         <div
                                             v-if="index < getWorkflowSteps(selectedHoaDon.loaiHoaDon).length - 1"
-                                            :class="['flex-fill', 'border-top', 'border-2', 'mx-2', isStepCompleted(selectedHoaDon, step) ? 'border-success' : 'border-light']"
+                                            :class="['workflow-connector', isStepCompleted(selectedHoaDon, step) || isStepActive(selectedHoaDon, step) ? 'completed' : 'pending']"
                                         ></div>
                                     </div>
                                 </div>
@@ -386,7 +388,7 @@
 
                         <!-- Actions Bar -->
                         <div class="d-flex justify-content-end bg-light mb-3 gap-2 rounded p-3">
-                            <button v-if="canProcessNextStep(selectedHoaDon)" @click="processNextStep(selectedHoaDon)" class="btn btn-success btn-sm">
+                            <button v-if="canProcessNextStep(selectedHoaDon)" @click="processNextStepWithRefresh(selectedHoaDon)" class="btn btn-success btn-sm">
                                 <i class="pi pi-arrow-right me-1"></i>
                                 {{ getNextStepAction(selectedHoaDon) }}
                             </button>
@@ -402,6 +404,10 @@
                                 <i class="pi pi-map-marker me-1"></i>
                                 Tracking
                             </button>
+                            <button @click="debugWorkflowState(selectedHoaDon)" class="btn btn-secondary btn-sm">
+                                <i class="pi pi-info-circle me-1"></i>
+                                Debug
+                            </button>
                         </div>
 
                         <!-- Thông tin chi tiết -->
@@ -410,93 +416,7 @@
                             <div class="col-lg-4">
                                 <div class="card h-100">
                                     <div class="card-header">
-                                        <h6 class="card-title mb-0">Thông tin hóa đơn</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row g-2">
-                                            <div class="col-6"><strong>Mã HĐ:</strong></div>
-                                            <div class="col-6">
-                                                <span class="badge bg-secondary">{{ selectedHoaDon.maHoaDon }}</span>
-                                            </div>
-                                            <div class="col-6"><strong>Loại:</strong></div>
-                                            <div class="col-6">
-                                                <span :class="['badge', selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'bg-warning' : 'bg-success']">
-                                                    {{ selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online' }}
-                                                </span>
-                                            </div>
-                                            <div class="col-6"><strong>Ngày tạo:</strong></div>
-                                            <div class="col-6">{{ formatDate(selectedHoaDon.ngayTao) }}</div>
-                                            <div class="col-6"><strong>Tổng tiền:</strong></div>
-                                            <div class="col-6">
-                                                <span class="fw-bold text-success">{{ formatCurrency(selectedHoaDon.tongTien) }}</span>
-                                            </div>
-                                            <div class="col-6"><strong>Trạng thái:</strong></div>
-                                            <div class="col-6">
-                                                <span :class="['badge', 'bg-' + getStatusColor(selectedHoaDon.trangThaiHoaDon)]">
-                                                    {{ getStatusLabel(selectedHoaDon.trangThaiHoaDon) }}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Thông tin khách hàng -->
-                            <div class="col-lg-4">
-                                <div class="card h-100">
-                                    <div class="card-header">
-                                        <h6 class="card-title mb-0">Thông tin khách hàng</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row g-2">
-                                            <div class="col-4"><strong>Tên:</strong></div>
-                                            <div class="col-8">{{ selectedHoaDon.tenKhachHang || 'Khách lẻ' }}</div>
-                                            <div v-if="selectedHoaDon.sdt" class="col-4"><strong>SĐT:</strong></div>
-                                            <div v-if="selectedHoaDon.sdt" class="col-8">{{ selectedHoaDon.sdt }}</div>
-                                            <div v-if="selectedHoaDon.email" class="col-4"><strong>Email:</strong></div>
-                                            <div v-if="selectedHoaDon.email" class="col-8">{{ selectedHoaDon.email }}</div>
-                                            <div v-if="selectedHoaDon.diaChi" class="col-4"><strong>Địa chỉ:</strong></div>
-                                            <div v-if="selectedHoaDon.diaChi" class="col-8">{{ selectedHoaDon.diaChi }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Thông tin thanh toán -->
-                            <div class="col-lg-4">
-                                <div class="card h-100">
-                                    <div class="card-header">
-                                        <h6 class="card-title mb-0">Thanh toán</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row g-2">
-                                            <div class="col-6"><strong>Phương thức:</strong></div>
-                                            <div class="col-6">{{ selectedHoaDon.phuongThucThanhToan || 'Chưa xác định' }}</div>
-                                            <div class="col-6"><strong>Tình trạng:</strong></div>
-                                            <div class="col-6">
-                                                <span :class="['badge', 'bg-' + getPaymentStatusColor(selectedHoaDon.tinhTrangThanhToan)]">
-                                                    {{ getPaymentStatusLabel(selectedHoaDon.tinhTrangThanhToan) }}
-                                                </span>
-                                            </div>
-                                            <div v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE' && selectedHoaDon.tienThua" class="col-6"><strong>Tiền thừa:</strong></div>
-                                            <div v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE' && selectedHoaDon.tienThua" class="col-6">
-                                                <span class="fw-bold text-danger">{{ formatCurrency(selectedHoaDon.tienThua) }}</span>
-                                            </div>
-                                            <div v-if="selectedHoaDon.maGiaoDich" class="col-6"><strong>Mã GD:</strong></div>
-                                            <div v-if="selectedHoaDon.maGiaoDich" class="col-6">
-                                                <code class="small">{{ selectedHoaDon.maGiaoDich }}</code>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Chi tiết sản phẩm -->
-                        <div class="card">
-                            <div class="card-header">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6 class="card-title mb-0">
+                                        <h6 class="card-title mb-0">
                                         <i class="pi pi-list me-2"></i>
                                         Chi tiết sản phẩm ({{ hoaDonChiTiets.length }} mặt hàng)
                                     </h6>
@@ -823,6 +743,39 @@ async function fetchWithErrorHandling(url, options = {}) {
     }
 }
 
+// Fetch chi tiết hóa đơn từ API
+async function fetchChiTietHoaDon(hoaDonId) {
+    isLoadingChiTiet.value = true;
+    try {
+        const endpoint = `${API_ENDPOINTS.hoaDonChiTiet}/by-hoa-don/${hoaDonId}`;
+        console.log('🔍 Fetching chi tiet for hoa don:', hoaDonId);
+        const data = await fetchWithErrorHandling(endpoint);
+        
+        hoaDonChiTiets.value = Array.isArray(data) ? data : [];
+        console.log('✅ Chi tiet loaded:', hoaDonChiTiets.value.length, 'items');
+        
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Đã tải ${hoaDonChiTiets.value.length} chi tiết sản phẩm`,
+            life: 3000
+        });
+    } catch (error) {
+        console.error('💥 Error fetching chi tiet:', error);
+        // Fallback to sample data
+        hoaDonChiTiets.value = createSampleChiTietData(hoaDonId);
+        
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Không thể tải chi tiết từ API, hiển thị dữ liệu mẫu',
+            life: 3000
+        });
+    } finally {
+        isLoadingChiTiet.value = false;
+    }
+}
+
 async function fetchAllData() {
     isLoading.value = true;
     hasError.value = false;
@@ -977,629 +930,6 @@ function createSampleData() {
     ];
 }
 
-// Tất cả các computed properties và functions khác giữ nguyên như bản gốc...
-// (Giữ nguyên tất cả code từ line 200 trở đi của file gốc)
-
-// Computed properties
-const filteredHoaDons = computed(() => {
-    let filtered = [...hoaDons.value];
-
-    // Tab filter
-    if (activeTab.value === 'pos') {
-        filtered = filtered.filter((hd) => hd.loaiHoaDon === 'OFFLINE');
-    } else if (activeTab.value === 'online') {
-        filtered = filtered.filter((hd) => hd.loaiHoaDon === 'ONLINE');
-    } else if (activeTab.value === 'pending') {
-        filtered = filtered.filter((hd) => ['PENDING', 'CONFIRMED', 'PREPARING', 'PAYMENT_PENDING'].includes(hd.trangThaiHoaDon));
-    }
-
-    // Search filter
-    if (searchKeyword.value.trim()) {
-        const keyword = searchKeyword.value.toLowerCase();
-        filtered = filtered.filter((hd) => hd.maHoaDon?.toLowerCase().includes(keyword) || hd.tenKhachHang?.toLowerCase().includes(keyword) || hd.sdt?.includes(keyword) || hd.email?.toLowerCase().includes(keyword));
-    }
-
-    // Type filter
-    if (typeFilter.value) {
-        filtered = filtered.filter((hd) => hd.loaiHoaDon === typeFilter.value);
-    }
-
-    // Status filter
-    if (statusFilter.value) {
-        filtered = filtered.filter((hd) => hd.trangThaiHoaDon === statusFilter.value);
-    }
-
-    // Date filter
-    if (dateFilter.value) {
-        const filterDate = new Date(dateFilter.value).toDateString();
-        filtered = filtered.filter((hd) => {
-            const hoaDonDate = new Date(hd.ngayTao).toDateString();
-            return hoaDonDate === filterDate;
-        });
-    }
-
-    // Advanced filters
-    if (minAmount.value || maxAmount.value) {
-        filtered = filtered.filter((hd) => {
-            const amount = hd.tongTien || 0;
-            const min = minAmount.value ? parseFloat(minAmount.value) : 0;
-            const max = maxAmount.value ? parseFloat(maxAmount.value) : Infinity;
-            return amount >= min && amount <= max;
-        });
-    }
-
-    if (staffFilter.value) {
-        filtered = filtered.filter((hd) => hd.nhanVienId === staffFilter.value);
-    }
-
-    if (paymentMethodFilter.value) {
-        filtered = filtered.filter((hd) => hd.phuongThucThanhToan === paymentMethodFilter.value);
-    }
-
-    return filtered;
-});
-
-const paginatedHoaDons = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage.value;
-    const end = start + itemsPerPage.value;
-    return filteredHoaDons.value.slice(start, end);
-});
-
-const filteredChiTiets = computed(() => {
-    if (!searchChiTietKeyword.value.trim()) {
-        return hoaDonChiTiets.value;
-    }
-
-    const keyword = searchChiTietKeyword.value.toLowerCase();
-    return hoaDonChiTiets.value.filter((item) => item.id.toString().includes(keyword) || item.tenSanPham?.toLowerCase().includes(keyword) || item.maSanPham?.toLowerCase().includes(keyword));
-});
-
-// Statistics
-const posInvoices = computed(() => {
-    return hoaDons.value.filter((hd) => hd.loaiHoaDon === 'OFFLINE');
-});
-
-const onlineInvoices = computed(() => {
-    return hoaDons.value.filter((hd) => hd.loaiHoaDon === 'ONLINE');
-});
-
-const totalRevenue = computed(() => {
-    return hoaDons.value.filter((hd) => ['COMPLETED', 'PAID'].includes(hd.trangThaiHoaDon)).reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
-});
-
-const posRevenue = computed(() => {
-    return posInvoices.value.filter((hd) => ['COMPLETED', 'PAID'].includes(hd.trangThaiHoaDon)).reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
-});
-
-const onlineRevenue = computed(() => {
-    return onlineInvoices.value.filter((hd) => hd.trangThaiHoaDon === 'COMPLETED').reduce((sum, hd) => sum + (hd.tongTien || 0), 0);
-});
-
-const completedInvoices = computed(() => {
-    return hoaDons.value.filter((hd) => ['COMPLETED', 'PAID'].includes(hd.trangThaiHoaDon)).length;
-});
-
-const pendingInvoices = computed(() => {
-    return hoaDons.value.filter((hd) => ['PENDING', 'CONFIRMED', 'PREPARING', 'PAYMENT_PENDING'].includes(hd.trangThaiHoaDon)).length;
-});
-
-const urgentInvoices = computed(() => {
-    const urgentStatuses = ['PAYMENT_PENDING', 'PENDING'];
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return hoaDons.value.filter((hd) => urgentStatuses.includes(hd.trangThaiHoaDon) && new Date(hd.ngayTao) < oneDayAgo).length;
-});
-
-const completionRate = computed(() => {
-    if (hoaDons.value.length === 0) return 0;
-    return Math.round((completedInvoices.value / hoaDons.value.length) * 100);
-});
-
-// Update tab counts
-watch([hoaDons], () => {
-    tabs.value[0].count = hoaDons.value.length;
-    tabs.value[1].count = posInvoices.value.length;
-    tabs.value[2].count = onlineInvoices.value.length;
-    tabs.value[3].count = pendingInvoices.value;
-});
-
-// Utility functions
-function goToLogin() {
-    // Xóa tất cả token có thể
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_info');
-    localStorage.removeItem('token');
-    sessionStorage.clear();
-
-    window.location.href = '/login';
-}
-
-function formatDate(date) {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('vi-VN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-function formatCurrency(amount) {
-    if (!amount) return '0 ₫';
-    return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND'
-    }).format(amount);
-}
-
-function getInitials(name) {
-    if (!name) return 'KH';
-    return name
-        .split(' ')
-        .map((word) => word.charAt(0))
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
-}
-
-function getStatusLabel(status) {
-    if (!status) return 'Không xác định';
-
-    const statusMap = {
-        DRAFT: 'Đang tạo',
-        CART: 'Giỏ hàng',
-        PENDING: 'Chờ xác nhận',
-        CONFIRMED: 'Đã xác nhận',
-        PREPARING: 'Chuẩn bị hàng',
-        PACKED: 'Đã đóng gói',
-        PAYMENT_PENDING: 'Chờ thanh toán',
-        PAID: 'Đã thanh toán',
-        SHIPPING: 'Đang giao',
-        DELIVERED: 'Đã giao',
-        COMPLETED: 'Hoàn thành',
-        CANCELLED: 'Đã hủy',
-        RETURNED: 'Hoàn trả'
-    };
-
-    return statusMap[status.toUpperCase()] || status;
-}
-
-function getStatusColor(status) {
-    if (!status) return 'secondary';
-
-    const statusLower = status.toString().toLowerCase();
-
-    if (statusLower.includes('pending') || statusLower.includes('chờ')) {
-        return 'warning';
-    } else if (statusLower.includes('confirmed') || statusLower.includes('xác nhận')) {
-        return 'info';
-    } else if (statusLower.includes('preparing') || statusLower.includes('chuẩn bị')) {
-        return 'primary';
-    } else if (statusLower.includes('shipping') || statusLower.includes('giao')) {
-        return 'dark';
-    } else if (statusLower.includes('completed') || statusLower.includes('paid') || statusLower.includes('hoàn thành')) {
-        return 'success';
-    } else if (statusLower.includes('cancelled') || statusLower.includes('hủy')) {
-        return 'danger';
-    } else if (statusLower.includes('draft') || statusLower.includes('cart')) {
-        return 'secondary';
-    } else {
-        return 'secondary';
-    }
-}
-
-function getStatusIcon(status) {
-    if (!status) return 'pi pi-question-circle';
-
-    const statusLower = status.toString().toLowerCase();
-
-    if (statusLower.includes('pending') || statusLower.includes('chờ')) {
-        return 'pi pi-clock';
-    } else if (statusLower.includes('confirmed') || statusLower.includes('xác nhận')) {
-        return 'pi pi-check-circle';
-    } else if (statusLower.includes('preparing') || statusLower.includes('chuẩn bị')) {
-        return 'pi pi-cog';
-    } else if (statusLower.includes('shipping') || statusLower.includes('giao')) {
-        return 'pi pi-truck';
-    } else if (statusLower.includes('completed') || statusLower.includes('paid') || statusLower.includes('hoàn thành')) {
-        return 'pi pi-verified';
-    } else if (statusLower.includes('cancelled') || statusLower.includes('hủy')) {
-        return 'pi pi-times-circle';
-    } else if (statusLower.includes('draft') || statusLower.includes('cart')) {
-        return 'pi pi-file';
-    } else {
-        return 'pi pi-circle';
-    }
-}
-
-// Workflow functions
-function getWorkflowSteps(loaiHoaDon) {
-    if (loaiHoaDon === 'OFFLINE') {
-        return ['DRAFT', 'PAYMENT_PENDING', 'PAID', 'COMPLETED'];
-    } else {
-        return ['CART', 'PENDING', 'CONFIRMED', 'PREPARING', 'PACKED', 'SHIPPING', 'DELIVERED', 'COMPLETED'];
-    }
-}
-
-function getStepBootstrapClass(hoaDon, step) {
-    const currentStep = hoaDon.trangThaiHoaDon;
-    const steps = getWorkflowSteps(hoaDon.loaiHoaDon);
-    const currentIndex = steps.indexOf(currentStep);
-    const stepIndex = steps.indexOf(step);
-
-    if (stepIndex < currentIndex) {
-        return 'bg-success text-white';
-    } else if (stepIndex === currentIndex) {
-        return 'bg-primary text-white';
-    } else {
-        return 'bg-light text-muted';
-    }
-}
-
-function getDetailStepBootstrapClass(hoaDon, step) {
-    const currentStep = hoaDon.trangThaiHoaDon;
-    const steps = getWorkflowSteps(hoaDon.loaiHoaDon);
-    const currentIndex = steps.indexOf(currentStep);
-    const stepIndex = steps.indexOf(step);
-
-    if (stepIndex < currentIndex) {
-        return 'bg-success border-success text-white';
-    } else if (stepIndex === currentIndex) {
-        return 'bg-primary border-primary text-white';
-    } else {
-        return 'bg-white border-light text-muted';
-    }
-}
-
-function isStepCompleted(hoaDon, step) {
-    const currentStep = hoaDon.trangThaiHoaDon;
-    const steps = getWorkflowSteps(hoaDon.loaiHoaDon);
-    const currentIndex = steps.indexOf(currentStep);
-    const stepIndex = steps.indexOf(step);
-    return stepIndex < currentIndex;
-}
-
-function getStepIcon(step) {
-    const iconMap = {
-        DRAFT: 'pi pi-file',
-        CART: 'pi pi-shopping-cart',
-        PENDING: 'pi pi-clock',
-        CONFIRMED: 'pi pi-check',
-        PREPARING: 'pi pi-cog',
-        PACKED: 'pi pi-box',
-        PAYMENT_PENDING: 'pi pi-credit-card',
-        PAID: 'pi pi-money-bill',
-        SHIPPING: 'pi pi-truck',
-        DELIVERED: 'pi pi-home',
-        COMPLETED: 'pi pi-check-circle'
-    };
-    return iconMap[step] || 'pi pi-circle';
-}
-
-function getStepLabel(step) {
-    const labelMap = {
-        DRAFT: 'Tạo đơn',
-        CART: 'Giỏ hàng',
-        PENDING: 'Chờ xác nhận',
-        CONFIRMED: 'Đã xác nhận',
-        PREPARING: 'Chuẩn bị',
-        PACKED: 'Đóng gói',
-        PAYMENT_PENDING: 'Chờ thanh toán',
-        PAID: 'Đã thanh toán',
-        SHIPPING: 'Đang giao',
-        DELIVERED: 'Đã giao',
-        COMPLETED: 'Hoàn thành'
-    };
-    return labelMap[step] || step;
-}
-
-// Status functions
-function canUpdateStatus(hoaDon) {
-    const terminalStates = ['COMPLETED', 'CANCELLED', 'RETURNED'];
-    return !terminalStates.includes(hoaDon.trangThaiHoaDon);
-}
-
-function canProcessNextStep(hoaDon) {
-    const steps = getWorkflowSteps(hoaDon.loaiHoaDon);
-    const currentIndex = steps.indexOf(hoaDon.trangThaiHoaDon);
-    return currentIndex >= 0 && currentIndex < steps.length - 1;
-}
-
-function getNextStepAction(hoaDon) {
-    const currentStep = hoaDon.trangThaiHoaDon;
-    const actionMap = {
-        DRAFT: 'Chờ thanh toán',
-        CART: 'Đặt hàng',
-        PENDING: 'Xác nhận',
-        CONFIRMED: 'Chuẩn bị hàng',
-        PREPARING: 'Đóng gói',
-        PACKED: 'Giao hàng',
-        PAYMENT_PENDING: 'Thanh toán',
-        PAID: 'Hoàn thành',
-        SHIPPING: 'Đã giao',
-        DELIVERED: 'Hoàn thành'
-    };
-    return actionMap[currentStep] || 'Tiếp theo';
-}
-
-function canCancelInvoice(hoaDon) {
-    const cancelableStates = ['DRAFT', 'CART', 'PENDING', 'CONFIRMED', 'PAYMENT_PENDING'];
-    return cancelableStates.includes(hoaDon.trangThaiHoaDon);
-}
-
-function canEditPOSItems(hoaDon) {
-    return hoaDon.loaiHoaDon === 'OFFLINE' && ['DRAFT', 'PAYMENT_PENDING'].includes(hoaDon.trangThaiHoaDon);
-}
-
-function canEditItems(hoaDon) {
-    if (hoaDon.loaiHoaDon === 'OFFLINE') {
-        return ['DRAFT', 'PAYMENT_PENDING'].includes(hoaDon.trangThaiHoaDon);
-    } else {
-        return ['CART', 'PENDING'].includes(hoaDon.trangThaiHoaDon);
-    }
-}
-
-function getAvailableStatuses(hoaDon) {
-    if (!hoaDon) return [];
-
-    const steps = getWorkflowSteps(hoaDon.loaiHoaDon);
-    const currentIndex = steps.indexOf(hoaDon.trangThaiHoaDon);
-
-    const availableSteps = [];
-
-    // Can move to next step
-    if (currentIndex >= 0 && currentIndex < steps.length - 1) {
-        const nextStep = steps[currentIndex + 1];
-        availableSteps.push({
-            value: nextStep,
-            label: getStepLabel(nextStep)
-        });
-    }
-
-    // Can cancel (except completed states)
-    if (!['COMPLETED', 'CANCELLED'].includes(hoaDon.trangThaiHoaDon)) {
-        availableSteps.push({
-            value: 'CANCELLED',
-            label: 'Hủy đơn'
-        });
-    }
-
-    return availableSteps;
-}
-
-function needsNote(status) {
-    return status === 'CANCELLED';
-}
-
-function getPaymentStatusColor(status) {
-    if (!status) return 'secondary';
-
-    const statusLower = status.toString().toLowerCase();
-
-    if (statusLower.includes('completed') || statusLower.includes('paid')) {
-        return 'success';
-    } else if (statusLower.includes('pending')) {
-        return 'warning';
-    } else if (statusLower.includes('failed')) {
-        return 'danger';
-    } else {
-        return 'secondary';
-    }
-}
-
-function getPaymentStatusLabel(status) {
-    if (!status) return 'Chưa xác định';
-
-    const statusMap = {
-        PENDING: 'Chờ thanh toán',
-        COMPLETED: 'Đã thanh toán',
-        PAID: 'Đã thanh toán',
-        FAILED: 'Thất bại'
-    };
-
-    return statusMap[status.toUpperCase()] || status;
-}
-
-function getChiTietStatusLabel(status) {
-    if (!status) return 'Không xác định';
-    return 'Hoạt động';
-}
-
-// Sorting functions
-function onSort(event) {
-    sortField.value = event.sortField;
-    sortOrder.value = event.sortOrder === 1 ? 'asc' : 'desc';
-}
-
-// Modal functions
-function showModal(modalRef) {
-    if (modalRef.value) {
-        const modalInstance = new bootstrap.Modal(modalRef.value);
-        modalInstance.show();
-    }
-}
-
-function hideModal(modalRef) {
-    if (modalRef.value) {
-        const modalInstance = bootstrap.Modal.getInstance(modalRef.value);
-        if (modalInstance) {
-            modalInstance.hide();
-        }
-    }
-}
-
-async function viewChiTiet(hoaDon) {
-    selectedHoaDon.value = hoaDon;
-    searchChiTietKeyword.value = '';
-    showChiTietDialog.value = true;
-
-    await nextTick();
-    showModal(detailModal);
-
-    // await fetchChiTietHoaDon(hoaDon.id);
-    // Placeholder for now
-    hoaDonChiTiets.value = createSampleChiTietData(hoaDon.id);
-}
-
-function closeChiTietDialog() {
-    hideModal(detailModal);
-    showChiTietDialog.value = false;
-    selectedHoaDon.value = null;
-    hoaDonChiTiets.value = [];
-    searchChiTietKeyword.value = '';
-    editingItemId.value = null;
-}
-
-function updateInvoiceStatus(hoaDon) {
-    selectedInvoiceForUpdate.value = hoaDon;
-    newStatus.value = '';
-    statusNote.value = '';
-    showStatusUpdateDialog.value = true;
-
-    nextTick(() => {
-        showModal(statusModal);
-    });
-}
-
-function closeStatusUpdateDialog() {
-    hideModal(statusModal);
-    showStatusUpdateDialog.value = false;
-    selectedInvoiceForUpdate.value = null;
-    newStatus.value = '';
-    statusNote.value = '';
-}
-
-async function confirmStatusUpdate() {
-    if (!newStatus.value) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Vui lòng chọn trạng thái mới',
-            life: 3000
-        });
-        return;
-    }
-
-    try {
-        const endpoint = `${API_ENDPOINTS.hoaDon}/${selectedInvoiceForUpdate.value.id}/trang-thai`;
-        await fetchWithErrorHandling(endpoint, {
-            method: 'PUT',
-            body: JSON.stringify({
-                trangThai: newStatus.value,
-                ghiChu: statusNote.value || `Cập nhật trạng thái sang ${getStatusLabel(newStatus.value)}`
-            })
-        });
-
-        // Update local data
-        const index = hoaDons.value.findIndex((hd) => hd.id === selectedInvoiceForUpdate.value.id);
-        if (index !== -1) {
-            hoaDons.value[index].trangThaiHoaDon = newStatus.value;
-        }
-
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Cập nhật trạng thái thành công',
-            life: 3000
-        });
-        closeStatusUpdateDialog();
-    } catch (error) {
-        console.error('Error updating status:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Không thể cập nhật trạng thái',
-            life: 3000
-        });
-    }
-}
-
-// Calculation functions
-function getTotalQuantity() {
-    return filteredChiTiets.value.reduce((sum, item) => sum + item.soLuong, 0);
-}
-
-function getTotalAmount() {
-    return filteredChiTiets.value.reduce((sum, item) => sum + item.giaBan * item.soLuong, 0);
-}
-
-// Item editing functions
-function isEditingItem(itemId) {
-    return editingItemId.value === itemId;
-}
-
-function editItem(item) {
-    editingItemId.value = item.id;
-    editQuantity.value = item.soLuong;
-}
-
-function cancelEdit() {
-    editingItemId.value = null;
-    editQuantity.value = 1;
-}
-
-async function saveQuantity(itemId) {
-    try {
-        const endpoint = `${API_ENDPOINTS.hoaDonChiTiet}/${itemId}/quantity`;
-        await fetchWithErrorHandling(endpoint, {
-            method: 'PUT',
-            body: JSON.stringify({ soLuong: editQuantity.value })
-        });
-
-        // Update local data
-        const index = hoaDonChiTiets.value.findIndex((item) => item.id === itemId);
-        if (index !== -1) {
-            hoaDonChiTiets.value[index].soLuong = editQuantity.value;
-        }
-
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Cập nhật số lượng thành công',
-            life: 3000
-        });
-        cancelEdit();
-    } catch (error) {
-        console.error('Error updating quantity:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Không thể cập nhật số lượng',
-            life: 3000
-        });
-    }
-}
-
-async function removeItem(itemId) {
-    if (!confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) return;
-
-    try {
-        const endpoint = `${API_ENDPOINTS.hoaDonChiTiet}/remove-product/${itemId}`;
-        await fetchWithErrorHandling(endpoint, { method: 'DELETE' });
-
-        // Remove from local data
-        const index = hoaDonChiTiets.value.findIndex((item) => item.id === itemId);
-        if (index !== -1) {
-            hoaDonChiTiets.value.splice(index, 1);
-        }
-
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Đã xóa sản phẩm',
-            life: 3000
-        });
-    } catch (error) {
-        console.error('Error removing item:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Không thể xóa sản phẩm',
-            life: 3000
-        });
-    }
-}
-
 // Sample data for chi tiet
 function createSampleChiTietData(hoaDonId) {
     return [
@@ -1628,232 +958,280 @@ function createSampleChiTietData(hoaDonId) {
     ];
 }
 
-function applyAdvancedFilters() {
-    currentPage.value = 1;
-    toast.add({
-        severity: 'info',
-        summary: 'Bộ lọc',
-        detail: 'Đã áp dụng bộ lọc nâng cao',
-        life: 3000
-    });
-}
-
-function clearAllFilters() {
-    searchKeyword.value = '';
-    typeFilter.value = '';
-    statusFilter.value = '';
-    dateFilter.value = '';
-    minAmount.value = null;
-    maxAmount.value = null;
-    staffFilter.value = '';
-    paymentMethodFilter.value = '';
-    currentPage.value = 1;
-    toast.add({
-        severity: 'info',
-        summary: 'Bộ lọc',
-        detail: 'Đã xóa tất cả bộ lọc',
-        life: 3000
-    });
-}
-
-// Event handlers
-async function refreshAllData() {
-    await fetchAllData();
-}
-
-async function retryConnection() {
-    hasError.value = false;
-    await fetchAllData();
-}
-
-// Search and filter functions
-let searchTimeout;
-function onSearch() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        currentPage.value = 1;
-    }, 300);
-}
-
-function applyFilters() {
-    currentPage.value = 1;
-}
-
-function exportData() {
+// Process next step with API call
+async function processNextStep(hoaDon) {
     try {
-        const headers = ['ID', 'Mã hóa đơn', 'Loại', 'Ngày tạo', 'Tên khách hàng', 'Số điện thoại', 'Email', 'Tổng tiền', 'Trạng thái', 'Phương thức thanh toán'];
+        const currentStep = hoaDon.trangThaiHoaDon;
+        const steps = getWorkflowSteps(hoaDon.loaiHoaDon);
+        const currentIndex = steps.indexOf(currentStep);
+        
+        if (currentIndex >= 0 && currentIndex < steps.length - 1) {
+            const nextStep = steps[currentIndex + 1];
+            
+            console.log('🔄 Processing next step:', currentStep, '->', nextStep);
+            
+            const endpoint = `${API_ENDPOINTS.hoaDon}/${hoaDon.id}/trang-thai`;
+            const requestData = {
+                trangThai: nextStep,
+                ghiChu: `Cập nhật trạng thái từ ${getStatusLabel(currentStep)} sang ${getStatusLabel(nextStep)}`
+            };
+            
+            const updatedHoaDon = await fetchWithErrorHandling(endpoint, {
+                method: 'PUT',
+                body: JSON.stringify(requestData)
+            });
+            
+            // Cập nhật dữ liệu local
+            const index = hoaDons.value.findIndex(hd => hd.id === hoaDon.id);
+            if (index !== -1) {
+                hoaDons.value[index].trangThaiHoaDon = nextStep;
+                hoaDons.value[index].ngayCapNhat = new Date().toISOString();
+            }
+            
+            // Cập nhật selectedHoaDon nếu đang xem chi tiết
+            if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDon.id) {
+                selectedHoaDon.value.trangThaiHoaDon = nextStep;
+                selectedHoaDon.value.ngayCapNhat = new Date().toISOString();
+            }
+            
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã cập nhật trạng thái sang ${getStatusLabel(nextStep)}`,
+                life: 3000
+            });
+            
+        } else {
+            throw new Error('Không thể chuyển sang bước tiếp theo');
+        }
+    } catch (error) {
+        console.error('💥 Error processing next step:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: `Không thể cập nhật trạng thái: ${error.message}`,
+            life: 3000
+        });
+    }
+}
 
-        const csvData = filteredHoaDons.value.map((hd) => [
-            hd.id,
-            hd.maHoaDon || '',
-            hd.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online',
-            formatDate(hd.ngayTao),
-            hd.tenKhachHang || 'Khách lẻ',
-            hd.sdt || '',
-            hd.email || '',
-            hd.tongTien || 0,
-            getStatusLabel(hd.trangThaiHoaDon),
-            hd.phuongThucThanhToan || ''
-        ]);
-
-        const csvContent = [
-            headers.join(','),
-            ...csvData.map((row) =>
-                row
-                    .map((field) => {
-                        const stringField = String(field);
-                        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                            return `"${stringField.replace(/"/g, '""')}"`;
-                        }
-                        return stringField;
-                    })
-                    .join(',')
-            )
-        ].join('\n');
-
-        const BOM = '\uFEFF';
-        const csvWithBOM = BOM + csvContent;
-        const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const filename = `HoaDon_${dateStr}.csv`;
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+// Cancel invoice with API call
+async function cancelInvoice(hoaDon) {
+    const reason = prompt('Nhập lý do hủy đơn hàng:');
+    if (!reason || reason.trim() === '') {
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Vui lòng nhập lý do hủy đơn',
+            life: 3000
+        });
+        return;
+    }
+    
+    try {
+        console.log('🚫 Cancelling invoice:', hoaDon.id, 'Reason:', reason);
+        
+        const endpoint = `${API_ENDPOINTS.hoaDon}/${hoaDon.id}/huy`;
+        const requestData = { lyDo: reason };
+        
+        const updatedHoaDon = await fetchWithErrorHandling(endpoint, {
+            method: 'PUT',
+            body: JSON.stringify(requestData)
+        });
+        
+        // Cập nhật dữ liệu local
+        const index = hoaDons.value.findIndex(hd => hd.id === selectedInvoiceForUpdate.value.id);
+        if (index !== -1) {
+            hoaDons.value[index].trangThaiHoaDon = newStatus.value;
+            hoaDons.value[index].ghiChu = requestData.ghiChu;
+            hoaDons.value[index].ngayCapNhat = new Date().toISOString();
+        }
+        
+        // Cập nhật selectedHoaDon nếu đang xem chi tiết
+        if (selectedHoaDon.value && selectedHoaDon.value.id === selectedInvoiceForUpdate.value.id) {
+            selectedHoaDon.value.trangThaiHoaDon = newStatus.value;
+            selectedHoaDon.value.ghiChu = requestData.ghiChu;
+            selectedHoaDon.value.ngayCapNhat = new Date().toISOString();
+        }
 
         toast.add({
             severity: 'success',
-            summary: 'Xuất dữ liệu thành công',
-            detail: `Đã xuất ${filteredHoaDons.value.length} hóa đơn ra file ${filename}`,
+            summary: 'Thành công',
+            detail: `Cập nhật trạng thái thành công sang ${getStatusLabel(newStatus.value)}`,
             life: 3000
         });
+        
+        closeStatusUpdateDialog();
     } catch (error) {
-        console.error('Error exporting data:', error);
+        console.error('💥 Error updating status:', error);
         toast.add({
             severity: 'error',
-            summary: 'Lỗi xuất dữ liệu',
-            detail: 'Có lỗi xảy ra khi xuất file',
+            summary: 'Lỗi',
+            detail: `Không thể cập nhật trạng thái: ${error.message}`,
             life: 3000
         });
     }
 }
 
-// Watch for filter changes
-watch([statusFilter, typeFilter, dateFilter], () => {
-    currentPage.value = 1;
-});
+// Computed properties
+const filteredHoaDons = computed(() => {
+    let filtered = [...hoaDons.value];
 
-// Initialize
-onMounted(() => {
-    console.log('🎯 ViewHoaDon component mounted');
-    fetchAllData();
-});
-</script>
-
-<style scoped>
-.invoice-management {
-    padding: 1rem;
-    min-height: 100vh;
-    background-color: #f8f9fa;
-}
-
-.bg-gradient-primary {
-    background: linear-gradient(135deg, #007bff, #6610f2);
-}
-
-.avatar {
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.workflow-step {
-    font-size: 0.75rem;
-    min-width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-}
-
-.workflow-arrow {
-    width: 0;
-    height: 0;
-    border-top: 4px solid transparent;
-    border-bottom: 4px solid transparent;
-    border-left: 8px solid #dee2e6;
-}
-
-.nav-pills .nav-link {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    margin-right: 0.5rem;
-    transition: all 0.3s ease;
-}
-
-.nav-pills .nav-link:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.nav-pills .nav-link.active {
-    background: rgba(255, 255, 255, 0.9);
-    color: #007bff !important;
-    font-weight: 600;
-}
-
-.card {
-    border: none;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    transition: box-shadow 0.15s ease-in-out;
-}
-
-.card:hover {
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-}
-
-.table th {
-    border-top: none;
-    font-weight: 600;
-    color: #495057;
-    background-color: #f8f9fa;
-}
-
-.table td {
-    vertical-align: middle;
-}
-
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
-
-.display-1 {
-    font-size: 6rem;
-}
-
-.display-4 {
-    font-size: 2.5rem;
-}
-
-@media (max-width: 768px) {
-    .invoice-management {
-        padding: 0.5rem;
+    // Tab filter
+    if (activeTab.value === 'pos') {
+        filtered = filtered.filter((hd) => hd.loaiHoaDon === 'OFFLINE');
+    } else if (activeTab.value === 'online') {
+        filtered = filtered.filter((hd) => hd.loaiHoaDon === 'ONLINE');
+    } else if (activeTab.value === 'pending') {
+        filtered = filtered.filter((hd) => ['PENDING', 'CONFIRMED', 'PREPARING', 'PAYMENT_PENDING'].includes(hd.trangThaiHoaDon));
     }
 
-    .display-1 {
-        font-size: 4rem;
-    }
-
-    .display-4 {
-        font-size: 2rem;
+    // Search filter
+    if (searchKeyword.value.trim()) {
+        const keyword = searchKeyword.value.toLowerCase();
+        filtered = filtered.filter((hd) => hd.maHoaDon?.toLowerCase().includes(keyword) || hd.te.value.findIndex(hd => hd.id === hoaDon.id);
+        if (index !== -1) {
+            hoaDons.value[index].trangThaiHoaDon = 'CANCELLED';
+            hoaDons.value[index].ghiChu = reason;
+            hoaDons.value[index].ngayCapNhat = new Date().toISOString();
+        }
+        
+        // Cập nhật selectedHoaDon nếu đang xem chi tiết
+        if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDon.id) {
+            selectedHoaDon.value.trangThaiHoaDon = 'CANCELLED';
+            selectedHoaDon.value.ghiChu = reason;
+            selectedHoaDon.value.ngayCapNhat = new Date().toISOString();
+        }
+        
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Đã hủy đơn hàng thành công',
+            life: 3000
+        });
+        
+    } catch (error) {
+        console.error('💥 Error cancelling invoice:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: `Không thể hủy đơn hàng: ${error.message}`,
+            life: 3000
+        });
     }
 }
-</style>
+
+// Confirm status update with API call
+async function confirmStatusUpdate() {
+    if (!newStatus.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Vui lòng chọn trạng thái mới',
+            life: 3000
+        });
+        return;
+    }
+
+    try {
+        console.log('🔄 Updating status:', selectedInvoiceForUpdate.value.id, '->', newStatus.value);
+        
+        const endpoint = `${API_ENDPOINTS.hoaDon}/${selectedInvoiceForUpdate.value.id}/trang-thai`;
+        const requestData = {
+            trangThai: newStatus.value,
+            ghiChu: statusNote.value || `Cập nhật trạng thái sang ${getStatusLabel(newStatus.value)}`
+        };
+        
+        const updatedHoaDon = await fetchWithErrorHandling(endpoint, {
+            method: 'PUT',
+            body: JSON.stringify(requestData)
+        });
+
+        // Cập nhật dữ liệu local
+        const index = hoaDonsclass="card-title mb-0">Thông tin hóa đơn</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-2">
+                                            <div class="col-6"><strong>Mã HĐ:</strong></div>
+                                            <div class="col-6">
+                                                <span class="badge bg-secondary">{{ selectedHoaDon.maHoaDon }}</span>
+                                            </div>
+                                            <div class="col-6"><strong>Loại:</strong></div>
+                                            <div class="col-6">
+                                                <span :class="['badge', selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'bg-warning' : 'bg-success']">
+                                                    {{ selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online' }}
+                                                </span>
+                                            </div>
+                                            <div class="col-6"><strong>Ngày tạo:</strong></div>
+                                            <div class="col-6">{{ formatDate(selectedHoaDon.ngayTao) }}</div>
+                                            <div class="col-6"><strong>Tổng tiền:</strong></div>
+                                            <div class="col-6">
+                                                <span class="fw-bold text-success">{{ formatCurrency(selectedHoaDon.tongTien) }}</span>
+                                            </div>
+                                            <div class="col-6"><strong>Trạng thái:</strong></div>
+                                            <div class="col-6">
+                                                <span :class="['badge', 'bg-' + getStatusColor(selectedHoaDon.trangThaiHoaDon)]">
+                                                    {{ getStatusLabel(selectedHoaDon.trangThaiHoaDon) }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Thông tin khách hàng -->
+                            <div class="col-lg-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">Thông tin khách hàng</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-2">
+                                            <div class="col-4"><strong>Tên:</strong></div>
+                                            <div class="col-8">{{ selectedHoaDon.tenKhachHang || 'Khách lẻ' }}</div>
+                                            <div v-if="selectedHoaDon.sdt" class="col-4"><strong>SĐT:</strong></div>
+                                            <div v-if="selectedHoaDon.sdt" class="col-8">{{ selectedHoaDon.sdt }}</div>
+                                            <div v-if="selectedHoaDon.email" class="col-4"><strong>Email:</strong></div>
+                                            <div v-if="selectedHoaDon.email" class="col-8">{{ selectedHoaDon.email }}</div>
+                                            <div v-if="selectedHoaDon.diaChi" class="col-4"><strong>Địa chỉ:</strong></div>
+                                            <div v-if="selectedHoaDon.diaChi" class="col-8">{{ selectedHoaDon.diaChi }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Thông tin thanh toán -->
+                            <div class="col-lg-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">Thanh toán</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-2">
+                                            <div class="col-6"><strong>Phương thức:</strong></div>
+                                            <div class="col-6">{{ selectedHoaDon.phuongThucThanhToan || 'Chưa xác định' }}</div>
+                                            <div class="col-6"><strong>Tình trạng:</strong></div>
+                                            <div class="col-6">
+                                                <span :class="['badge', 'bg-' + getPaymentStatusColor(selectedHoaDon.tinhTrangThanhToan)]">
+                                                    {{ getPaymentStatusLabel(selectedHoaDon.tinhTrangThanhToan) }}
+                                                </span>
+                                            </div>
+                                            <div v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE' && selectedHoaDon.tienThua" class="col-6"><strong>Tiền thừa:</strong></div>
+                                            <div v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE' && selectedHoaDon.tienThua" class="col-6">
+                                                <span class="fw-bold text-danger">{{ formatCurrency(selectedHoaDon.tienThua) }}</span>
+                                            </div>
+                                            <div v-if="selectedHoaDon.maGiaoDich" class="col-6"><strong>Mã GD:</strong></div>
+                                            <div v-if="selectedHoaDon.maGiaoDich" class="col-6">
+                                                <code class="small">{{ selectedHoaDon.maGiaoDich }}</code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chi tiết sản phẩm -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6
