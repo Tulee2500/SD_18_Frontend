@@ -1,19 +1,69 @@
 <script setup>
-import UserButton from "@/components/user/UserButton.vue";
 import arrowRight from "@/assets/icons/arrow-right.svg";
-import { statistics, shoesCards } from "@/constants/index";
-import { Swiper, SwiperSlide } from "swiper/vue";
-import { ref } from "vue";
+import Card from "@/components/user/Card.vue";
+import UserButton from "@/components/user/UserButton.vue";
+import { statistics } from "@/constants/index";
+import axios from "axios";
 import "swiper/css";
 import { Keyboard } from "swiper/modules";
-import Card from "@/components/user/Card.vue";
+import { Swiper, SwiperSlide } from "swiper/vue";
+import { onMounted, ref } from "vue";
 
-const bigImageUrl = ref(shoesCards[0].imgUrl);
+// Dữ liệu hình ảnh sản phẩm
+const shoesCards = ref([]);
+const bigImageUrl = ref("");
 
+// Đổi ảnh chính
 const changeHeroImg = (imgUrl) => {
   bigImageUrl.value = imgUrl;
 };
+
+// Gọi API sản phẩm khi mount
+onMounted(async () => {
+  try {
+    const res = await axios.get("http://localhost:8080/api/san-pham-chi-tiet");
+    
+    // Tạo map sản phẩm -> hình ảnh đầu tiên
+    const map = new Map();
+
+    res.data.forEach(detail => {
+      const productId = detail.sanPham?.id;
+      const hinhAnh = detail.hinhAnh;
+      if (!productId || map.has(productId)) return;
+
+      let imageUrl = "";
+
+      if (typeof hinhAnh === "object") {
+        imageUrl = hinhAnh.duongDan || hinhAnh.url || hinhAnh.path || hinhAnh.link || hinhAnh.src || "";
+      } else if (typeof hinhAnh === "string") {
+        imageUrl = hinhAnh;
+      }
+
+      if (imageUrl && !imageUrl.startsWith("http")) {
+        imageUrl = "http://localhost:8080" + (imageUrl.startsWith("/") ? "" : "/") + imageUrl;
+      }
+
+      if (imageUrl) {
+        map.set(productId, {
+          imgUrl: imageUrl,
+          id: detail.id
+        });
+      }
+    });
+
+    shoesCards.value = Array.from(map.values());
+
+    // Set ảnh chính ban đầu là ảnh đầu tiên
+    if (shoesCards.value.length > 0) {
+      bigImageUrl.value = shoesCards.value[0].imgUrl;
+    }
+
+  } catch (err) {
+    console.error("Lỗi gọi API sản phẩm:", err);
+  }
+});
 </script>
+
 
 <template>
   <section class="w-full min-h-screen flex flex-col xl:flex-row max-container">
@@ -50,7 +100,7 @@ const changeHeroImg = (imgUrl) => {
       <!-- Use Vue's built-in transition for smooth image transitions -->
       <transition name="fade" mode="out-in">
         <img
-          class="z-40 object-contain rotate-12 transition-all duration-1000"
+          class="z-40 object-contain rotate-12 transition-all duration-1000 mix-blend-multiply"
           :key="bigImageUrl"
           :src="bigImageUrl"
           alt="Shoes collection"
@@ -81,6 +131,7 @@ const changeHeroImg = (imgUrl) => {
         >
           <SwiperSlide v-for="shoe in shoesCards" :key="shoe.imgUrl">
             <Card
+            
               :key="shoe.imgUrl"
               :imgUrl="shoe.imgUrl"
               :width="'140'"

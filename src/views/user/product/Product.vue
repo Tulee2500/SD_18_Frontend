@@ -3,16 +3,7 @@
     <!-- Navigation -->
     <Nav />
     
-    <!-- Breadcrumb -->
-    <div class="breadcrumb-container">
-      <div class="breadcrumb">
-        <router-link to="/" class="breadcrumb-item">Trang chủ</router-link>
-        <span class="breadcrumb-separator">/</span>
-        <router-link to="/products" class="breadcrumb-item">Sản phẩm</router-link>
-        <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current">{{ productName }}</span>
-      </div>
-    </div>
+   <Hero />
     
     <!-- Main Product Content -->
     <div class="product-main">
@@ -401,7 +392,7 @@
           <div class="similar-products-slider">
             <div class="similar-products-grid">
               <div 
-                v-for="similarProduct in similarProducts"
+                 v-for="similarProduct in similarProducts"
                 :key="similarProduct.id"
                 @click="goToProduct(similarProduct.id)"
                 class="similar-product-card"
@@ -474,12 +465,14 @@
 import Nav from '@/components/user/Nav.vue';
 import Footer from '@/views/user/Footer.vue';
 import axios from 'axios';
+import Hero from '../Hero.vue';
 
 export default {
   name: 'Product',
   components: {
     Nav,
-    Footer
+    Footer,
+    Hero
   },
   data() {
     return {
@@ -585,58 +578,60 @@ export default {
       console.log('Open zoom modal');
     },
     
-    async fetchProduct() {
-      try {
-        this.loading = true;
-        
-        const detailResponse = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${this.productId}`);
-        
-        if (!detailResponse.data) {
-          throw new Error('Không tìm thấy sản phẩm');
-        }
-        
-        const detail = detailResponse.data;
-        
-        const allDetailsResponse = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
-        const relatedDetails = allDetailsResponse.data.filter(d => 
-          d.sanPham?.id === detail.sanPham?.id
-        );
-        
-        this.product = detail;
-        
-        this.productImages = relatedDetails.map(d => {
-          let imageUrl = '';
-          if (d.hinhAnh) {
-            if (typeof d.hinhAnh === 'object') {
-              imageUrl = d.hinhAnh.duongDan || d.hinhAnh.url || d.hinhAnh.path || '';
-            } else if (typeof d.hinhAnh === 'string') {
-              imageUrl = d.hinhAnh;
-            }
-          }
-          
-          if (imageUrl && !imageUrl.startsWith('http')) {
-            imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-          }
-          
-          return imageUrl || '/placeholder-shoe.png';
-        });
-        
-        this.productImages = [...new Set(this.productImages)].slice(0, 4);
-        
-        if (this.productImages.length === 0) {
-          this.productImages = ['/placeholder-shoe.png'];
-        }
-        
-        await this.fetchSimilarProducts();
-        
-      } catch (error) {
-        console.error('Error fetching product:', error);
-        this.product = null;
-      } finally {
-        this.loading = false;
-      }
-    },
+async fetchProduct() {
+  try {
+    this.loading = true;
     
+    // Sử dụng this.productId từ computed property
+    const detailResponse = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${this.productId}`);
+    
+    if (!detailResponse.data) {
+      throw new Error('Không tìm thấy sản phẩm');
+    }
+    
+    const detail = detailResponse.data;
+    
+    const allDetailsResponse = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
+    const relatedDetails = allDetailsResponse.data.filter(d => 
+      d.sanPham?.id === detail.sanPham?.id
+    );
+    
+    this.product = detail;
+    
+    // Xử lý hình ảnh
+    this.productImages = relatedDetails.map(d => {
+      let imageUrl = '';
+      if (d.hinhAnh) {
+        if (typeof d.hinhAnh === 'object') {
+          imageUrl = d.hinhAnh.duongDan || d.hinhAnh.url || d.hinhAnh.path || '';
+        } else if (typeof d.hinhAnh === 'string') {
+          imageUrl = d.hinhAnh;
+        }
+      }
+      
+      if (imageUrl && !imageUrl.startsWith('http')) {
+        imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
+      }
+      
+      return imageUrl || '/placeholder-shoe.png';
+    });
+    
+    this.productImages = [...new Set(this.productImages)].slice(0, 4);
+    
+    if (this.productImages.length === 0) {
+      this.productImages = ['/placeholder-shoe.png'];
+    }
+    
+    // Fetch sản phẩm tương tự
+    await this.fetchSimilarProducts();
+    
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    this.product = null;
+  } finally {
+    this.loading = false;
+  }
+},    
     async fetchSimilarProducts() {
       try {
         const response = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
@@ -741,9 +736,17 @@ export default {
     },
     
     goToProduct(productId) {
-      this.$router.push(`/product/${productId}`);
-      this.fetchProduct();
-    },
+  // Scroll lên đầu trang
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  
+  // Reset các state
+  this.selectedImageIndex = 0;
+  this.quantity = 1;
+  this.progressWidth = 0;
+  
+  // Điều hướng đến sản phẩm mới
+  this.$router.push(`/product/${productId}`);
+},
     
     goBack() {
       this.$router.push('/products');
@@ -765,14 +768,27 @@ export default {
     this.stopAutoSlide();
   },
   watch: {
-    '$route.params.id': {
-      handler() {
+  '$route.params.id': {
+    handler(newId) {
+      if (newId) {
+        // Reset state
+        this.selectedImageIndex = 0;
+        this.quantity = 1;
+        this.progressWidth = 0;
+        
+        // Stop auto slide cũ
         this.stopAutoSlide();
-        this.fetchProduct();
-        this.startAutoSlide();
+        
+        // Fetch dữ liệu mới
+        this.fetchProduct().then(() => {
+          // Start auto slide sau khi load xong
+          this.startAutoSlide();
+        });
       }
-    }
+    },
+    immediate: true
   }
+},
 };
 </script>
 

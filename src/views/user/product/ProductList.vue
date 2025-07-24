@@ -285,11 +285,11 @@ export default {
       }
     },
     
-    goToProductDetail(product) {
-  // Đảm bảo truyền đúng id
+   goToProductDetail(product) {
+  // Chuyển đến trang chi tiết với id của chi tiết sản phẩm đầu tiên
   this.$router.push({
     name: 'product',
-    params: { id: product.id.toString() } // Chuyển thành string để nhất quán
+    params: { id: product.firstDetailId || product.id }
   });
 },
     addToCart(product) {
@@ -343,7 +343,14 @@ export default {
         
         console.log('Products API Response:', productsResponse.data);
         console.log('Details API Response:', detailsResponse.data);
-        
+        const firstDetailMap = new Map();
+detailsResponse.data.forEach(detail => {
+  const productId = detail.sanPham?.id;
+  if (productId && !firstDetailMap.has(productId)) {
+    firstDetailMap.set(productId, detail.id); // lưu lại id của chi tiết đầu tiên
+  }
+});
+
         if (!productsResponse.data || productsResponse.data.length === 0) {
           console.warn('No products data received from API');
           this.products = [];
@@ -403,6 +410,7 @@ detailsResponse.data.forEach(detail => {
           
           const product = {
             id: p.id,
+            firstDetailId: firstDetailMap.get(p.id),
             imgUrl: imageUrl,
             label: p.tenSanPham || 'Sản phẩm không tên',
             price: priceInfo.giaBan,
