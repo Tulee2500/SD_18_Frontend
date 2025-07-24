@@ -29,7 +29,7 @@ const router = createRouter({
         {
             path: '/product/:id',
             name: 'product',
-            component: () => import('@/components/user/product/Product.vue')
+            component: () => import('@/views/user/product/Product.vue')
         },
 
         // ADMIN ROUTES - CẦN ĐĂNG NHẬP VÀ LÀ ADMIN/NHÂN VIÊN

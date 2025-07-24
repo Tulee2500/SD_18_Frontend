@@ -119,28 +119,31 @@
             >
               <!-- Product Image Container -->
               <div class="product-image-container">
-                <div class="product-image-wrapper">
-                  <img 
-                    v-if="product.imgUrl"
-                    :src="product.imgUrl"
-                    :alt="product.label"
-                    class="product-image"
-                    @error="handleImageError"
-                  />
-                  <div v-else class="product-placeholder">
-                    <svg viewBox="0 0 120 80" class="placeholder-icon">
-                      <defs>
-                        <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stop-color="#e5e7eb"/>
-                          <stop offset="50%" stop-color="#f3f4f6"/>
-                          <stop offset="100%" stop-color="#e5e7eb"/>
-                        </linearGradient>
-                      </defs>
-                      <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)"/>
-                      <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db"/>
-                    </svg>
-                  </div>
-                </div>
+  <!-- Nếu có ảnh thì hiển thị ảnh -->
+  <div v-if="product.imgUrl" class="product-image-wrapper">
+    <img 
+      :src="product.imgUrl"
+      :alt="product.label"
+      class="product-image"
+      @error="handleImageError"
+    />
+  </div>
+
+  <!-- Nếu không có ảnh thì hiển thị placeholder -->
+  <div v-else class="product-placeholder">
+    <svg viewBox="0 0 120 80" class="placeholder-icon">
+      <defs>
+        <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#e5e7eb"/>
+          <stop offset="50%" stop-color="#f3f4f6"/>
+          <stop offset="100%" stop-color="#e5e7eb"/>
+        </linearGradient>
+      </defs>
+      <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)"/>
+      <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db"/>
+    </svg>
+  </div>
+
                 
                 <!-- Product Badge -->
                 <div class="product-badge">
@@ -283,12 +286,12 @@ export default {
     },
     
     goToProductDetail(product) {
-      this.$router.push({
-        name: 'product',
-        params: { id: product.id }
-      });
-    },
-    
+  // Đảm bảo truyền đúng id
+  this.$router.push({
+    name: 'product',
+    params: { id: product.id.toString() } // Chuyển thành string để nhất quán
+  });
+},
     addToCart(product) {
       this.cartItems++;
       console.log('Added to cart:', product);
@@ -331,73 +334,93 @@ export default {
     async fetchProducts() {
       try {
         this.loading = true;
-        const response = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
-        console.log('API Response:', response.data); // Debug toàn bộ response
         
-        // Kiểm tra xem có dữ liệu không
-        if (!response.data || response.data.length === 0) {
+        // Gọi cả 2 API
+        const [productsResponse, detailsResponse] = await Promise.all([
+          axios.get('http://localhost:8080/api/san-pham'),
+          axios.get('http://localhost:8080/api/san-pham-chi-tiet')
+        ]);
+        
+        console.log('Products API Response:', productsResponse.data);
+        console.log('Details API Response:', detailsResponse.data);
+        
+        if (!productsResponse.data || productsResponse.data.length === 0) {
           console.warn('No products data received from API');
           this.products = [];
           return;
         }
         
-        // Log chi tiết sản phẩm đầu tiên để xem cấu trúc
-        console.log('First product detail:', response.data[0]);
+        // Tạo map để lưu giá thấp nhất của mỗi sản phẩm
+        const priceMap = new Map();
+        const imageMap = new Map();
         
-        this.products = response.data.map((p, index) => {
-          // Log chi tiết cho vài sản phẩm đầu
+       // Trong methods fetchProducts()
+detailsResponse.data.forEach(detail => {
+  if (detail.sanPham?.id) {
+    const productId = detail.sanPham.id;
+    
+    // Xử lý giá
+    if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
+      priceMap.set(productId, {
+        giaBan: detail.giaBan,
+        giaGoc: detail.giaGoc
+      });
+    }
+    
+    // Xử lý hình ảnh giống như trong Product.vue
+    if (!imageMap.has(productId) && detail.hinhAnh) {
+      let imageUrl = '';
+      if (typeof detail.hinhAnh === 'object') {
+        imageUrl = detail.hinhAnh.duongDan || 
+                   detail.hinhAnh.url || 
+                   detail.hinhAnh.path || 
+                   detail.hinhAnh.link || 
+                   detail.hinhAnh.src || '';
+      } else if (typeof detail.hinhAnh === 'string') {
+        imageUrl = detail.hinhAnh;
+      }
+      
+      if (imageUrl && !imageUrl.startsWith('http')) {
+        imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
+      }
+      
+      if (imageUrl) {
+        imageMap.set(productId, imageUrl);
+      }
+    }
+  }
+});
+        
+        // Map sản phẩm với giá từ chi tiết
+        this.products = productsResponse.data.map((p, index) => {
           if (index < 3) {
             console.log(`Product ${index + 1} full data:`, p);
-            console.log(`Product ${index + 1} image data:`, {
-              hinhAnh: p.hinhAnh,
-              hinhAnhType: typeof p.hinhAnh,
-              hinhAnhKeys: p.hinhAnh ? Object.keys(p.hinhAnh) : null
-            });
           }
           
-          // Thử các cách khác nhau để lấy URL ảnh
-          let imageUrl = '';
-          if (p.hinhAnh) {
-            // Nếu hinhAnh là object
-            if (typeof p.hinhAnh === 'object') {
-              imageUrl = p.hinhAnh.url || 
-                        p.hinhAnh.duongDan || 
-                        p.hinhAnh.path ||
-                        p.hinhAnh.link ||
-                        p.hinhAnh.src ||
-                        '';
-            } 
-            // Nếu hinhAnh là string (URL trực tiếp)
-            else if (typeof p.hinhAnh === 'string') {
-              imageUrl = p.hinhAnh;
-            }
-          }
-          
-          // Đảm bảo URL đầy đủ nếu là relative path
-          if (imageUrl && !imageUrl.startsWith('http')) {
-            imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-          }
+          // Lấy giá từ map
+          const priceInfo = priceMap.get(p.id) || { giaBan: 0, giaGoc: 0 };
+          const imageUrl = imageMap.get(p.id) || `/images/product-${p.id}.jpg`;
           
           const product = {
             id: p.id,
             imgUrl: imageUrl,
-            label: p.sanPham?.tenSanPham || 'Sản phẩm không tên',
-            price: p.giaBan || 0,
-            originalPrice: p.giaGoc || 0,
-            rating: 4.8,
-            colorId: p.mauSac?.id,
-            colorName: p.mauSac?.tenMauSac || '',
-            sizeId: p.kichCo?.id,
-            sizeName: p.kichCo?.tenKichCo || '',
-            productId: p.sanPham?.id,
-            categoryId: p.sanPham?.danhMuc?.id,
-            categoryName: p.sanPham?.danhMuc?.tenDanhMuc || '',
-            maChiTiet: p.maChiTiet,
+            label: p.tenSanPham || 'Sản phẩm không tên',
+            price: priceInfo.giaBan,
+            originalPrice: priceInfo.giaGoc,
+            rating: 4.5 + (Math.random() * 0.5),
+            brandId: p.thuongHieu?.id,
+            brandName: p.thuongHieu?.tenThuongHieu || '',
+            categoryId: p.danhMuc?.id,
+            categoryName: p.danhMuc?.tenDanhMuc || '',
+            materialId: p.chatLieu?.id,
+            materialName: p.chatLieu?.tenChatLieu || '',
+            soleId: p.deGiay?.id,
+            soleName: p.deGiay?.tenDeGiay || '',
+            maSanPham: p.maSanPham,
             soLuong: p.soLuong || 0,
             trangThai: p.trangThai
           };
           
-          // Log sản phẩm đã xử lý
           if (index < 3) {
             console.log(`Processed product ${index + 1}:`, product);
           }
@@ -406,20 +429,14 @@ export default {
         });
         
         console.log('Total processed products:', this.products.length);
-        console.log('Products with images:', this.products.filter(p => p.imgUrl).length);
-        console.log('Products without images:', this.products.filter(p => !p.imgUrl).length);
-        
-        // Log một vài sản phẩm có ảnh
-        const productsWithImages = this.products.filter(p => p.imgUrl).slice(0, 3);
-        console.log('Sample products with images:', productsWithImages);
+        console.log('Products with prices:', this.products.filter(p => p.price > 0).length);
         
       } catch (error) {
         console.error("Error fetching products:", error);
         console.error("Error details:", {
           message: error.message,
           response: error.response,
-          request: error.request,
-          stack: error.stack
+          request: error.request
         });
         this.products = [];
       } finally {
@@ -438,8 +455,7 @@ export default {
     console.log('ProductList component unmounting');
   }
 }
-</script>
-<style lang="scss" scoped>
+</script><style lang="scss" scoped>
 .nike-complete-layout {
   font-family: 'Helvetica Neue', Arial, sans-serif;
   background-color: #f5f5f5;
