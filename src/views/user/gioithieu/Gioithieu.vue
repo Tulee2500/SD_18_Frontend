@@ -347,7 +347,7 @@
                       <img src="" alt="" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       <div class="absolute inset-0 bg-gradient-to-t from-red-600/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-1">Lê Anh Tú     </h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-1">Lê Anh Tú</h3>
                     <p class="text-sm text-gray-600 mb-3">Developer</p>
                     <div class="flex justify-center gap-3">
                       <a href="#" class="text-gray-400 hover:text-red-600 transition-colors">

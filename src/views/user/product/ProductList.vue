@@ -119,32 +119,31 @@
             >
               <!-- Product Image Container -->
               <div class="product-image-container">
-  <!-- Nếu có ảnh thì hiển thị ảnh -->
-  <div v-if="product.imgUrl" class="product-image-wrapper">
-    <img 
-      :src="product.imgUrl"
-      :alt="product.label"
-      class="product-image"
-      @error="handleImageError"
-    />
-  </div>
+                <!-- Nếu có ảnh thì hiển thị ảnh -->
+                <div v-if="product.imgUrl" class="product-image-wrapper">
+                  <img 
+                    :src="product.imgUrl"
+                    :alt="product.label"
+                    class="product-image"
+                    @error="handleImageError"
+                  />
+                </div>
 
-  <!-- Nếu không có ảnh thì hiển thị placeholder -->
-  <div v-else class="product-placeholder">
-    <svg viewBox="0 0 120 80" class="placeholder-icon">
-      <defs>
-        <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#e5e7eb"/>
-          <stop offset="50%" stop-color="#f3f4f6"/>
-          <stop offset="100%" stop-color="#e5e7eb"/>
-        </linearGradient>
-      </defs>
-      <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)"/>
-      <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db"/>
-    </svg>
-  </div>
+                <!-- Nếu không có ảnh thì hiển thị placeholder -->
+                <div v-else class="product-placeholder">
+                  <svg viewBox="0 0 120 80" class="placeholder-icon">
+                    <defs>
+                      <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#e5e7eb"/>
+                        <stop offset="50%" stop-color="#f3f4f6"/>
+                        <stop offset="100%" stop-color="#e5e7eb"/>
+                      </linearGradient>
+                    </defs>
+                    <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)"/>
+                    <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db"/>
+                  </svg>
+                </div>
 
-                
                 <!-- Product Badge -->
                 <div class="product-badge">
                   <span>Mới</span>
@@ -285,13 +284,14 @@ export default {
       }
     },
     
-   goToProductDetail(product) {
-  // Chuyển đến trang chi tiết với id của chi tiết sản phẩm đầu tiên
-  this.$router.push({
-    name: 'product',
-    params: { id: product.firstDetailId || product.id }
-  });
-},
+    goToProductDetail(product) {
+      // Chuyển đến trang chi tiết với id của chi tiết sản phẩm đầu tiên
+      this.$router.push({
+        name: 'product',
+        params: { id: product.firstDetailId || product.id }
+      });
+    },
+
     addToCart(product) {
       this.cartItems++;
       console.log('Added to cart:', product);
@@ -343,79 +343,79 @@ export default {
         
         console.log('Products API Response:', productsResponse.data);
         console.log('Details API Response:', detailsResponse.data);
-        const firstDetailMap = new Map();
-detailsResponse.data.forEach(detail => {
-  const productId = detail.sanPham?.id;
-  if (productId && !firstDetailMap.has(productId)) {
-    firstDetailMap.set(productId, detail.id); // lưu lại id của chi tiết đầu tiên
-  }
-});
-
+        
         if (!productsResponse.data || productsResponse.data.length === 0) {
           console.warn('No products data received from API');
           this.products = [];
           return;
         }
         
-        // Tạo map để lưu giá thấp nhất của mỗi sản phẩm
+        // Tạo map để lưu chi tiết đầu tiên, giá thấp nhất và hình ảnh của mỗi sản phẩm
+        const firstDetailMap = new Map();
         const priceMap = new Map();
         const imageMap = new Map();
         
-       // Trong methods fetchProducts()
-detailsResponse.data.forEach(detail => {
-  if (detail.sanPham?.id) {
-    const productId = detail.sanPham.id;
-    
-    // Xử lý giá
-    if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
-      priceMap.set(productId, {
-        giaBan: detail.giaBan,
-        giaGoc: detail.giaGoc
-      });
-    }
-    
-    // Xử lý hình ảnh giống như trong Product.vue
-    if (!imageMap.has(productId) && detail.hinhAnh) {
-      let imageUrl = '';
-      if (typeof detail.hinhAnh === 'object') {
-        imageUrl = detail.hinhAnh.duongDan || 
-                   detail.hinhAnh.url || 
-                   detail.hinhAnh.path || 
-                   detail.hinhAnh.link || 
-                   detail.hinhAnh.src || '';
-      } else if (typeof detail.hinhAnh === 'string') {
-        imageUrl = detail.hinhAnh;
-      }
-      
-      if (imageUrl && !imageUrl.startsWith('http')) {
-        imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-      }
-      
-      if (imageUrl) {
-        imageMap.set(productId, imageUrl);
-      }
-    }
-  }
-});
+        // Xử lý dữ liệu chi tiết sản phẩm
+        detailsResponse.data.forEach(detail => {
+          if (detail.sanPham?.id) {
+            const productId = detail.sanPham.id;
+            
+            // Lưu chi tiết đầu tiên của mỗi sản phẩm
+            if (!firstDetailMap.has(productId)) {
+              firstDetailMap.set(productId, detail.id);
+            }
+            
+            // Xử lý giá - lấy giá thấp nhất
+            if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
+              priceMap.set(productId, {
+                giaBan: detail.giaBan,
+                giaGoc: detail.giaGoc
+              });
+            }
+            
+            // Xử lý hình ảnh - lấy hình ảnh đầu tiên
+            if (!imageMap.has(productId) && detail.hinhAnh) {
+              let imageUrl = '';
+              if (typeof detail.hinhAnh === 'object') {
+                imageUrl = detail.hinhAnh.duongDan || 
+                           detail.hinhAnh.url || 
+                           detail.hinhAnh.path || 
+                           detail.hinhAnh.link || 
+                           detail.hinhAnh.src || '';
+              } else if (typeof detail.hinhAnh === 'string') {
+                imageUrl = detail.hinhAnh;
+              }
+              
+              if (imageUrl && !imageUrl.startsWith('http')) {
+                imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
+              }
+              
+              if (imageUrl) {
+                imageMap.set(productId, imageUrl);
+              }
+            }
+          }
+        });
         
-        // Map sản phẩm với giá từ chi tiết
+        // Map sản phẩm với thông tin từ chi tiết
         this.products = productsResponse.data.map((p, index) => {
           if (index < 3) {
             console.log(`Product ${index + 1} full data:`, p);
           }
           
-          // Lấy giá từ map
+          // Lấy thông tin từ các map
           const priceInfo = priceMap.get(p.id) || { giaBan: 0, giaGoc: 0 };
-          const imageUrl = imageMap.get(p.id) || `/images/product-${p.id}.jpg`;
+          const imageUrl = imageMap.get(p.id) || null;
+          const firstDetailId = firstDetailMap.get(p.id);
           
           const product = {
             id: p.id,
-            firstDetailId: firstDetailMap.get(p.id),
+            firstDetailId: firstDetailId, // ID của chi tiết đầu tiên để navigation
             imgUrl: imageUrl,
             label: p.tenSanPham || 'Sản phẩm không tên',
             price: priceInfo.giaBan,
             originalPrice: priceInfo.giaGoc,
-            rating: 4.5 + (Math.random() * 0.5),
+            rating: 4.5 + (Math.random() * 0.5), // Random rating từ 4.5-5.0
             brandId: p.thuongHieu?.id,
             brandName: p.thuongHieu?.tenThuongHieu || '',
             categoryId: p.danhMuc?.id,
@@ -438,6 +438,7 @@ detailsResponse.data.forEach(detail => {
         
         console.log('Total processed products:', this.products.length);
         console.log('Products with prices:', this.products.filter(p => p.price > 0).length);
+        console.log('Products with images:', this.products.filter(p => p.imgUrl).length);
         
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -450,6 +451,20 @@ detailsResponse.data.forEach(detail => {
       } finally {
         this.loading = false;
       }
+    },
+
+    // Method để get random products - sẽ được gọi từ Product.vue
+    getRandomProducts(excludeProductId = null, count = 4) {
+      let availableProducts = this.products;
+      
+      // Loại trừ sản phẩm hiện tại nếu có
+      if (excludeProductId) {
+        availableProducts = this.products.filter(p => p.id !== excludeProductId);
+      }
+      
+      // Shuffle và lấy số lượng cần thiết
+      const shuffled = availableProducts.sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, count);
     }
   },
 
@@ -461,9 +476,19 @@ detailsResponse.data.forEach(detail => {
   
   beforeUnmount() {
     console.log('ProductList component unmounting');
+  },
+
+  // Expose methods cho component khác có thể gọi
+  expose() {
+    return {
+      getRandomProducts: this.getRandomProducts,
+      products: this.products
+    };
   }
 }
-</script><style lang="scss" scoped>
+</script>
+
+<style lang="scss" scoped>
 .nike-complete-layout {
   font-family: 'Helvetica Neue', Arial, sans-serif;
   background-color: #f5f5f5;
@@ -513,7 +538,6 @@ detailsResponse.data.forEach(detail => {
   height: 24px;
   color: #FF6452;
 }
-
 
 .mobile-close-btn {
   display: none;
@@ -828,14 +852,9 @@ detailsResponse.data.forEach(detail => {
     transform: translateY(-12px) scale(1.02);
     box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
     
-   .product-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
-  transition: all 0.3s ease;
-}
-
+    .product-image {
+      transform: scale(1.05);
+    }
     
     .product-overlay {
       opacity: 1;
@@ -851,7 +870,7 @@ detailsResponse.data.forEach(detail => {
 
 .product-image-container {
   position: relative;
-  background: transparent; // bỏ nền
+  background: transparent;
   padding: 2.5rem;
   display: flex;
   justify-content: center;
@@ -859,6 +878,7 @@ detailsResponse.data.forEach(detail => {
   height: 280px;
   overflow: hidden;
 }
+
 .product-image-wrapper {
   width: 100%;
   height: 100%;

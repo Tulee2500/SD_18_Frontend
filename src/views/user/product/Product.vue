@@ -92,10 +92,10 @@
               </div>
               <h1 class="product-title">{{ productName }}</h1>
               <div class="product-subtitle">
-                <span class="brand-name" v-if="product.sanPham?.thuongHieu">
-                  {{ product.sanPham.thuongHieu.tenThuongHieu }}
+                <span class="brand-name" v-if="currentProduct.sanPham?.thuongHieu">
+                  {{ currentProduct.sanPham.thuongHieu.tenThuongHieu }}
                 </span>
-                <span class="product-code">Mã: {{ product.maChiTiet || 'N/A' }}</span>
+                <span class="product-code">Mã: {{ currentProduct.maChiTiet || 'N/A' }}</span>
               </div>
             </div>
             
@@ -123,9 +123,9 @@
               <div class="price-wrapper">
                 <div class="price-label">Giá bán</div>
                 <div class="price-content">
-                  <span class="current-price">{{ formatPrice(product.giaBan) }}₫</span>
-                  <span class="original-price" v-if="product.giaGoc">
-                    {{ formatPrice(product.giaGoc) }}₫
+                  <span class="current-price">{{ formatPrice(currentPrice) }}₫</span>
+                  <span class="original-price" v-if="originalPrice && originalPrice !== currentPrice">
+                    {{ formatPrice(originalPrice) }}₫
                   </span>
                   <span class="discount-percentage" v-if="discountPercent > 0">
                     -{{ discountPercent }}%
@@ -143,27 +143,47 @@
             <!-- Product Options -->
             <div class="product-options">
               <!-- Color Option -->
-              <div class="option-group" v-if="product.mauSac">
+              <div class="option-group" v-if="availableColors.length > 0">
                 <div class="option-header">
                   <span class="option-label">Màu sắc:</span>
-                  <span class="option-value">{{ product.mauSac.tenMauSac }}</span>
+                  <span class="option-value">{{ selectedColorName }}</span>
                 </div>
-                <div class="color-display">
-                  <div class="color-item selected">
+                <div class="color-options">
+                  <div 
+                    v-for="color in availableColors"
+                    :key="color.id"
+                    class="color-item"
+                    :class="{ selected: selectedColor === color.id }"
+                    @click="selectColor(color.id)"
+                  >
                     <div 
                       class="color-circle"
-                      :style="{ backgroundColor: getColorHex(product.mauSac.tenMauSac) }"
+                      :style="{ backgroundColor: getColorHex(color.name) }"
                     ></div>
-                    <span class="color-name">{{ product.mauSac.tenMauSac }}</span>
+                    <span class="color-name">{{ color.name }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- Size Option -->
-              <div class="option-group" v-if="product.kichCo">
+              <div class="option-group" v-if="availableSizes.length > 0">
                 <div class="option-header">
                   <span class="option-label">Kích cỡ:</span>
-                  <span class="option-value">{{ product.kichCo.tenKichCo }}</span>
+                  <span class="option-value">{{ selectedSizeName }}</span>
+                </div>
+                <div class="size-options">
+                  <div 
+                    v-for="size in availableSizes"
+                    :key="size.id"
+                    class="size-item"
+                    :class="{ 
+                      selected: selectedSize === size.id,
+                      disabled: !isVariantAvailable(selectedColor, size.id)
+                    }"
+                    @click="selectSize(size.id)"
+                  >
+                    <span class="size-name">{{ size.name }}</span>
+                  </div>
                 </div>
                 <div class="size-guide">
                   <button class="size-guide-btn">
@@ -176,7 +196,7 @@
               </div>
 
               <!-- Stock Status -->
-              <div class="stock-status" :class="{ 'in-stock': product.soLuong > 0 }">
+              <div class="stock-status" :class="{ 'in-stock': currentStock > 0 }">
                 <div class="stock-icon">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
@@ -185,7 +205,7 @@
                 <div class="stock-info">
                   <span class="stock-label">Tình trạng:</span>
                   <span class="stock-value">
-                    {{ product.soLuong > 0 ? `Còn hàng (${product.soLuong} sản phẩm)` : 'Hết hàng' }}
+                    {{ currentStock > 0 ? `Còn hàng (${currentStock} sản phẩm)` : 'Hết hàng' }}
                   </span>
                 </div>
               </div>
@@ -207,9 +227,9 @@
                     @input="validateQuantity"
                     class="qty-input"
                     min="1"
-                    :max="product.soLuong"
+                    :max="currentStock"
                   />
-                  <button class="qty-btn plus" @click="increaseQuantity" :disabled="quantity >= product.soLuong">
+                  <button class="qty-btn plus" @click="increaseQuantity" :disabled="quantity >= currentStock">
                     <svg viewBox="0 0 24 24" fill="currentColor">
                       <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                     </svg>
@@ -221,7 +241,7 @@
                 <button 
                   class="btn-add-cart"
                   @click="addToCart"
-                  :disabled="product.soLuong === 0"
+                  :disabled="currentStock === 0 || !selectedColor || !selectedSize"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
@@ -231,7 +251,7 @@
                 <button 
                   class="btn-buy-now"
                   @click="buyNow"
-                  :disabled="product.soLuong === 0"
+                  :disabled="currentStock === 0 || !selectedColor || !selectedSize"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM10 17l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
@@ -314,19 +334,19 @@
             <div v-if="activeTab === 'description'" class="tab-panel">
               <h3>Mô tả sản phẩm</h3>
               <div class="product-description">
-                <p>{{ productName }} - Sản phẩm chất lượng cao từ thương hiệu {{ product.sanPham?.thuongHieu?.tenThuongHieu || 'uy tín' }}.</p>
+                <p>{{ productName }} - Sản phẩm chất lượng cao từ thương hiệu {{ currentProduct.sanPham?.thuongHieu?.tenThuongHieu || 'uy tín' }}.</p>
                 <ul class="feature-list">
-                  <li v-if="product.sanPham?.chatLieu">
-                    <strong>Chất liệu:</strong> {{ product.sanPham.chatLieu.tenChatLieu }}
+                  <li v-if="currentProduct.sanPham?.chatLieu">
+                    <strong>Chất liệu:</strong> {{ currentProduct.sanPham.chatLieu.tenChatLieu }}
                   </li>
-                  <li v-if="product.sanPham?.deGiay">
-                    <strong>Đế giày:</strong> {{ product.sanPham.deGiay.loaiDe }}
+                  <li v-if="currentProduct.sanPham?.deGiay">
+                    <strong>Đế giày:</strong> {{ currentProduct.sanPham.deGiay.loaiDe }}
                   </li>
-                  <li v-if="product.mauSac">
-                    <strong>Màu sắc:</strong> {{ product.mauSac.tenMauSac }}
+                  <li v-if="selectedColorName">
+                    <strong>Màu sắc:</strong> {{ selectedColorName }}
                   </li>
-                  <li v-if="product.kichCo">
-                    <strong>Size:</strong> {{ product.kichCo.tenKichCo }}
+                  <li v-if="selectedSizeName">
+                    <strong>Size:</strong> {{ selectedSizeName }}
                   </li>
                 </ul>
               </div>
@@ -337,25 +357,25 @@
               <h3>Thông số kỹ thuật</h3>
               <table class="specs-table">
                 <tbody>
-                  <tr v-if="product.sanPham?.thuongHieu">
+                  <tr v-if="currentProduct.sanPham?.thuongHieu">
                     <td>Thương hiệu</td>
-                    <td>{{ product.sanPham.thuongHieu.tenThuongHieu }}</td>
+                    <td>{{ currentProduct.sanPham.thuongHieu.tenThuongHieu }}</td>
                   </tr>
-                  <tr v-if="product.sanPham?.danhMuc">
+                  <tr v-if="currentProduct.sanPham?.danhMuc">
                     <td>Danh mục</td>
-                    <td>{{ product.sanPham.danhMuc.tenDanhMuc }}</td>
+                    <td>{{ currentProduct.sanPham.danhMuc.tenDanhMuc }}</td>
                   </tr>
-                  <tr v-if="product.sanPham?.chatLieu">
+                  <tr v-if="currentProduct.sanPham?.chatLieu">
                     <td>Chất liệu</td>
-                    <td>{{ product.sanPham.chatLieu.tenChatLieu }}</td>
+                    <td>{{ currentProduct.sanPham.chatLieu.tenChatLieu }}</td>
                   </tr>
-                  <tr v-if="product.sanPham?.deGiay">
+                  <tr v-if="currentProduct.sanPham?.deGiay">
                     <td>Loại đế</td>
-                    <td>{{ product.sanPham.deGiay.loaiDe }}</td>
+                    <td>{{ currentProduct.sanPham.deGiay.loaiDe }}</td>
                   </tr>
                   <tr>
                     <td>Mã sản phẩm</td>
-                    <td>{{ product.maChiTiet || 'N/A' }}</td>
+                    <td>{{ currentProduct.maChiTiet || 'N/A' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -394,7 +414,7 @@
               <div 
                  v-for="similarProduct in similarProducts"
                 :key="similarProduct.id"
-                @click="goToProduct(similarProduct.id)"
+                @click="goToProduct(similarProduct.firstDetailId)"
                 class="similar-product-card"
               >
                 <div class="product-image-wrapper">
@@ -477,11 +497,20 @@ export default {
   data() {
     return {
       product: null,
+      currentProduct: null, // Chi tiết hiện tại được chọn
+      allProductDetails: [], // Tất cả chi tiết của sản phẩm
       productImages: [],
       selectedImageIndex: 0,
       quantity: 1,
       loading: true,
       similarProducts: [],
+      
+      // Lựa chọn màu sắc và kích cỡ
+      availableColors: [],
+      availableSizes: [],
+      selectedColor: null,
+      selectedSize: null,
+      
       autoSlideInterval: null,
       isPaused: false,
       progressWidth: 0,
@@ -504,9 +533,26 @@ export default {
     productName() {
       return this.product?.sanPham?.tenSanPham || 'Sản phẩm không tên';
     },
+    selectedColorName() {
+      const color = this.availableColors.find(c => c.id === this.selectedColor);
+      return color ? color.name : '';
+    },
+    selectedSizeName() {
+      const size = this.availableSizes.find(s => s.id === this.selectedSize);
+      return size ? size.name : '';
+    },
+    currentPrice() {
+      return this.currentProduct?.giaBan || 0;
+    },
+    originalPrice() {
+      return this.currentProduct?.giaGoc || 0;
+    },
+    currentStock() {
+      return this.currentProduct?.soLuong || 0;
+    },
     discountPercent() {
-      if (!this.product?.giaGoc || !this.product?.giaBan) return 0;
-      return Math.round((1 - this.product.giaBan / this.product.giaGoc) * 100);
+      if (!this.originalPrice || !this.currentPrice) return 0;
+      return Math.round((1 - this.currentPrice / this.originalPrice) * 100);
     }
   },
   methods: {
@@ -516,8 +562,7 @@ export default {
         this.autoSlideInterval = setInterval(() => {
           this.nextImage();
         }, 4000);
-        
-        // Progress bar animation
+      
         this.progressInterval = setInterval(() => {
           if (this.progressWidth < 100) {
             this.progressWidth += 2.5;
@@ -577,94 +622,220 @@ export default {
       // Implement zoom functionality
       console.log('Open zoom modal');
     },
-    
-async fetchProduct() {
-  try {
-    this.loading = true;
-    
-    // Sử dụng this.productId từ computed property
-    const detailResponse = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${this.productId}`);
-    
-    if (!detailResponse.data) {
-      throw new Error('Không tìm thấy sản phẩm');
-    }
-    
-    const detail = detailResponse.data;
-    
-    const allDetailsResponse = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
-    const relatedDetails = allDetailsResponse.data.filter(d => 
-      d.sanPham?.id === detail.sanPham?.id
-    );
-    
-    this.product = detail;
-    
-    // Xử lý hình ảnh
-    this.productImages = relatedDetails.map(d => {
-      let imageUrl = '';
-      if (d.hinhAnh) {
-        if (typeof d.hinhAnh === 'object') {
-          imageUrl = d.hinhAnh.duongDan || d.hinhAnh.url || d.hinhAnh.path || '';
-        } else if (typeof d.hinhAnh === 'string') {
-          imageUrl = d.hinhAnh;
-        }
-      }
+
+    // Chọn màu sắc
+    selectColor(colorId) {
+      this.selectedColor = colorId;
+      this.updateCurrentProduct();
+      this.updateImages();
+    },
+
+    // Chọn kích cỡ
+    selectSize(sizeId) {
+      if (!this.isVariantAvailable(this.selectedColor, sizeId)) return;
+      this.selectedSize = sizeId;
+      this.updateCurrentProduct();
+    },
+
+    // Kiểm tra variant có sẵn không
+    isVariantAvailable(colorId, sizeId) {
+      return this.allProductDetails.some(detail => 
+        detail.mauSac?.id === colorId && 
+        detail.kichCo?.id === sizeId &&
+        detail.soLuong > 0
+      );
+    },
+
+    // Cập nhật sản phẩm hiện tại dựa trên lựa chọn
+    updateCurrentProduct() {
+      if (!this.selectedColor || !this.selectedSize) return;
       
-      if (imageUrl && !imageUrl.startsWith('http')) {
-        imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-      }
+      const variant = this.allProductDetails.find(detail => 
+        detail.mauSac?.id === this.selectedColor && 
+        detail.kichCo?.id === this.selectedSize
+      );
       
-      return imageUrl || '/placeholder-shoe.png';
-    });
-    
-    this.productImages = [...new Set(this.productImages)].slice(0, 4);
-    
-    if (this.productImages.length === 0) {
-      this.productImages = ['/placeholder-shoe.png'];
-    }
-    
-    // Fetch sản phẩm tương tự
-    await this.fetchSimilarProducts();
-    
-  } catch (error) {
-    console.error('Error fetching product:', error);
-    this.product = null;
-  } finally {
-    this.loading = false;
-  }
-},    
-    async fetchSimilarProducts() {
-      try {
-        const response = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
-        const allProducts = response.data.map(p => {
+      if (variant) {
+        this.currentProduct = variant;
+      }
+    },
+
+    // Cập nhật hình ảnh dựa trên màu sắc được chọn
+    updateImages() {
+      if (!this.selectedColor) return;
+      
+      // Lấy hình ảnh của màu được chọn
+      const colorVariants = this.allProductDetails.filter(detail => 
+        detail.mauSac?.id === this.selectedColor
+      );
+      
+      const newImages = [];
+      
+      colorVariants.forEach(detail => {
+        if (detail.hinhAnh) {
           let imageUrl = '';
-          if (p.hinhAnh) {
-            if (typeof p.hinhAnh === 'object') {
-              imageUrl = p.hinhAnh.url || p.hinhAnh.duongDan || p.hinhAnh.path || '';
-            } else if (typeof p.hinhAnh === 'string') {
-              imageUrl = p.hinhAnh;
-            }
+          if (typeof detail.hinhAnh === 'object') {
+            imageUrl = detail.hinhAnh.duongDan || detail.hinhAnh.url || detail.hinhAnh.path || '';
+          } else if (typeof detail.hinhAnh === 'string') {
+            imageUrl = detail.hinhAnh;
           }
           
           if (imageUrl && !imageUrl.startsWith('http')) {
             imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
           }
           
-          return {
-            id: p.id,
-            imgUrl: imageUrl,
-            label: p.sanPham?.tenSanPham || 'Sản phẩm',
-            price: p.giaBan || 0,
-            categoryId: p.sanPham?.danhMuc?.id
-          };
+          if (imageUrl) {
+            newImages.push(imageUrl);
+          }
+        }
+      });
+      
+      if (newImages.length > 0) {
+        this.productImages = [...new Set(newImages)]; // Loại bỏ duplicate
+        this.selectedImageIndex = 0;
+      }
+    },
+    
+    async fetchProduct() {
+      try {
+        this.loading = true;
+        
+        // Lấy chi tiết sản phẩm hiện tại
+        const detailResponse = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${this.productId}`);
+        
+        if (!detailResponse.data) {
+          throw new Error('Không tìm thấy sản phẩm');
+        }
+        
+        const currentDetail = detailResponse.data;
+        
+        // Lấy tất cả chi tiết của cùng sản phẩm
+        const allDetailsResponse = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
+        const relatedDetails = allDetailsResponse.data.filter(d => 
+          d.sanPham?.id === currentDetail.sanPham?.id
+        );
+        
+        this.product = currentDetail;
+        this.allProductDetails = relatedDetails;
+        
+        // Lấy danh sách màu sắc và kích cỡ có sẵn
+        this.availableColors = [...new Map(relatedDetails
+          .filter(d => d.mauSac)
+          .map(d => [d.mauSac.id, {
+            id: d.mauSac.id,
+            name: d.mauSac.tenMauSac
+          }])
+        ).values()];
+        
+        this.availableSizes = [...new Map(relatedDetails
+          .filter(d => d.kichCo)
+          .map(d => [d.kichCo.id, {
+            id: d.kichCo.id,
+            name: d.kichCo.tenKichCo
+          }])
+        ).values()];
+        
+        // Set mặc định
+        this.selectedColor = currentDetail.mauSac?.id || (this.availableColors[0]?.id);
+        this.selectedSize = currentDetail.kichCo?.id || (this.availableSizes[0]?.id);
+        this.currentProduct = currentDetail;
+        
+        // Xử lý hình ảnh
+        this.updateImages();
+        
+        // Nếu không có hình ảnh từ màu sắc hiện tại, dùng hình mặc định
+        if (this.productImages.length === 0) {
+          this.productImages = ['/placeholder-shoe.png'];
+        }
+        
+        // Fetch sản phẩm tương tự
+        await this.fetchSimilarProducts();
+        
+      } catch (error) {
+        console.error('Error fetching product:', error);
+        this.product = null;
+      } finally {
+        this.loading = false;
+      }
+    },
+    
+    async fetchSimilarProducts() {
+      try {
+        // Lấy tất cả sản phẩm từ ProductList API
+        const [productsResponse, detailsResponse] = await Promise.all([
+          axios.get('http://localhost:8080/api/san-pham'),
+          axios.get('http://localhost:8080/api/san-pham-chi-tiet')
+        ]);
+        
+        // Tạo map để lưu chi tiết đầu tiên và hình ảnh của mỗi sản phẩm
+        const firstDetailMap = new Map();
+        const imageMap = new Map();
+        const priceMap = new Map();
+        
+        detailsResponse.data.forEach(detail => {
+          const productId = detail.sanPham?.id;
+          if (productId) {
+            // Lưu chi tiết đầu tiên
+            if (!firstDetailMap.has(productId)) {
+              firstDetailMap.set(productId, detail.id);
+            }
+            
+            // Lưu giá thấp nhất
+            if (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId)) {
+              priceMap.set(productId, detail.giaBan);
+            }
+            
+            // Lưu hình ảnh đầu tiên
+            if (!imageMap.has(productId) && detail.hinhAnh) {
+              let imageUrl = '';
+              if (typeof detail.hinhAnh === 'object') {
+                imageUrl = detail.hinhAnh.duongDan || 
+                           detail.hinhAnh.url || 
+                           detail.hinhAnh.path || '';
+              } else if (typeof detail.hinhAnh === 'string') {
+                imageUrl = detail.hinhAnh;
+              }
+              
+              if (imageUrl && !imageUrl.startsWith('http')) {
+                imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
+              }
+              
+              if (imageUrl) {
+                imageMap.set(productId, imageUrl);
+              }
+            }
+          }
         });
         
+        // Chuyển đổi thành format cho similar products
+        const allProducts = productsResponse.data
+          .filter(p => p.id !== this.product?.sanPham?.id) // Loại bỏ sản phẩm hiện tại
+          .map(p => ({
+            id: p.id,
+            firstDetailId: firstDetailMap.get(p.id),
+            imgUrl: imageMap.get(p.id) || '/placeholder-shoe.png',
+            label: p.tenSanPham || 'Sản phẩm',
+            price: priceMap.get(p.id) || 0,
+            categoryId: p.danhMuc?.id
+          }));
+        
+        // Lọc sản phẩm cùng danh mục trước
         const currentCategoryId = this.product?.sanPham?.danhMuc?.id;
-        this.similarProducts = allProducts
-          .filter(p => p.id !== parseInt(this.productId) && 
-                      (!currentCategoryId || p.categoryId === currentCategoryId))
-          .slice(0, 4);
+        let sameCategoryProducts = allProducts.filter(p => p.categoryId === currentCategoryId);
+        
+        // Nếu không đủ 4 sản phẩm cùng danh mục, lấy thêm từ danh mục khác
+        if (sameCategoryProducts.length < 4) {
+          const otherProducts = allProducts.filter(p => p.categoryId !== currentCategoryId);
+          sameCategoryProducts = [...sameCategoryProducts, ...otherProducts];
+        }
+        
+        // Shuffle và lấy 4 sản phẩm ngẫu nhiên
+        const shuffled = sameCategoryProducts.sort(() => 0.5 - Math.random());
+        this.similarProducts = shuffled.slice(0, 4);
+        
       } catch (error) {
         console.error('Error fetching similar products:', error);
+        this.similarProducts = [];
       }
     },
     
@@ -701,7 +872,7 @@ async fetchProduct() {
     },
     
     increaseQuantity() {
-      if (this.quantity < this.product.soLuong) {
+      if (this.quantity < this.currentStock) {
         this.quantity++;
       }
     },
@@ -709,20 +880,25 @@ async fetchProduct() {
     validateQuantity() {
       if (this.quantity < 1) {
         this.quantity = 1;
-      } else if (this.quantity > this.product.soLuong) {
-        this.quantity = this.product.soLuong;
+      } else if (this.quantity > this.currentStock) {
+        this.quantity = this.currentStock;
       }
     },
     
     addToCart() {
+      if (!this.selectedColor || !this.selectedSize) {
+        alert('Vui lòng chọn màu sắc và kích cỡ!');
+        return;
+      }
+      
       const cartItem = {
-        id: this.product.id,
+        id: this.currentProduct.id,
         name: this.productName,
-        price: this.product.giaBan,
+        price: this.currentPrice,
         quantity: this.quantity,
         image: this.selectedImage,
-        size: this.product.kichCo?.tenKichCo,
-        color: this.product.mauSac?.tenMauSac
+        size: this.selectedSizeName,
+        color: this.selectedColorName
       };
       
       console.log('Adding to cart:', cartItem);
@@ -735,18 +911,18 @@ async fetchProduct() {
       this.$router.push('/checkout');
     },
     
-    goToProduct(productId) {
-  // Scroll lên đầu trang
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  
-  // Reset các state
-  this.selectedImageIndex = 0;
-  this.quantity = 1;
-  this.progressWidth = 0;
-  
-  // Điều hướng đến sản phẩm mới
-  this.$router.push(`/product/${productId}`);
-},
+    goToProduct(productDetailId) {
+      // Scroll lên đầu trang
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Reset các state
+      this.selectedImageIndex = 0;
+      this.quantity = 1;
+      this.progressWidth = 0;
+      
+      // Điều hướng đến sản phẩm mới
+      this.$router.push(`/product/${productDetailId}`);
+    },
     
     goBack() {
       this.$router.push('/products');
@@ -768,27 +944,29 @@ async fetchProduct() {
     this.stopAutoSlide();
   },
   watch: {
-  '$route.params.id': {
-    handler(newId) {
-      if (newId) {
-        // Reset state
-        this.selectedImageIndex = 0;
-        this.quantity = 1;
-        this.progressWidth = 0;
-        
-        // Stop auto slide cũ
-        this.stopAutoSlide();
-        
-        // Fetch dữ liệu mới
-        this.fetchProduct().then(() => {
-          // Start auto slide sau khi load xong
-          this.startAutoSlide();
-        });
-      }
-    },
-    immediate: true
-  }
-},
+    '$route.params.id': {
+      handler(newId) {
+        if (newId) {
+          // Reset state
+          this.selectedImageIndex = 0;
+          this.quantity = 1;
+          this.progressWidth = 0;
+          this.selectedColor = null;
+          this.selectedSize = null;
+          
+          // Stop auto slide cũ
+          this.stopAutoSlide();
+          
+          // Fetch dữ liệu mới
+          this.fetchProduct().then(() => {
+            // Start auto slide sau khi load xong
+            this.startAutoSlide();
+          });
+        }
+      },
+      immediate: true
+    }
+  },
 };
 </script>
 
@@ -1245,9 +1423,11 @@ async fetchProduct() {
   font-weight: 700;
 }
 
-.color-display {
+/* Color Options */
+.color-options {
   display: flex;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .color-item {
@@ -1266,6 +1446,10 @@ async fetchProduct() {
   background: #fef2f2;
 }
 
+.color-item:hover {
+  border-color: #FF6452;
+}
+
 .color-circle {
   width: 24px;
   height: 24px;
@@ -1276,6 +1460,43 @@ async fetchProduct() {
 .color-name {
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+/* Size Options */
+.size-options {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.size-item {
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 60px;
+  text-align: center;
+}
+
+.size-item.selected {
+  border-color: #FF6452;
+  background: #fef2f2;
+}
+
+.size-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f3f4f6;
+}
+
+.size-item:hover:not(.disabled) {
+  border-color: #FF6452;
+}
+
+.size-name {
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .size-guide {
@@ -2037,6 +2258,11 @@ async fetchProduct() {
   .similar-products-section {
     padding: 2rem 1.5rem;
   }
+
+  .color-options,
+  .size-options {
+    gap: 0.5rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -2103,5 +2329,15 @@ async fetchProduct() {
     align-items: flex-start;
     gap: 1rem;
   }
+
+  .color-options {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .size-options {
+    justify-content: flex-start;
+  }
 }
 </style>
+
