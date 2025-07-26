@@ -52,7 +52,7 @@
             <Column field="tenKhuyenMai" header="Tên Khuyến Mãi" sortable style="min-width: 16rem" />
             <Column field="giaTri" header="Giá Trị Giảm" sortable style="width: 12rem">
                 <template #body="slotProps">
-                    <span class="font-bold text-red-600">{{ slotProps.data.giaTri.toFixed(0) }}%</span>
+                    <span class="font-bold text-red-600">{{ formatPercentage(slotProps.data.giaTri) }}%</span>
                 </template>
             </Column>
             <Column field="soLuongSanPham" header="Sản Phẩm" sortable style="width: 10rem">
@@ -75,9 +75,12 @@
             </Column>
             <Column field="trangThai" header="Trạng Thái" sortable style="width: 12rem">
                 <template #body="slotProps">
-                    <Tag :value="slotProps.data.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'" :severity="slotProps.data.trangThai === 1 ? 'success' : 'danger'">
-                        <i :class="slotProps.data.trangThai === 1 ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i>
-                        {{ slotProps.data.trangThai === 1 ? 'Còn hạn' : 'Hết hạn' }}
+                    <Tag 
+                        :value="getPromotionStatusText(slotProps.data)" 
+                        :severity="getPromotionStatusSeverity(slotProps.data)"
+                    >
+                        <i :class="getPromotionStatusIcon(slotProps.data)" class="mr-1"></i>
+                        {{ getPromotionStatusText(slotProps.data) }}
                     </Tag>
                 </template>
             </Column>
@@ -85,10 +88,27 @@
                 <template #body="slotProps">
                     <div class="flex justify-between gap-1">
                         <Button icon="pi pi-eye" outlined rounded size="small" severity="info" @click="viewPromotionProducts(slotProps.data)" title="Xem sản phẩm" />
-                        <Button icon="pi pi-plus" outlined rounded size="small" severity="warning" @click="openApplyProductsDialog(slotProps.data)" title="Áp dụng sản phẩm" />
+                        <Button 
+                            icon="pi pi-plus" 
+                            outlined 
+                            rounded 
+                            size="small" 
+                            severity="warning" 
+                            @click="openApplyProductsDialog(slotProps.data)" 
+                            title="Áp dụng sản phẩm"
+                            :disabled="getPromotionStatus(slotProps.data) !== 'active'"
+                        />
                         <Button icon="pi pi-pencil" outlined rounded size="small" @click="editKhuyenMai(slotProps.data)" title="Chỉnh sửa" />
                         <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteKhuyenMai(slotProps.data)" title="Xóa" />
-                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" :title="slotProps.data.trangThai === 1 ? 'Vô hiệu hóa' : 'Kích hoạt'" />
+                        <Button 
+                            icon="pi pi-refresh" 
+                            outlined 
+                            rounded 
+                            severity="secondary" 
+                            size="small" 
+                            @click="changeStatus(slotProps.data)" 
+                            :title="slotProps.data.trangThai === 1 ? 'Vô hiệu hóa' : 'Kích hoạt'"
+                        />
                     </div>
                 </template>
             </Column>
@@ -115,7 +135,17 @@
                 </div>
                 <div>
                     <label for="giaTri" class="mb-3 block font-bold">Giá Trị Giảm (%)</label>
-                    <InputText id="giaTri" v-model.number="khuyenMai.giaTri" :min="0" :max="100" suffix="%" fluid :invalid="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" />
+                    <InputNumber 
+                        id="giaTri" 
+                        v-model="khuyenMai.giaTri" 
+                        :min="0" 
+                        :max="100" 
+                        suffix="%" 
+                        fluid 
+                        :invalid="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)"
+                        :minFractionDigits="0"
+                        :maxFractionDigits="2"
+                    />
                     <small v-if="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" class="text-red-500">Giá trị giảm phải lớn hơn 0.</small>
                     <!-- <small class="text-gray-500">Nhập số từ 1-100 (ví dụ: 15 = 15%)</small> -->
                 </div>
@@ -131,8 +161,9 @@
                     <small v-if="submitted && isEndDateBeforeStartDate" class="text-red-500">Ngày kết thúc phải sau ngày bắt đầu.</small>
                 </div>
                 <div>
-                    <label for="trangThai" class="mb-3 block font-bold">Trạng Thái</label>
+                    <label for="trangThai" class="mb-3 block font-bold">Trạng Thái Hoạt Động</label>
                     <Select id="trangThai" v-model="khuyenMai.trangThai" :options="statusOptionsForForm" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
+                    <small class="text-gray-500">Trạng thái này chỉ là bật/tắt khuyến mãi, không phụ thuộc vào thời gian</small>
                 </div>
             </div>
             <template #footer>
@@ -150,8 +181,12 @@
                     <div class="flex flex-wrap items-center gap-4">
                         <Tag :value="selectedPromotionForApply?.maKhuyenMai" severity="secondary" />
                         <span class="font-medium">{{ selectedPromotionForApply?.tenKhuyenMai }}</span>
-                        <span class="font-bold text-red-600"> Giảm {{ selectedPromotionForApply ? selectedPromotionForApply.giaTri.toFixed(0) : 0 }}% </span>
+                        <span class="font-bold text-red-600"> Giảm {{ formatPercentage(selectedPromotionForApply?.giaTri) }}% </span>
                         <Tag :value="`${selectedProductsForApply?.length || 0} sản phẩm đã chọn`" severity="success" />
+                        <Tag 
+                            :value="getPromotionStatusText(selectedPromotionForApply)" 
+                            :severity="getPromotionStatusSeverity(selectedPromotionForApply)"
+                        />
                     </div>
                 </div>
 
@@ -212,7 +247,7 @@
                                 <Tag :value="slotProps.data.kichCo?.tenKichCo" severity="info" />
                             </template>
                         </Column>
-                        <Column field="soLuong" header="Tồn Kho" style="width: 100px" sortable>
+                        <Column field="soLuong" header="Số lượng" style="width: 100px" sortable>
                             <template #body="slotProps">
                                 <Tag :value="slotProps.data.soLuong" :severity="slotProps.data.soLuong > 10 ? 'success' : slotProps.data.soLuong > 0 ? 'warning' : 'danger'" />
                             </template>
@@ -225,14 +260,14 @@
                         <Column header="Giá Sau KM" style="width: 130px">
                             <template #body="slotProps">
                                 <span class="font-bold text-red-600">
-                                    {{ formatCurrency(slotProps.data.giaGoc * (1 - (selectedPromotionForApply?.giaTri || 0) / 100)) }}
+                                    {{ formatCurrency(calculateDiscountedPrice(slotProps.data.giaGoc, selectedPromotionForApply?.giaTri)) }}
                                 </span>
                             </template>
                         </Column>
                         <Column header="Tiết Kiệm" style="width: 130px">
                             <template #body="slotProps">
                                 <span class="font-bold text-green-600">
-                                    {{ formatCurrency((slotProps.data.giaGoc * (selectedPromotionForApply?.giaTri || 0)) / 100) }}
+                                    {{ formatCurrency(calculateSavings(slotProps.data.giaGoc, selectedPromotionForApply?.giaTri)) }}
                                 </span>
                             </template>
                         </Column>
@@ -256,7 +291,13 @@
                     </span>
                     <div class="flex gap-2">
                         <Button label="Hủy" icon="pi pi-times" text @click="applyProductsDialog = false" />
-                        <Button label="Áp Dụng Khuyến Mãi" icon="pi pi-check" @click="applyPromotionToProducts" :disabled="!selectedProductsForApply || selectedProductsForApply.length === 0" :loading="isApplyingPromotion" />
+                        <Button 
+                            label="Áp Dụng Khuyến Mãi" 
+                            icon="pi pi-check" 
+                            @click="applyPromotionToProducts" 
+                            :disabled="!selectedProductsForApply || selectedProductsForApply.length === 0 || getPromotionStatus(selectedPromotionForApply) !== 'active'" 
+                            :loading="isApplyingPromotion" 
+                        />
                     </div>
                 </div>
             </template>
@@ -271,9 +312,12 @@
                     <div class="flex flex-wrap items-center gap-4">
                         <Tag :value="selectedPromotionForView?.maKhuyenMai" severity="secondary" />
                         <span class="font-medium">{{ selectedPromotionForView?.tenKhuyenMai }}</span>
-                        <span class="font-bold text-red-600"> Giảm {{ selectedPromotionForView ? selectedPromotionForView.giaTri.toFixed(0) : 0 }}% </span>
+                        <span class="font-bold text-red-600"> Giảm {{ formatPercentage(selectedPromotionForView?.giaTri) }}% </span>
                         <Tag :value="`${promotionProducts.length} sản phẩm`" severity="info" />
-                        <Tag :value="selectedPromotionForView?.trangThai === 1 ? 'Đang hoạt động' : 'Đã dừng'" :severity="selectedPromotionForView?.trangThai === 1 ? 'success' : 'danger'" />
+                        <Tag 
+                            :value="getPromotionStatusText(selectedPromotionForView)" 
+                            :severity="getPromotionStatusSeverity(selectedPromotionForView)"
+                        />
                     </div>
                 </div>
 
@@ -338,7 +382,7 @@
                                 <Tag :value="slotProps.data.chiTietSanPham.kichCo?.tenKichCo" severity="info" />
                             </template>
                         </Column>
-                        <Column field="chiTietSanPham.soLuong" header="Tồn Kho" style="width: 100px">
+                        <Column field="chiTietSanPham.soLuong" header="Số lượng" style="width: 100px">
                             <template #body="slotProps">
                                 <Tag :value="slotProps.data.chiTietSanPham.soLuong" :severity="slotProps.data.chiTietSanPham.soLuong > 10 ? 'success' : slotProps.data.chiTietSanPham.soLuong > 0 ? 'warning' : 'danger'" />
                             </template>
@@ -377,7 +421,7 @@
                                 <i class="pi pi-shopping-bag mb-4 text-6xl text-gray-400"></i>
                                 <h5 class="mb-2 text-gray-600">Chưa có sản phẩm nào được áp dụng</h5>
                                 <p class="mb-4 text-gray-500">Khuyến mãi này chưa được áp dụng cho sản phẩm nào.</p>
-                                <Button label="Áp Dụng Sản Phẩm Ngay" icon="pi pi-plus" @click="openApplyProductsFromView" />
+                                <Button label="Áp Dụng Sản Phẩm Ngay" icon="pi pi-plus" @click="openApplyProductsFromView" :disabled="getPromotionStatus(selectedPromotionForView) !== 'active'" />
                             </div>
                         </template>
                     </DataTable>
@@ -390,7 +434,13 @@
                     </div>
                     <div class="flex gap-2">
                         <Button label="Đóng" icon="pi pi-times" @click="viewProductsDialog = false" />
-                        <Button label="Áp Dụng Thêm Sản Phẩm" icon="pi pi-plus" @click="openApplyProductsFromView" severity="secondary" />
+                        <Button 
+                            label="Áp Dụng Thêm Sản Phẩm" 
+                            icon="pi pi-plus" 
+                            @click="openApplyProductsFromView" 
+                            severity="secondary"
+                            :disabled="getPromotionStatus(selectedPromotionForView) !== 'active'"
+                        />
                     </div>
                 </div>
             </template>
@@ -458,7 +508,7 @@
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
-import { InputText } from 'primevue';
+import { InputText, InputNumber } from 'primevue';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
 
@@ -500,25 +550,116 @@ let searchTimeout = null;
 
 const statusOptions = ref([
     { label: 'Tất cả trạng thái', value: '' },
-    { label: 'Còn hạn', value: 1 },
-    { label: 'Hết hạn', value: 0 }
+    { label: 'Chưa diễn ra', value: 'pending' },
+    { label: 'Đang diễn ra', value: 'active' },
+    { label: 'Đã hết hạn', value: 'expired' },
+    { label: 'Đã vô hiệu hóa', value: 'disabled' }
 ]);
 
 const statusOptionsForForm = ref([
-    { label: 'Còn hạn', value: 1 },
-    { label: 'Hết hạn', value: 0 }
+    { label: 'Hoạt động', value: 1 },
+    { label: 'Vô hiệu hóa', value: 0 }
 ]);
 
 onMounted(() => {
     fetchData();
 });
 
+// Helper functions for formatting and calculations
+function formatPercentage(value) {
+    if (value == null || value === undefined || isNaN(value)) {
+        return '0';
+    }
+    return Number(value).toFixed(1);
+}
+
+function calculateDiscountedPrice(originalPrice, discountPercent) {
+    if (!originalPrice || !discountPercent) return originalPrice || 0;
+    return originalPrice * (1 - discountPercent / 100);
+}
+
+function calculateSavings(originalPrice, discountPercent) {
+    if (!originalPrice || !discountPercent) return 0;
+    return originalPrice * (discountPercent / 100);
+}
+
+// Helper functions for promotion status based on dates
+function getPromotionStatus(promotion) {
+    if (!promotion) return 'disabled';
+    
+    // If manually disabled
+    if (promotion.trangThai === 0) return 'disabled';
+    
+    const now = new Date();
+    const startDate = new Date(promotion.ngayBatDau);
+    const endDate = new Date(promotion.ngayKetThuc);
+    
+    if (now < startDate) {
+        return 'pending'; // Chưa diễn ra
+    } else if (now >= startDate && now <= endDate) {
+        return 'active'; // Đang diễn ra
+    } else {
+        return 'expired'; // Đã hết hạn
+    }
+}
+
+function getPromotionStatusText(promotion) {
+    const status = getPromotionStatus(promotion);
+    switch (status) {
+        case 'pending':
+            return 'Chưa diễn ra';
+        case 'active':
+            return 'Đang diễn ra';
+        case 'expired':
+            return 'Đã hết hạn';
+        case 'disabled':
+            return 'Đã vô hiệu hóa';
+        default:
+            return 'Không xác định';
+    }
+}
+
+function getPromotionStatusSeverity(promotion) {
+    const status = getPromotionStatus(promotion);
+    switch (status) {
+        case 'pending':
+            return 'info';
+        case 'active':
+            return 'success';
+        case 'expired':
+            return 'danger';
+        case 'disabled':
+            return 'secondary';
+        default:
+            return 'secondary';
+    }
+}
+
+function getPromotionStatusIcon(promotion) {
+    const status = getPromotionStatus(promotion);
+    switch (status) {
+        case 'pending':
+            return 'pi pi-clock';
+        case 'active':
+            return 'pi pi-check-circle';
+        case 'expired':
+            return 'pi pi-times-circle';
+        case 'disabled':
+            return 'pi pi-ban';
+        default:
+            return 'pi pi-question-circle';
+    }
+}
+
 // Computed properties
 const filteredKhuyenMai = computed(() => {
     let filtered = khuyenMais.value;
 
     if (statusFilter.value !== '') {
-        filtered = filtered.filter((km) => km.trangThai === parseInt(statusFilter.value));
+        filtered = filtered.filter((km) => {
+            const status = getPromotionStatus(km);
+            return status === statusFilter.value;
+        });
     }
 
     return filtered;
@@ -567,6 +708,31 @@ async function fetchData() {
 
 // Apply products functions
 async function openApplyProductsDialog(promotion) {
+    const status = getPromotionStatus(promotion);
+    if (status !== 'active') {
+        let message = '';
+        switch (status) {
+            case 'pending':
+                message = 'Khuyến mãi chưa bắt đầu, không thể áp dụng cho sản phẩm';
+                break;
+            case 'expired':
+                message = 'Khuyến mãi đã hết hạn, không thể áp dụng cho sản phẩm';
+                break;
+            case 'disabled':
+                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng cho sản phẩm';
+                break;
+            default:
+                message = 'Khuyến mãi không khả dụng, không thể áp dụng cho sản phẩm';
+        }
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: message,
+            life: 3000
+        });
+        return;
+    }
+    
     selectedPromotionForApply.value = promotion;
     applyProductsDialog.value = true;
     await loadAvailableProducts();
@@ -645,6 +811,32 @@ async function applyPromotionToProducts() {
             severity: 'warn',
             summary: 'Cảnh báo',
             detail: 'Vui lòng chọn ít nhất một sản phẩm',
+            life: 3000
+        });
+        return;
+    }
+
+    // Check if promotion is still valid
+    const status = getPromotionStatus(selectedPromotionForApply.value);
+    if (status !== 'active') {
+        let message = '';
+        switch (status) {
+            case 'pending':
+                message = 'Khuyến mãi chưa bắt đầu, không thể áp dụng cho sản phẩm';
+                break;
+            case 'expired':
+                message = 'Khuyến mãi đã hết hạn, không thể áp dụng cho sản phẩm';
+                break;
+            case 'disabled':
+                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng cho sản phẩm';
+                break;
+            default:
+                message = 'Khuyến mãi không khả dụng, không thể áp dụng cho sản phẩm';
+        }
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: message,
             life: 3000
         });
         return;
@@ -737,6 +929,31 @@ async function removeProductFromPromotion() {
 }
 
 function openApplyProductsFromView() {
+    const status = getPromotionStatus(selectedPromotionForView.value);
+    if (status !== 'active') {
+        let message = '';
+        switch (status) {
+            case 'pending':
+                message = 'Khuyến mãi chưa bắt đầu, không thể áp dụng thêm sản phẩm';
+                break;
+            case 'expired':
+                message = 'Khuyến mãi đã hết hạn, không thể áp dụng thêm sản phẩm';
+                break;
+            case 'disabled':
+                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng thêm sản phẩm';
+                break;
+            default:
+                message = 'Khuyến mãi không khả dụng, không thể áp dụng thêm sản phẩm';
+        }
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: message,
+            life: 3000
+        });
+        return;
+    }
+    
     viewProductsDialog.value = false;
     openApplyProductsDialog(selectedPromotionForView.value);
 }
@@ -748,7 +965,9 @@ function formatDateDisplay(dateString) {
     return date.toLocaleDateString('vi-VN', {
         year: 'numeric',
         month: '2-digit',
-        day: '2-digit'
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
     });
 }
 
@@ -956,10 +1175,10 @@ function exportCSV() {
                 item.id || '',
                 item.maKhuyenMai || '',
                 item.tenKhuyenMai || '',
-                item.giaTri ? item.giaTri.toFixed(1) + '%' : '',
+                formatPercentage(item.giaTri) + '%',
                 formatDateDisplay(item.ngayBatDau),
                 formatDateDisplay(item.ngayKetThuc),
-                item.trangThai === 1 ? 'Còn hạn' : 'Hết hạn',
+                getPromotionStatusText(item),
                 item.soLuongSanPham || 0
             ];
         });
@@ -1025,389 +1244,3 @@ function createId() {
     return 'KM' + id;
 }
 </script>
-
-<style scoped>
-.card {
-    border: none;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-}
-
-.grid {
-    display: grid;
-}
-
-.grid-cols-4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.gap-4 {
-    gap: 1rem;
-}
-
-.border-2 {
-    border-width: 2px;
-}
-
-.border-gray-200 {
-    border-color: #e5e7eb;
-}
-
-.rounded-lg {
-    border-radius: 0.5rem;
-}
-
-.p-4 {
-    padding: 1rem;
-}
-
-.p-3 {
-    padding: 0.75rem;
-}
-
-.mb-4 {
-    margin-bottom: 1rem;
-}
-
-.mb-1 {
-    margin-bottom: 0.25rem;
-}
-
-.mb-2 {
-    margin-bottom: 0.5rem;
-}
-
-.mb-3 {
-    margin-bottom: 0.75rem;
-}
-
-.mt-3 {
-    margin-top: 0.75rem;
-}
-
-.text-lg {
-    font-size: 1.125rem;
-}
-
-.text-2xl {
-    font-size: 1.5rem;
-}
-
-.text-sm {
-    font-size: 0.875rem;
-}
-
-.text-3xl {
-    font-size: 1.875rem;
-}
-
-.font-bold {
-    font-weight: 700;
-}
-
-.font-semibold {
-    font-weight: 600;
-}
-
-.font-medium {
-    font-weight: 500;
-}
-
-.text-center {
-    text-align: center;
-}
-
-.text-primary {
-    color: var(--primary-color);
-}
-
-.text-gray-700 {
-    color: #374151;
-}
-
-.text-gray-800 {
-    color: #1f2937;
-}
-
-.text-gray-600 {
-    color: #4b5563;
-}
-
-.text-gray-500 {
-    color: #6b7280;
-}
-
-.text-gray-400 {
-    color: #9ca3af;
-}
-
-.text-red-600 {
-    color: #dc2626;
-}
-
-.text-red-500 {
-    color: #ef4444;
-}
-
-.text-red-700 {
-    color: #b91c1c;
-}
-
-.text-blue-600 {
-    color: #2563eb;
-}
-
-.text-blue-800 {
-    color: #1e40af;
-}
-
-.text-green-600 {
-    color: #16a34a;
-}
-
-.text-green-800 {
-    color: #166534;
-}
-
-.text-orange-500 {
-    color: #f97316;
-}
-
-.text-orange-600 {
-    color: #ea580c;
-}
-
-.text-orange-800 {
-    color: #9a3412;
-}
-
-.text-purple-600 {
-    color: #9333ea;
-}
-
-.text-purple-800 {
-    color: #6b21a8;
-}
-
-.bg-blue-50 {
-    background-color: #eff6ff;
-}
-
-.bg-green-50 {
-    background-color: #f0fdf4;
-}
-
-.bg-red-50 {
-    background-color: #fef2f2;
-}
-
-.bg-gray-50 {
-    background-color: #f9fafb;
-}
-
-.bg-orange-50 {
-    background-color: #fff7ed;
-}
-
-.bg-purple-50 {
-    background-color: #faf5ff;
-}
-
-.block {
-    display: block;
-}
-
-.flex {
-    display: flex;
-}
-
-.flex-1 {
-    flex: 1 1 0%;
-}
-
-.flex-wrap {
-    flex-wrap: wrap;
-}
-
-.flex-col {
-    flex-direction: column;
-}
-
-.items-center {
-    align-items: center;
-}
-
-.justify-between {
-    justify-content: space-between;
-}
-
-.gap-2 {
-    gap: 0.5rem;
-}
-
-.gap-4 {
-    gap: 1rem;
-}
-
-.mr-1 {
-    margin-right: 0.25rem;
-}
-
-.mr-2 {
-    margin-right: 0.5rem;
-}
-
-.w-4 {
-    width: 1rem;
-}
-
-.h-4 {
-    height: 1rem;
-}
-
-.h-full {
-    height: 100%;
-}
-
-.min-w-64 {
-    min-width: 16rem;
-}
-
-.overflow-hidden {
-    overflow: hidden;
-}
-
-.rounded-full {
-    border-radius: 9999px;
-}
-
-.border {
-    border-width: 1px;
-}
-
-.inline-block {
-    display: inline-block;
-}
-
-/* Custom styles for dialogs */
-.apply-products-dialog .p-dialog-content {
-    padding: 0;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .grid-cols-4 {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .flex-wrap {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .min-w-64 {
-        min-width: 100%;
-    }
-}
-
-/* Loading spinner */
-.p-datatable-loading-overlay {
-    background-color: rgba(255, 255, 255, 0.8);
-}
-
-/* Custom tag colors for better visibility */
-.p-tag.p-tag-success {
-    background-color: #10b981;
-}
-
-.p-tag.p-tag-warning {
-    background-color: #f59e0b;
-}
-
-.p-tag.p-tag-danger {
-    background-color: #ef4444;
-}
-
-.p-tag.p-tag-info {
-    background-color: #3b82f6;
-}
-
-.p-tag.p-tag-secondary {
-    background-color: #6b7280;
-}
-
-/* Hover effects */
-.p-button:hover {
-    transform: translateY(-1px);
-    transition: transform 0.2s ease;
-}
-
-/* Table row hover */
-.p-datatable .p-datatable-tbody > tr:hover {
-    background-color: #f8fafc;
-}
-
-/* Scrollbar styling */
-.p-datatable .p-datatable-scrollable-body::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-.p-datatable .p-datatable-scrollable-body::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
-}
-
-.p-datatable .p-datatable-scrollable-body::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
-}
-
-.p-datatable .p-datatable-scrollable-body::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-
-/* Dialog animations */
-.p-dialog {
-    transition: all 0.3s ease;
-}
-
-/* Input focus styles */
-.p-inputtext:focus {
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-    border-color: #3b82f6;
-}
-
-/* Calendar styling */
-.p-calendar .p-inputtext {
-    width: 100%;
-}
-
-/* Number input styling */
-.p-inputnumber .p-inputtext {
-    text-align: right;
-}
-
-/* Success message styling */
-.p-toast .p-toast-message.p-toast-message-success {
-    background-color: #10b981;
-    border: 1px solid #059669;
-}
-
-/* Error message styling */
-.p-toast .p-toast-message.p-toast-message-error {
-    background-color: #ef4444;
-    border: 1px solid #dc2626;
-}
-
-/* Warning message styling */
-.p-toast .p-toast-message.p-toast-message-warn {
-    background-color: #f59e0b;
-    border: 1px solid #d97706;
-}
-
-/* Info message styling */
-.p-toast .p-toast-message.p-toast-message-info {
-    background-color: #3b82f6;
-    border: 1px solid #2563eb;
-}
-</style>

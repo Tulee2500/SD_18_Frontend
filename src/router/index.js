@@ -16,7 +16,6 @@ const router = createRouter({
             name: 'products',
             component: () => import('@/views/user/product/ProductList.vue')
         },
-
         {
             path: '/gioithieu',
             name: 'gioi-thieu',
@@ -27,12 +26,12 @@ const router = createRouter({
             name: 'lien-he',
             component: () => import('@/views/user/lienhe/LienHe.vue')
         },
-
         {
             path: '/product/:id',
             name: 'product',
-            component: () => import('@/components/user/product/Product.vue')
+            component: () => import('@/views/user/product/Product.vue')
         },
+
         // ADMIN ROUTES - CẦN ĐĂNG NHẬP VÀ LÀ ADMIN/NHÂN VIÊN
         {
             path: '/adminNhanVien',
@@ -169,7 +168,7 @@ const router = createRouter({
                     name: 'NhanVien',
                     path: '/nhan-vien',
                     component: () => import('@/views/TaiKhoan/NhanVien/NhanVienView.vue'),
-                    meta: { requiresAuth: true, roles: ['ADMIN'] } // Chỉ admin mới được quản lý nhân viên
+                    meta: { requiresAuth: true, roles: ['ADMIN'] }
                 },
                 {
                     name: 'KhachHang',
@@ -240,17 +239,13 @@ const router = createRouter({
                 {
                     name: 'TaiKhoan',
                     path: '/tai-khoan',
-                    // <<<<<<< HEAD
                     component: () => import('@/views/TaiKhoan/TaiKhoanManagement.vue'),
-                    meta: { requiresAuth: true, roles: ['ADMIN'] } // Chỉ admin mới được quản lý tài khoản
-
-                    // component: () => import('@/views/TaiKhoan/TaiKhoanManagement.vue')
+                    meta: { requiresAuth: true, roles: ['ADMIN'] }
                 },
                 {
                     name: 'BanHang',
                     path: '/ban-hang',
                     component: () => import('@/views/BanHang/BanHangView.vue')
-                    // >>>>>>> 7d7a58ff60c379d799e175708c0f01d6978a670f
                 }
             ]
         },
@@ -276,7 +271,7 @@ const router = createRouter({
             component: () => import('@/views/pages/auth/Login.vue'),
             meta: {
                 requiresAuth: false,
-                requiresGuest: true // Chỉ cho phép user chưa đăng nhập
+                requiresGuest: true
             }
         },
         {
@@ -291,25 +286,26 @@ const router = createRouter({
             component: () => import('@/views/pages/auth/Error.vue'),
             meta: { requiresAuth: false }
         },
-
         {
             path: '/auth/register',
             name: 'register',
             component: () => import('@/views/pages/auth/Register.vue'),
             meta: { requiresAuth: false }
         },
-        // Redirect routes
+
+        // Redirect
         {
             path: '/admin',
             redirect: '/dashboard'
         },
 
-        // Catch all route
+        // Catch all
         {
             path: '/:pathMatch(.*)*',
             redirect: '/pages/notfound'
         }
     ]
+
 });
 
 // ROUTE GUARDS - Kiểm tra quyền truy cập
