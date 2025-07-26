@@ -117,7 +117,7 @@
                     <label for="giaTri" class="mb-3 block font-bold">Giá Trị Giảm (%)</label>
                     <InputText id="giaTri" v-model.number="khuyenMai.giaTri" :min="0" :max="100" suffix="%" fluid :invalid="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" />
                     <small v-if="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" class="text-red-500">Giá trị giảm phải lớn hơn 0.</small>
-                    <small class="text-gray-500">Nhập số từ 1-100 (ví dụ: 15 = 15%)</small>
+                    <!-- <small class="text-gray-500">Nhập số từ 1-100 (ví dụ: 15 = 15%)</small> -->
                 </div>
                 <div>
                     <label for="ngayBatDau" class="mb-3 block font-bold">Ngày Bắt Đầu</label>
