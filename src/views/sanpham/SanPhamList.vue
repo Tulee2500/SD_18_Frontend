@@ -55,6 +55,282 @@ const statuses = ref([
     { label: 'NGỪNG HOẠT ĐỘNG', value: 0 }
 ]);
 
+// Quick Add Dialogs
+const quickAddDialog = ref(false);
+const quickAddType = ref('');
+const quickAddItem = ref({});
+const quickAddSubmitted = ref(false);
+const quickAddLoading = ref(false);
+
+// Quick Add Types
+const quickAddTypes = {
+    'mauSac': {
+        title: 'Thêm màu sắc',
+        fields: [
+            { key: 'tenMauSac', label: 'Tên màu sắc', type: 'text', required: true, placeholder: 'Ví dụ: Đỏ cherry' },
+            // { key: 'maMau', label: 'Mã màu (Hex)', type: 'color', required: true, placeholder: '#FF0000' }
+        ],
+        apiUrl: '/mau-sac',
+        codePrefix: 'MS',
+        refreshFunction: loadMauSacs
+    },
+    'kichCo': {
+        title: 'Thêm kích cỡ',
+        fields: [
+            { key: 'tenKichCo', label: 'Tên kích cỡ', type: 'text', required: true, placeholder: 'Ví dụ: 42, XL, M' }
+        ],
+        apiUrl: '/kich-co',
+        codePrefix: 'KC',
+        refreshFunction: loadKichCos
+    },
+    'danhMuc': {
+        title: 'Thêm danh mục',
+        fields: [
+            { key: 'tenDanhMuc', label: 'Tên danh mục', type: 'text', required: true, placeholder: 'Ví dụ: Giày thể thao' },
+            // { key: 'moTa', label: 'Mô tả', type: 'textarea', required: false, placeholder: 'Mô tả về danh mục...' }
+        ],
+        apiUrl: '/danh-muc',
+        codePrefix: 'DM',
+        refreshFunction: loadDanhMucs
+    },
+    'thuongHieu': {
+        title: 'Thêm thương hiệu',
+        fields: [
+            { key: 'tenThuongHieu', label: 'Tên thương hiệu', type: 'text', required: true, placeholder: 'Ví dụ: Nike, Adidas' },
+            // { key: 'moTa', label: 'Mô tả', type: 'textarea', required: false, placeholder: 'Mô tả về thương hiệu...' }
+        ],
+        apiUrl: '/thuong-hieu',
+        codePrefix: 'TH',
+        refreshFunction: loadThuongHieus
+    },
+    'chatLieu': {
+        title: 'Thêm chất liệu',
+        fields: [
+            { key: 'tenChatLieu', label: 'Tên chất liệu', type: 'text', required: true, placeholder: 'Ví dụ: Da thật, Canvas' },
+            // { key: 'moTa', label: 'Mô tả', type: 'textarea', required: false, placeholder: 'Mô tả về chất liệu...' }
+        ],
+        apiUrl: '/chat-lieu',
+        codePrefix: 'CL',
+        refreshFunction: loadChatLieus
+    },
+    'deGiay': {
+        title: 'Thêm đế giày',
+        fields: [
+            { key: 'tenDeGiay', label: 'Tên đế giày', type: 'text', required: true, placeholder: 'Ví dụ: Đế cao su, Đế EVA' },
+            // { key: 'moTa', label: 'Mô tả', type: 'textarea', required: false, placeholder: 'Mô tả về đế giày...' }
+        ],
+        apiUrl: '/de-giay',
+        codePrefix: 'DG',
+        refreshFunction: loadDeGiays
+    }
+};
+
+// Quick Add Functions
+function openQuickAdd(type) {
+    quickAddType.value = type;
+    const config = quickAddTypes[type];
+    
+    // Initialize form
+    quickAddItem.value = {
+        trangThai: 1 // Default active status
+    };
+    
+    // Add auto-generated code
+    if (config.codePrefix) {
+        quickAddItem.value[`ma${type.charAt(0).toUpperCase() + type.slice(1)}`] = createQuickAddId(config.codePrefix);
+    }
+    
+    quickAddSubmitted.value = false;
+    quickAddDialog.value = true;
+}
+
+function createQuickAddId(prefix) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let id = '';
+    for (let i = 0; i < 6; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return prefix + id;
+}
+// Hàm kiểm tra trùng lặp theo tên (case-insensitive)
+function checkDuplicateByName(type, name) {
+    if (!name || !name.trim()) return false;
+    
+    const normalizedName = name.trim().toLowerCase();
+    let dataArray = [];
+    
+    switch (type) {
+        case 'mauSac':
+            dataArray = mauSacs.value;
+            return dataArray.some(item => item.tenMauSac?.toLowerCase() === normalizedName);
+        case 'kichCo':
+            dataArray = kichCos.value;
+            return dataArray.some(item => item.tenKichCo?.toLowerCase() === normalizedName);
+        case 'danhMuc':
+            dataArray = danhMucs.value;
+            return dataArray.some(item => item.tenDanhMuc?.toLowerCase() === normalizedName);
+        case 'thuongHieu':
+            dataArray = thuongHieus.value;
+            return dataArray.some(item => item.tenThuongHieu?.toLowerCase() === normalizedName);
+        case 'chatLieu':
+            dataArray = chatLieus.value;
+            return dataArray.some(item => item.tenChatLieu?.toLowerCase() === normalizedName);
+        case 'deGiay':
+            dataArray = deGiays.value;
+            return dataArray.some(item => item.tenDeGiay?.toLowerCase() === normalizedName);
+        default:
+            return false;
+    }
+}
+
+// Hàm kiểm tra trùng lặp theo mã màu (cho màu sắc)
+function checkDuplicateByColorCode(colorCode) {
+    if (!colorCode || !colorCode.trim()) return false;
+    
+    const normalizedCode = colorCode.trim().toLowerCase();
+    return mauSacs.value.some(item => item.maMau?.toLowerCase() === normalizedCode);
+}
+
+// Hàm lấy tên field theo type
+function getFieldNameByType(type) {
+    const fieldNames = {
+        'mauSac': 'tenMauSac',
+        'kichCo': 'tenKichCo', 
+        'danhMuc': 'tenDanhMuc',
+        'thuongHieu': 'tenThuongHieu',
+        'chatLieu': 'tenChatLieu',
+        'deGiay': 'tenDeGiay'
+    };
+    return fieldNames[type];
+}
+
+async function saveQuickAdd() {
+    quickAddSubmitted.value = true;
+    const config = quickAddTypes[quickAddType.value];
+    
+    // Validate required fields
+    for (const field of config.fields) {
+        if (field.required && (!quickAddItem.value[field.key] || !quickAddItem.value[field.key].toString().trim())) {
+            toast.add({ 
+                severity: 'warn', 
+                summary: 'Cảnh báo', 
+                detail: `${field.label} là bắt buộc`, 
+                life: 3000 
+            });
+            return;
+        }
+    }
+    
+    // Validate format mã màu trước khi kiểm tra trùng lặp
+    if (quickAddType.value === 'mauSac' && quickAddItem.value.maMau) {
+        if (!quickAddItem.value.maMau.match(/^#[0-9A-Fa-f]{6}$/)) {
+            toast.add({ 
+                severity: 'warn', 
+                summary: 'Cảnh báo', 
+                detail: 'Mã màu phải có định dạng hex hợp lệ (Ví dụ: #FF0000)', 
+                life: 3000 
+            });
+            return;
+        }
+    }
+    
+    // ===== KIỂM TRA TRÙNG LẶP KHI SUBMIT =====
+    
+    // 1. Kiểm tra trùng tên
+    const fieldName = getFieldNameByType(quickAddType.value);
+    const itemName = quickAddItem.value[fieldName];
+    
+    if (checkDuplicateByName(quickAddType.value, itemName)) {
+        toast.add({ 
+            severity: 'info', 
+            summary: 'Cảnh báo', 
+            detail: `${config.title.replace('Thêm ', '')} "${itemName}" đã tồn tại`, 
+            life: 4000 
+        });
+        return; // Dừng lại, không thêm vào database
+    }
+   
+    // ===== TIẾP TỤC XỬ LÝ NẾU KHÔNG TRÙNG LẶP =====
+    
+    try {
+        quickAddLoading.value = true;
+        
+        const response = await axios.post(`${API_BASE_URL}${config.apiUrl}`, quickAddItem.value);
+        
+        toast.add({ 
+            severity: 'success', 
+            summary: 'Thành công', 
+            detail: `Đã thêm ${config.title.toLowerCase().replace('thêm ', '')}: "${itemName}"`, 
+            life: 3000 
+        });
+        
+        // Refresh the related data
+        await config.refreshFunction();
+        
+        // Auto-select the newly created item if we're in a form
+        if (quickAddType.value === 'mauSac' && detailDialog.value) {
+            const newItem = response.data;
+            if (detail.value.isEditing) {
+                selectedMauSac.value = newItem;
+            } else {
+                if (!detail.value.mauSacs) detail.value.mauSacs = [];
+                detail.value.mauSacs.push(newItem);
+            }
+        } else if (quickAddType.value === 'kichCo' && detailDialog.value) {
+            const newItem = response.data;
+            if (detail.value.isEditing) {
+                selectedKichCo.value = newItem;
+            } else {
+                if (!detail.value.kichCos) detail.value.kichCos = [];
+                detail.value.kichCos.push(newItem);
+            }
+        } else if (productDialog.value) {
+            const newItem = response.data;
+            if (quickAddType.value === 'danhMuc') {
+                product.value.danhMuc = newItem;
+            } else if (quickAddType.value === 'thuongHieu') {
+                product.value.thuongHieu = newItem;
+            } else if (quickAddType.value === 'chatLieu') {
+                product.value.chatLieu = newItem;
+            } else if (quickAddType.value === 'deGiay') {
+                product.value.deGiay = newItem;
+            }
+        }
+        
+        quickAddDialog.value = false;
+        quickAddItem.value = {};
+        
+    } catch (error) {
+        console.error('Error adding quick item:', error);
+        
+        // Kiểm tra lỗi từ server (có thể server cũng có validation)
+        let errorMessage = 'Không thể thêm mới';
+        if (error.response?.data?.message) {
+            const serverMessage = error.response.data.message.toLowerCase();
+            if (serverMessage.includes('duplicate') || serverMessage.includes('trùng') || serverMessage.includes('exist')) {
+                errorMessage = `Dữ liệu đã tồn tại trong hệ thống`;
+            } else {
+                errorMessage = error.response.data.message;
+            }
+        }
+        
+        toast.add({ 
+            severity: 'info', 
+            summary: 'Dữ liệu đã tồn tại', 
+            detail: errorMessage, 
+            life: 4000 
+        });
+    } finally {
+        quickAddLoading.value = false;
+    }
+}
+
+function hideQuickAddDialog() {
+    quickAddDialog.value = false;
+    quickAddSubmitted.value = false;
+    quickAddItem.value = {};
+}
+
 // Thêm vào phần ref declarations
 const imagePreviewDialog = ref(false);
 const selectedImageDetail = ref({});
@@ -1058,7 +1334,7 @@ async function saveDetail() {
     }
     
     if (detail.value.giaGoc == null || detail.value.giaGoc === '' || detail.value.giaGoc <= 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá nhập phải lớn hơn 0', life: 3000 });
+        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá gốc phải lớn hơn 0', life: 3000 });
         return;
     }
     
@@ -1707,28 +1983,68 @@ function collapseAll() {
                     </div>
                 </div>
 
-                <div class="grid grid-cols-12 gap-4">
+                    <div class="grid grid-cols-12 gap-4">
+                    <!-- Danh mục với nút thêm nhanh -->
                     <div class="col-span-6">
                         <label for="danhMuc" class="block font-bold mb-3">Danh mục </label>
-                        <Select id="danhMuc" v-model="product.danhMuc" :options="danhMucs" optionLabel="tenDanhMuc" placeholder="Chọn danh mục" fluid />
+                        <div class="flex gap-2">
+                            <Select id="danhMuc" v-model="product.danhMuc" :options="danhMucs" optionLabel="tenDanhMuc" placeholder="Chọn danh mục" fluid class="flex-1" />
+                            <Button 
+                                icon="pi pi-plus" 
+                                @click="openQuickAdd('danhMuc')" 
+                                v-tooltip.top="'Thêm danh mục mới'"
+                                severity="secondary"
+                                outlined
+                            />
+                        </div>
                         <small v-if="submitted && !product.danhMuc" class="text-red-500">Danh mục là bắt buộc.</small>
                     </div>
+                    <!-- Thương hiệu với nút thêm nhanh -->
                     <div class="col-span-6">
                         <label for="thuongHieu" class="block font-bold mb-3">Thương hiệu </label>
-                        <Select id="thuongHieu" v-model="product.thuongHieu" :options="thuongHieus" optionLabel="tenThuongHieu" placeholder="Chọn thương hiệu" fluid />
+                        <div class="flex gap-2">
+                            <Select id="thuongHieu" v-model="product.thuongHieu" :options="thuongHieus" optionLabel="tenThuongHieu" placeholder="Chọn thương hiệu" fluid class="flex-1" />
+                            <Button 
+                                icon="pi pi-plus" 
+                                @click="openQuickAdd('thuongHieu')" 
+                                v-tooltip.top="'Thêm thương hiệu mới'"
+                                severity="secondary"
+                                outlined
+                            />
+                        </div>
                         <small v-if="submitted && !product.thuongHieu" class="text-red-500">Thương hiệu là bắt buộc.</small>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-12 gap-4">
+                    <!-- Chất liệu với nút thêm nhanh -->
                     <div class="col-span-6">
                         <label for="chatLieu" class="block font-bold mb-3">Chất liệu </label>
-                        <Select id="chatLieu" v-model="product.chatLieu" :options="chatLieus" optionLabel="tenChatLieu" placeholder="Chọn chất liệu" fluid />
+                        <div class="flex gap-2">
+                            <Select id="chatLieu" v-model="product.chatLieu" :options="chatLieus" optionLabel="tenChatLieu" placeholder="Chọn chất liệu" fluid class="flex-1" />
+                            <Button 
+                                icon="pi pi-plus" 
+                                @click="openQuickAdd('chatLieu')" 
+                                v-tooltip.top="'Thêm chất liệu mới'"
+                                severity="secondary"
+                                outlined
+                            />
+                        </div>
                         <small v-if="submitted && !product.chatLieu" class="text-red-500">Chất liệu là bắt buộc.</small>
                     </div>
+                    <!-- Đế giày với nút thêm nhanh -->
                     <div class="col-span-6">
                         <label for="deGiay" class="block font-bold mb-3">Đế giày </label>
-                        <Select id="deGiay" v-model="product.deGiay" :options="deGiays" optionLabel="tenDeGiay" placeholder="Chọn đế giày" fluid />
+                        <div class="flex gap-2">
+                            <Select id="deGiay" v-model="product.deGiay" :options="deGiays" optionLabel="tenDeGiay" placeholder="Chọn đế giày" fluid class="flex-1" />
+                            <Button 
+                                icon="pi pi-plus" 
+                                @click="openQuickAdd('deGiay')" 
+                                v-tooltip.top="'Thêm đế giày mới'"
+                                severity="secondary"
+                                outlined
+                            />
+                        </div>
                         <small v-if="submitted && !product.deGiay" class="text-red-500">Đế giày là bắt buộc.</small>
                     </div>
                 </div>
@@ -1769,9 +2085,9 @@ function collapseAll() {
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="giaGoc" class="block font-bold mb-3">Giá nhập </label>
+                        <label for="giaGoc" class="block font-bold mb-3">Giá gốc </label>
                         <InputText id="giaGoc" v-model.number="detail.giaGoc" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" />
-                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" class="text-red-500">Giá nhập phải lớn hơn 0.</small>
+                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" class="text-red-500">Giá gốc phải lớn hơn 0.</small>
                     </div>
                     <!-- <div class="col-span-6">
                         <label for="giaBan" class="block font-bold mb-3">Giá bán </label>
@@ -1781,16 +2097,17 @@ function collapseAll() {
                 </div>
 
                 <!-- SỬA: PHẦN MÀU SẮC VÀ KÍCH CỠ -->
-                <div class="grid grid-cols-12 gap-4">
-                    <!-- MÀU SẮC -->
-                    <div class="col-span-6">
-                        <label for="mauSacs" class="block font-bold mb-3">
-                            Màu sắc 
-                            <span v-if="detail.isEditing" class="text-sm font-normal text-gray-500"></span>
-                            <span v-else class="text-sm font-normal text-gray-500"></span>
-                        </label>
-                        
-                        <!-- CHẾ ĐỘ SỬA: CHỈ CHỌN 1 - SỬ DỤNG REF RIÊNG -->
+                 <div class="grid grid-cols-12 gap-4">
+                <!-- MÀU SẮC với nút thêm nhanh -->
+                <div class="col-span-6">
+                    <label for="mauSacs" class="block font-bold mb-3">
+                        Màu sắc 
+                        <span v-if="detail.isEditing" class="text-sm font-normal text-gray-500"></span>
+                        <span v-else class="text-sm font-normal text-gray-500"></span>
+                    </label>
+                    
+                    <div class="flex gap-2">
+                        <!-- CHẾ ĐỘ SỬA: CHỈ CHỌN 1 -->
                         <Select 
                             v-if="detail.isEditing"
                             id="mauSacSingle" 
@@ -1799,6 +2116,7 @@ function collapseAll() {
                             optionLabel="tenMauSac" 
                             placeholder="Chọn màu sắc" 
                             fluid 
+                            class="flex-1"
                             :invalid="submitted && (!selectedMauSac)"
                         />
                         
@@ -1811,25 +2129,36 @@ function collapseAll() {
                             optionLabel="tenMauSac" 
                             placeholder="Chọn màu sắc" 
                             fluid 
+                            class="flex-1"
                             :maxSelectedLabels="3"
                             selectedItemsLabel="{0} màu đã chọn"
                             :invalid="submitted && (!detail.mauSacs || detail.mauSacs.length === 0)"
                         />
                         
-                        <small v-if="submitted && (detail.isEditing ? !selectedMauSac : (!detail.mauSacs || detail.mauSacs.length === 0))" class="text-red-500">
-                            Phải chọn ít nhất một màu sắc.
-                        </small>
+                        <Button 
+                            icon="pi pi-plus" 
+                            @click="openQuickAdd('mauSac')" 
+                            v-tooltip.top="'Thêm màu sắc mới'"
+                            severity="secondary"
+                            outlined
+                        />
                     </div>
                     
-                    <!-- KÍCH CỠ -->
-                    <div class="col-span-6">
-                        <label for="kichCos" class="block font-bold mb-3">
-                            Kích cỡ 
-                            <span v-if="detail.isEditing" class="text-sm font-normal text-gray-500"></span>
-                            <span v-else class="text-sm font-normal text-gray-500"></span>
-                        </label>
-                        
-                        <!-- CHẾ ĐỘ SỬA: CHỈ CHỌN 1 - SỬ DỤNG REF RIÊNG -->
+                    <small v-if="submitted && (detail.isEditing ? !selectedMauSac : (!detail.mauSacs || detail.mauSacs.length === 0))" class="text-red-500">
+                        Phải chọn ít nhất một màu sắc.
+                    </small>
+                </div>
+                
+                <!-- KÍCH CỠ với nút thêm nhanh -->
+                <div class="col-span-6">
+                    <label for="kichCos" class="block font-bold mb-3">
+                        Kích cỡ 
+                        <span v-if="detail.isEditing" class="text-sm font-normal text-gray-500"></span>
+                        <span v-else class="text-sm font-normal text-gray-500"></span>
+                    </label>
+                    
+                    <div class="flex gap-2">
+                        <!-- CHẾ ĐỘ SỬA: CHỈ CHỌN 1 -->
                         <Select 
                             v-if="detail.isEditing"
                             id="kichCoSingle" 
@@ -1838,6 +2167,7 @@ function collapseAll() {
                             optionLabel="tenKichCo" 
                             placeholder="Chọn kích cỡ" 
                             fluid 
+                            class="flex-1"
                             :invalid="submitted && (!selectedKichCo)"
                         />
                         
@@ -1850,16 +2180,26 @@ function collapseAll() {
                             optionLabel="tenKichCo" 
                             placeholder="Chọn kích cỡ" 
                             fluid 
+                            class="flex-1"
                             :maxSelectedLabels="3"
                             selectedItemsLabel="{0} size đã chọn"
                             :invalid="submitted && (!detail.kichCos || detail.kichCos.length === 0)"
                         />
                         
-                        <small v-if="submitted && (detail.isEditing ? !selectedKichCo : (!detail.kichCos || detail.kichCos.length === 0))" class="text-red-500">
-                            Phải chọn ít nhất một kích cỡ.
-                        </small>
+                        <Button 
+                            icon="pi pi-plus" 
+                            @click="openQuickAdd('kichCo')" 
+                            v-tooltip.top="'Thêm kích cỡ mới'"
+                            severity="secondary"
+                            outlined
+                        />
                     </div>
+                    
+                    <small v-if="submitted && (detail.isEditing ? !selectedKichCo : (!detail.kichCos || detail.kichCos.length === 0))" class="text-red-500">
+                        Phải chọn ít nhất một kích cỡ.
+                    </small>
                 </div>
+            </div>
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
@@ -1869,7 +2209,7 @@ function collapseAll() {
                 </div>
 
                 <!-- PHẦN CHỌN HÌNH ẢNH - GIỐNG NHƯ CŨ -->
-                <div class="mt-4">
+                <!-- <div class="mt-4">
                     <div class="flex justify-between items-center mb-3">
                         <label class="block font-bold">Hình ảnh sản phẩm</label>
                         <Button 
@@ -1879,10 +2219,10 @@ function collapseAll() {
                             @click="openImageSelection"
                             severity="secondary"
                         />
-                    </div>
+                    </div> -->
                     
                     <!-- Hiển thị hình ảnh đã chọn -->
-                    <div v-if="detail.selectedImage" class="p-3 border border-gray-200 rounded">
+                    <!-- <div v-if="detail.selectedImage" class="p-3 border border-gray-200 rounded">
                         <div class="flex items-center gap-4">
                             <div class="relative group">
                                 <img 
@@ -1917,7 +2257,7 @@ function collapseAll() {
                         <p>Chưa chọn hình ảnh nào</p>
                         <small>Nhấn "Chọn hình ảnh" để thêm hình ảnh cho sản phẩm</small>
                     </div>
-                </div>
+                </div> -->
 
               <!-- PREVIEW BIẾN THỂ SẼ ĐƯỢC TẠO - CHỈ HIỂN THI KHI THÊM MỚI -->
                 <div v-if="!detail.isEditing && getVariantPreview.length > 0" class="mt-4">
@@ -2066,11 +2406,10 @@ function collapseAll() {
                 />
                 <Button 
                     v-else
-                    :label="getValidVariantsCount > 0 ? 'Thêm' : 'Không có biến thể hợp lệ'" 
+                    :label="'Thêm chi tiết'" 
                     icon="pi pi-plus" 
                     @click="saveDetail" 
                     :loading="loading"
-                    :disabled="getValidVariantsCount === 0"
                     :severity="getValidVariantsCount > 0 ? 'primary' : 'secondary'"
                 />
             </template>
@@ -2312,6 +2651,109 @@ function collapseAll() {
                     severity="secondary"
                 />
                 <Button label="Đóng" icon="pi pi-times" @click="qrDetailDialog = false" />
+            </template>
+        </Dialog>
+        <!-- DIALOG THÊM NHANH THUỘC TÍNH -->
+        <Dialog v-model:visible="quickAddDialog" :style="{ width: '500px' }" :header="quickAddTypes[quickAddType]?.title || 'Thêm mới'" :modal="true" class="p-fluid">
+            <div v-if="quickAddTypes[quickAddType]" class="flex flex-col gap-6">
+                <!-- Auto-generated code field -->
+                <div v-if="quickAddTypes[quickAddType].codePrefix">
+                    <label class="block font-bold mb-3">Mã {{ quickAddType === 'mauSac' ? 'màu sắc' : quickAddType === 'kichCo' ? 'kích cỡ' : quickAddType }}</label>
+                    <InputText 
+                        :value="quickAddItem[`ma${quickAddType.charAt(0).toUpperCase() + quickAddType.slice(1)}`]" 
+                        readonly 
+                        placeholder="Tự động tạo"
+                        class="bg-gray-50"
+                    />
+                </div>
+
+                <!-- Dynamic fields -->
+                <div v-for="field in quickAddTypes[quickAddType].fields" :key="field.key">
+                    <label :for="field.key" class="block font-bold mb-3">
+                        {{ field.label }}
+                        <span v-if="field.required" class="text-red-500">*</span>
+                    </label>
+                    
+                    <!-- Text input -->
+                    <InputText 
+                        v-if="field.type === 'text'"
+                        :id="field.key"
+                        v-model.trim="quickAddItem[field.key]"
+                        :placeholder="field.placeholder"
+                        :invalid="quickAddSubmitted && field.required && (!quickAddItem[field.key] || !quickAddItem[field.key].toString().trim())"
+                        fluid
+                    />
+                    
+                    <!-- Color picker -->
+                    <div v-else-if="field.type === 'color'" class="flex gap-3">
+                        <InputText 
+                            :id="field.key"
+                            v-model="quickAddItem[field.key]"
+                            :placeholder="field.placeholder"
+                            :invalid="quickAddSubmitted && field.required && !quickAddItem[field.key]"
+                            fluid
+                            class="flex-1"
+                        />
+                        <input 
+                            type="color" 
+                            v-model="quickAddItem[field.key]"
+                            class="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                            :title="'Chọn ' + field.label.toLowerCase()"
+                        />
+                    </div>
+                    
+                    <!-- Textarea -->
+                    <Textarea 
+                        v-else-if="field.type === 'textarea'"
+                        :id="field.key"
+                        v-model.trim="quickAddItem[field.key]"
+                        :placeholder="field.placeholder"
+                        rows="3"
+                        fluid
+                    />
+                    
+                    <small v-if="quickAddSubmitted && field.required && (!quickAddItem[field.key] || !quickAddItem[field.key].toString().trim())" class="text-red-500">
+                        {{ field.label }} là bắt buộc.
+                    </small>
+                </div>
+
+                <!-- Status field -->
+                <div>
+                    <label class="block font-bold mb-3">Trạng thái</label>
+                    <Select 
+                        v-model="quickAddItem.trangThai" 
+                        :options="statuses" 
+                        optionLabel="label" 
+                        optionValue="value" 
+                        placeholder="Chọn trạng thái" 
+                        fluid 
+                    />
+                </div>
+
+                <!-- Preview for color -->
+                <div v-if="quickAddType === 'mauSac' && quickAddItem.maMau" class="mt-4">
+                    <label class="block font-bold mb-3">Xem trước màu:</label>
+                    <div class="flex items-center gap-3 p-3 border rounded">
+                        <div 
+                            class="w-16 h-16 rounded border-2 border-gray-300"
+                            :style="{ backgroundColor: quickAddItem.maMau }"
+                        ></div>
+                        <div>
+                            <div class="font-medium">{{ quickAddItem.tenMauSac || 'Tên màu' }}</div>
+                            <div class="text-sm text-gray-600">{{ quickAddItem.maMau || '#000000' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <template #footer>
+                <Button label="Hủy" icon="pi pi-times" text @click="hideQuickAddDialog" :disabled="quickAddLoading" />
+                <Button 
+                    label="Thêm" 
+                    icon="pi pi-check" 
+                    @click="saveQuickAdd" 
+                    :loading="quickAddLoading"
+                />
             </template>
         </Dialog>
     </div>
