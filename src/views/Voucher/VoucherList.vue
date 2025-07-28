@@ -25,7 +25,7 @@
         >
             <template #header>
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h4 class="m-0">📦 Quản lý Voucher</h4>
+                    <h4 class="m-0">🎫 Quản lý Voucher</h4>
                     <IconField>
                         <InputIcon>
                             <i class="pi pi-search" />
@@ -39,56 +39,45 @@
             <Column field="id" header="ID" sortable style="min-width: 8rem"></Column>
             <Column field="maVoucher" header="Mã Voucher" sortable style="min-width: 12rem"></Column>
             <Column field="tenVoucher" header="Tên Voucher" sortable style="min-width: 16rem"></Column>
-            <Column field="duongDanHinhAnh" header="Hình ảnh" style="min-width: 10rem">
+
+            <!-- CỘT HÌNH ẢNH (FIXED) -->
+            <Column header="Hình ảnh" style="min-width: 12rem">
                 <template #body="slotProps">
-                    <div v-if="slotProps.data.duongDanHinhAnh" class="relative">
+                    <div class="flex justify-center">
                         <img
-                            :src="getImageUrl(slotProps.data.duongDanHinhAnh)"
+                            v-if="slotProps.data.duongDanHinhAnh"
+                            :src="`http://localhost:8080${slotProps.data.duongDanHinhAnh}`"
                             :alt="slotProps.data.tenVoucher"
                             class="h-16 w-16 cursor-pointer rounded border object-cover shadow-sm transition-transform hover:scale-105"
-                            @error="handleImageError($event)"
                             @click="previewImage(slotProps.data)"
+                            @error="handleImageError($event)"
                         />
-                        <!-- Debug info - có thể xóa sau khi test xong -->
-                        <div class="absolute -bottom-6 left-0 max-w-16 truncate text-xs text-gray-500" title="Debug: URL được tạo">
-                            {{ getImageUrl(slotProps.data.duongDanHinhAnh).split('/').pop() }}
+                        <div v-else class="flex h-16 w-16 items-center justify-center rounded border bg-gray-100">
+                            <i class="pi pi-image text-gray-400"></i>
                         </div>
-                    </div>
-                    <div v-else class="flex h-16 w-16 items-center justify-center rounded border bg-gray-100">
-                        <i class="pi pi-image text-gray-400"></i>
-                        <span class="sr-only">Chưa có ảnh</span>
                     </div>
                 </template>
             </Column>
+
             <Column field="loaiGiamGia" header="Loại giảm giá" sortable style="min-width: 12rem"></Column>
             <Column field="giaTriGiam" header="Giá trị giảm" sortable style="min-width: 12rem">
                 <template #body="slotProps">
-                    <span v-if="slotProps.data.loaiGiamGia === 'PHAN_TRAM'"> {{ slotProps.data.giaTriGiam }}% </span>
-                    <span v-else>
-                        {{ formatCurrency(slotProps.data.giaTriGiam) }}
-                    </span>
+                    <span v-if="slotProps.data.loaiGiamGia === 'PHAN_TRAM'">{{ slotProps.data.giaTriGiam }}%</span>
+                    <span v-else>{{ formatCurrency(slotProps.data.giaTriGiam) }}</span>
                 </template>
             </Column>
             <Column field="giaTriGiamToiThieu" header="Đơn hàng tối thiểu" sortable style="min-width: 12rem">
-                <template #body="slotProps">
-                    {{ formatCurrency(slotProps.data.giaTriGiamToiThieu) }}
-                </template>
+                <template #body="slotProps">{{ formatCurrency(slotProps.data.giaTriGiamToiThieu) }}</template>
             </Column>
             <Column field="giaTriGiamToiDa" header="Giảm tối đa" sortable style="min-width: 12rem">
-                <template #body="slotProps">
-                    {{ formatCurrency(slotProps.data.giaTriGiamToiDa) }}
-                </template>
+                <template #body="slotProps">{{ formatCurrency(slotProps.data.giaTriGiamToiDa) }}</template>
             </Column>
             <Column field="soLuong" header="Số lượng" sortable style="min-width: 10rem"></Column>
             <Column field="ngayBatDau" header="Ngày bắt đầu" sortable style="min-width: 12rem">
-                <template #body="slotProps">
-                    {{ formatDate(slotProps.data.ngayBatDau) }}
-                </template>
+                <template #body="slotProps">{{ formatDate(slotProps.data.ngayBatDau) }}</template>
             </Column>
             <Column field="ngayKetThuc" header="Ngày kết thúc" sortable style="min-width: 12rem">
-                <template #body="slotProps">
-                    {{ formatDate(slotProps.data.ngayKetThuc) }}
-                </template>
+                <template #body="slotProps">{{ formatDate(slotProps.data.ngayKetThuc) }}</template>
             </Column>
             <Column field="trangThai" header="Trạng thái" sortable style="min-width: 12rem">
                 <template #body="slotProps">
@@ -97,7 +86,7 @@
             </Column>
             <Column :exportable="false" style="width: 10rem">
                 <template #body="slotProps">
-                    <div class="flex justify-between gap-2">
+                    <div class="flex justify-center gap-2">
                         <Button icon="pi pi-pencil" outlined rounded size="small" @click="editVoucher(slotProps.data)" :disabled="loading" />
                         <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteVoucher(slotProps.data)" :disabled="loading" />
                         <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" :disabled="loading" />
@@ -106,6 +95,7 @@
             </Column>
         </DataTable>
 
+        <!-- DIALOG THÊM/SỬA VOUCHER -->
         <Dialog v-model:visible="voucherDialog" :style="{ width: '600px' }" header="Chi tiết Voucher" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
@@ -113,43 +103,39 @@
                     <InputText id="maVoucher" v-model.trim="voucher.maVoucher" required="true" autofocus :invalid="submitted && !voucher.maVoucher" fluid readonly="true" />
                     <small v-if="submitted && !voucher.maVoucher" class="text-red-500">Mã Voucher là bắt buộc.</small>
                 </div>
+
                 <div>
                     <label for="tenVoucher" class="mb-3 block font-bold">Tên Voucher</label>
                     <InputText id="tenVoucher" v-model.trim="voucher.tenVoucher" required="true" :invalid="submitted && !voucher.tenVoucher" fluid />
                     <small v-if="submitted && !voucher.tenVoucher" class="text-red-500">Tên Voucher là bắt buộc.</small>
                 </div>
+
+                <!-- PHẦN UPLOAD FILE -->
                 <div>
-                    <label for="duongDanHinhAnh" class="mb-3 block font-bold">Hình ảnh voucher</label>
-                    <div class="flex flex-col gap-3">
-                        <!-- Preview hình ảnh hiện tại -->
-                        <div v-if="voucher.duongDanHinhAnh" class="flex items-center gap-3">
-                            <div class="relative">
-                                <img :src="getImageUrl(voucher.duongDanHinhAnh)" :alt="voucher.tenVoucher" class="h-20 w-20 rounded border object-cover shadow-sm" @error="handleImageError($event)" />
-                                <!-- Debug info -->
-                                <div class="absolute -bottom-6 left-0 w-20 truncate text-xs text-gray-500" :title="getImageUrl(voucher.duongDanHinhAnh)">
-                                    {{ getImageUrl(voucher.duongDanHinhAnh).split('/').pop() }}
-                                </div>
-                            </div>
-                            <div class="flex flex-col gap-2">
-                                <Button label="Xem ảnh" icon="pi pi-eye" size="small" text @click="previewImage(voucher)" />
-                                <Button label="Xóa ảnh" icon="pi pi-trash" size="small" severity="danger" outlined @click="removeImage" :disabled="loading" />
-                            </div>
+                    <label class="mb-3 block font-bold">Hình ảnh voucher</label>
+                    <div class="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition-colors hover:border-blue-400" @click="$refs.fileInput.click()">
+                        <input type="file" ref="fileInput" @change="handleFileSelect" accept="image/*" class="hidden" />
+
+                        <!-- Hiển thị hình ảnh preview -->
+                        <div v-if="imagePreview" class="mb-4">
+                            <img :src="imagePreview" alt="Preview" class="mx-auto max-h-48 max-w-full rounded border shadow-sm" />
+                            <p class="mt-2 text-sm text-gray-600">{{ selectedFileName }}</p>
                         </div>
 
-                        <!-- Input file upload -->
-                        <div class="flex flex-col gap-2">
-                            <input ref="fileInput" type="file" accept="image/*" @change="onFileSelect" style="display: none" />
-                            <Button :label="voucher.duongDanHinhAnh ? 'Thay đổi ảnh' : 'Chọn ảnh'" icon="pi pi-upload" outlined @click="fileInput.click()" :disabled="loading || uploadingImage" :loading="uploadingImage" />
-                            <small class="text-gray-500">Chỉ chấp nhận file ảnh (JPG, PNG, GIF, WEBP) - Tối đa 5MB</small>
+                        <!-- Nút chọn file -->
+                        <div v-else class="mb-4">
+                            <i class="pi pi-cloud-upload mb-4 text-4xl text-gray-400"></i>
+                            <p class="text-gray-600">Nhấn để chọn hình ảnh</p>
+                            <p class="text-sm text-gray-400">JPG, PNG, GIF, WEBP (Tối đa 5MB)</p>
                         </div>
 
-                        <!-- Manual URL input (fallback) -->
-                        <div class="flex flex-col gap-2">
-                            <label class="text-sm font-medium">Hoặc nhập URL ảnh:</label>
-                            <InputText v-model="voucher.duongDanHinhAnh" placeholder="https://example.com/image.jpg" fluid />
+                        <div class="flex justify-center gap-2" @click.stop>
+                            <Button label="Chọn file" icon="pi pi-upload" @click="$refs.fileInput.click()" severity="secondary" />
+                            <Button v-if="imagePreview" label="Xóa" icon="pi pi-times" @click="clearFile" severity="danger" outlined />
                         </div>
                     </div>
                 </div>
+
                 <div>
                     <label for="loaiGiamGia" class="mb-3 block font-bold">Loại giảm giá</label>
                     <Select
@@ -165,47 +151,32 @@
                     />
                     <small v-if="submitted && !voucher.loaiGiamGia" class="text-red-500">Loại giảm giá là bắt buộc.</small>
                 </div>
+
                 <div v-if="voucher.loaiGiamGia === 'PHAN_TRAM'">
-                    <label for="giaTriGiam" class="mb-3 block font-bold">Phần trăm giảm (% - từ 1% đến 100%)</label>
+                    <label for="giaTriGiam" class="mb-3 block font-bold">Phần trăm giảm (1% - 100%)</label>
                     <InputText id="giaTriGiam" v-model.number="voucher.giaTriGiam" fluid :min="1" :max="100" :invalid="submitted && (!voucher.giaTriGiam || voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)" />
                     <small v-if="submitted && (!voucher.giaTriGiam || voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)" class="text-red-500">Phần trăm giảm phải từ 1% đến 100%.</small>
                 </div>
+
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
                         <label for="giaTriGiamToiThieu" class="mb-3 block font-bold">Đơn hàng tối thiểu (VND)</label>
-                        <InputText
-                            id="giaTriGiamToiThieu"
-                            v-model.number="voucher.giaTriGiamToiThieu"
-                            mode="currency"
-                            currency="VND"
-                            locale="vi-VN"
-                            fluid
-                            :min="0"
-                            :invalid="submitted && (voucher.giaTriGiamToiThieu == null || voucher.giaTriGiamToiThieu < 0)"
-                        />
-                        <small v-if="submitted && (voucher.giaTriGiamToiThieu == null || voucher.giaTriGiamToiThieu < 0)" class="text-red-500">Giá trị đơn hàng tối thiểu không hợp lệ.</small>
+                        <InputText id="giaTriGiamToiThieu" v-model.number="voucher.giaTriGiamToiThieu" fluid :min="0" :invalid="submitted && (voucher.giaTriGiamToiThieu == null || voucher.giaTriGiamToiThieu < 0)" />
+                        <small v-if="submitted && (voucher.giaTriGiamToiThieu == null || voucher.giaTriGiamToiThieu < 0)" class="text-red-500">Giá trị không hợp lệ.</small>
                     </div>
                     <div class="col-span-6">
                         <label for="giaTriGiamToiDa" class="mb-3 block font-bold">Giảm tối đa (VND)</label>
-                        <InputText
-                            id="giaTriGiamToiDa"
-                            v-model.number="voucher.giaTriGiamToiDa"
-                            mode="currency"
-                            currency="VND"
-                            locale="vi-VN"
-                            fluid
-                            :min="0"
-                            :invalid="submitted && (voucher.giaTriGiamToiDa == null || voucher.giaTriGiamToiDa < 0)"
-                            @input="onGiaTriGiamToiDaChange"
-                        />
-                        <small v-if="submitted && (voucher.giaTriGiamToiDa == null || voucher.giaTriGiamToiDa < 0)" class="text-red-500">Giá trị giảm tối đa không hợp lệ.</small>
+                        <InputText id="giaTriGiamToiDa" v-model.number="voucher.giaTriGiamToiDa" fluid :min="0" :invalid="submitted && (voucher.giaTriGiamToiDa == null || voucher.giaTriGiamToiDa < 0)" />
+                        <small v-if="submitted && (voucher.giaTriGiamToiDa == null || voucher.giaTriGiamToiDa < 0)" class="text-red-500">Giá trị không hợp lệ.</small>
                     </div>
                 </div>
+
                 <div>
                     <label for="soLuong" class="mb-3 block font-bold">Số lượng</label>
                     <InputText id="soLuong" v-model.number="voucher.soLuong" fluid :min="0" :invalid="submitted && (voucher.soLuong == null || voucher.soLuong < 0)" />
                     <small v-if="submitted && (voucher.soLuong == null || voucher.soLuong < 0)" class="text-red-500">Số lượng không hợp lệ.</small>
                 </div>
+
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
                         <label for="ngayBatDau" class="mb-3 block font-bold">Ngày bắt đầu</label>
@@ -218,6 +189,7 @@
                         <small v-if="submitted && !voucher.ngayKetThuc" class="text-red-500">Ngày kết thúc là bắt buộc.</small>
                     </div>
                 </div>
+
                 <div>
                     <label for="trangThai" class="mb-3 block font-bold">Trạng thái</label>
                     <Select id="trangThai" v-model="voucher.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid :invalid="submitted && voucher.trangThai == null" />
@@ -227,10 +199,22 @@
 
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveVoucher" :loading="loading" />
+                <Button label="Lưu" icon="pi pi-check" @click="saveVoucher" :loading="uploading || loading" />
             </template>
         </Dialog>
 
+        <!-- DIALOG XEM HÌNH ẢNH FULL SIZE -->
+        <Dialog v-model:visible="imagePreviewDialog" :style="{ width: '800px' }" header="Xem hình ảnh voucher" :modal="true">
+            <div class="text-center">
+                <img :src="previewImageSrc" :alt="previewImageName" class="max-h-96 max-w-full rounded object-contain shadow" />
+                <div class="mt-4 text-sm text-gray-600">
+                    <p><strong>Voucher:</strong> {{ previewImageName }}</p>
+                    <p><strong>Đường dẫn:</strong> {{ previewImagePath }}</p>
+                </div>
+            </div>
+        </Dialog>
+
+        <!-- Delete confirmation dialogs -->
         <Dialog v-model:visible="deleteVoucherDialog" :style="{ width: '450px' }" header="Xác nhận" :modal="true">
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
@@ -264,62 +248,67 @@ import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 
+// ===== REACTIVE VARIABLES =====
 const toast = useToast();
 const dt = ref();
 const vouchers = ref([]);
 const voucherDialog = ref(false);
 const deleteVoucherDialog = ref(false);
 const deleteVouchersDialog = ref(false);
+const imagePreviewDialog = ref(false);
 const voucher = ref({});
 const selectedVouchers = ref();
 const submitted = ref(false);
 const loading = ref(false);
-const uploadingImage = ref(false);
-const fileInput = ref(null);
+
+// CÁC REF CHO UPLOAD FILE
+const fileInput = ref();
+const selectedFile = ref(null);
+const selectedFileName = ref('');
+const imagePreview = ref('');
+const uploading = ref(false);
+
+// CÁC REF CHO PREVIEW HÌNH ẢNH
+const previewImageSrc = ref('');
+const previewImageName = ref('');
+const previewImagePath = ref('');
+
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
+
 const statuses = ref([
     { label: 'Còn hạn', value: 1 },
     { label: 'Hết hạn', value: 0 }
 ]);
+
 const discountTypes = ref([
     { label: 'Phần trăm', value: 'PHAN_TRAM' },
     { label: 'Số tiền cố định', value: 'SO_TIEN_CO_DINH' }
 ]);
 
+// ===== LIFECYCLE =====
 onMounted(() => {
     fetchData();
 });
 
+// ===== API FUNCTIONS =====
 async function fetchData() {
     try {
         loading.value = true;
-        const res = await axios.get('http://localhost:8080/voucher');
+        const response = await axios.get('http://localhost:8080/voucher');
 
-        console.log('📦 Raw voucher data:', res.data);
+        console.log('📦 Fetched vouchers:', response.data);
 
-        vouchers.value = res.data.map((item) => {
-            // Xử lý URL hình ảnh
-            const imageUrl = getImageUrl(item.duongDanHinhAnh);
-
-            console.log(`Voucher ${item.id} image processing:`, {
-                original: item.duongDanHinhAnh,
-                processed: imageUrl
-            });
-
-            return {
-                ...item,
-                ngayBatDau: item.ngayBatDau ? new Date(item.ngayBatDau) : null,
-                ngayKetThuc: item.ngayKetThuc ? new Date(item.ngayKetThuc) : null,
-                // Thêm thuộc tính imageUrl để dễ debug
-                imageUrl: imageUrl
-            };
-        });
+        vouchers.value = response.data.map((item) => ({
+            ...item,
+            ngayBatDau: item.ngayBatDau ? new Date(item.ngayBatDau) : null,
+            ngayKetThuc: item.ngayKetThuc ? new Date(item.ngayKetThuc) : null
+        }));
 
         console.log('✅ Processed vouchers:', vouchers.value);
     } catch (error) {
-        console.error('Lỗi khi tải voucher:', error);
+        console.error('❌ Error fetching vouchers:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
@@ -331,6 +320,7 @@ async function fetchData() {
     }
 }
 
+// ===== UTILITY FUNCTIONS =====
 function formatCurrency(value) {
     if (value != null) return value.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
     return '0 ₫';
@@ -355,6 +345,11 @@ function createId() {
     return 'V' + id;
 }
 
+function getStatusLabel(status) {
+    return status === 1 ? 'success' : 'danger';
+}
+
+// ===== DIALOG FUNCTIONS =====
 function openNew() {
     voucher.value = {
         maVoucher: createId(),
@@ -369,6 +364,8 @@ function openNew() {
         ngayKetThuc: null,
         trangThai: 1
     };
+
+    clearFile();
     submitted.value = false;
     voucherDialog.value = true;
 }
@@ -376,190 +373,124 @@ function openNew() {
 function hideDialog() {
     voucherDialog.value = false;
     submitted.value = false;
-    voucher.value = {};
+    clearFile();
+}
+
+function editVoucher(voucherData) {
+    voucher.value = {
+        ...voucherData,
+        giaTriGiam: voucherData.giaTriGiam ?? 0,
+        giaTriGiamToiThieu: voucherData.giaTriGiamToiThieu ?? 0,
+        giaTriGiamToiDa: voucherData.giaTriGiamToiDa ?? 0,
+        soLuong: voucherData.soLuong ?? 0,
+        ngayBatDau: voucherData.ngayBatDau ? new Date(voucherData.ngayBatDau) : null,
+        ngayKetThuc: voucherData.ngayKetThuc ? new Date(voucherData.ngayKetThuc) : null,
+        trangThai: voucherData.trangThai ?? 1
+    };
+
+    // Reset file upload khi edit
+    selectedFile.value = null;
+    selectedFileName.value = '';
+    imagePreview.value = '';
+
+    // Hiển thị hình ảnh hiện có nếu có
+    if (voucherData.duongDanHinhAnh) {
+        imagePreview.value = `http://localhost:8080${voucherData.duongDanHinhAnh}`;
+        selectedFileName.value = voucherData.tenVoucher;
+    }
+
+    submitted.value = false;
+    voucherDialog.value = true;
 }
 
 function onDiscountTypeChange() {
-    // Reset và cập nhật giá trị khi thay đổi loại giảm giá
     if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
-        // Với giảm tiền mặt, giaTriGiam = giaTriGiamToiDa
         voucher.value.giaTriGiam = voucher.value.giaTriGiamToiDa || 0;
     } else if (voucher.value.loaiGiamGia === 'PHAN_TRAM') {
-        // Với giảm phần trăm, reset về giá trị hợp lệ
         voucher.value.giaTriGiam = Math.min(voucher.value.giaTriGiam || 10, 100);
     }
 }
 
-function getImageUrl(imagePath) {
-    if (!imagePath) {
-        console.warn('⚠️ No image path provided, using placeholder');
-        return '/images/placeholder.png';
-    }
-
-    console.log('🔍 Processing voucher image path:', imagePath);
-
-    // Nếu đã là URL đầy đủ (http/https), return luôn
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-        console.log('✅ Full URL detected:', imagePath);
-        return imagePath;
-    }
-
-    // ĐẶC BIỆT: Xử lý đường dẫn database cũ dạng /voucher/vc001.jpg
-    if (imagePath.startsWith('/voucher/') && !imagePath.includes('uploads')) {
-        // Đây là format cũ từ database: /voucher/vc001.jpg
-        const fileName = imagePath.replace('/voucher/', '');
-        const finalUrl = `http://localhost:8080/voucher/uploads/images/${fileName}`;
-        console.log('🔄 Legacy path converted:', imagePath, '→', finalUrl);
-        return finalUrl;
-    }
-
-    // Clean path - loại bỏ các prefix không cần thiết cho path mới
-    let cleanPath = imagePath;
-
-    // Loại bỏ các prefix phổ biến cho voucher
-    const prefixesToRemove = ['/voucher/uploads/images/', '/uploads/images/', '/images/', 'voucher/uploads/images/', 'uploads/images/', 'images/'];
-
-    for (const prefix of prefixesToRemove) {
-        if (cleanPath.startsWith(prefix)) {
-            cleanPath = cleanPath.replace(prefix, '');
-            break;
-        }
-    }
-
-    // Đảm bảo cleanPath không bắt đầu bằng /
-    cleanPath = cleanPath.replace(/^\/+/, '');
-
-    // Tạo URL cuối cùng cho voucher
-    const finalUrl = `http://localhost:8080/voucher/uploads/images/${cleanPath}`;
-
-    console.log('🎯 Generated voucher URL:', finalUrl);
-    return finalUrl;
-}
-
-function handleImageError(event) {
-    console.error('❌ Image load error:', event.target.src);
-
-    // Tránh loop vô hạn
-    if (event.target.src.includes('placeholder.png')) {
-        console.log('⚠️ Already using placeholder, stopping');
-        return;
-    }
-
-    // Lưu src gốc để debug
-    const originalSrc = event.target.src;
-    console.log('🔄 Fallback from:', originalSrc);
-
-    // Ngăn loop bằng cách remove event handler
-    event.target.onerror = null;
-
-    // Set placeholder
-    event.target.src = '/images/placeholder.png';
-
-    // Có thể thử URL backup khác trước khi dùng placeholder
-    // event.target.src = originalSrc.replace('/voucher/uploads/images/', '/uploads/images/');
-}
-
-async function onFileSelect(event) {
+// ===== FILE HANDLING =====
+function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validation phía client
+    // Kiểm tra loại file
     if (!file.type.startsWith('image/')) {
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: 'Chỉ được chọn file hình ảnh',
+            detail: 'Vui lòng chọn file hình ảnh (JPG, PNG, GIF, WEBP)',
             life: 3000
         });
         return;
     }
 
+    // Kiểm tra kích thước file (5MB)
     if (file.size > 5 * 1024 * 1024) {
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: 'Kích thước file không được vượt quá 5MB',
+            detail: 'File không được vượt quá 5MB',
             life: 3000
         });
         return;
     }
 
-    try {
-        uploadingImage.value = true;
+    selectedFile.value = file;
+    selectedFileName.value = file.name;
 
-        // Tạo FormData để upload
+    // Tạo preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        imagePreview.value = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearFile() {
+    selectedFile.value = null;
+    selectedFileName.value = '';
+    imagePreview.value = '';
+    if (fileInput.value) {
+        fileInput.value.value = '';
+    }
+}
+
+// UPLOAD FILE
+async function uploadFile(file) {
+    try {
         const formData = new FormData();
         formData.append('file', file);
 
-        // Upload file
-        const response = await axios.post('http://localhost:8080/voucher/upload-image', formData, {
+        console.log('📤 Uploading voucher image:', file.name);
+
+        const response = await axios.post('http://localhost:8080/voucher/upload', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
         });
 
-        if (response.data.success) {
-            voucher.value.duongDanHinhAnh = response.data.fileUrl;
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: 'Upload ảnh thành công',
-                life: 3000
-            });
-        } else {
-            throw new Error(response.data.message || 'Upload thất bại');
-        }
+        console.log('📥 Upload response:', response.data);
+        return response.data.path;
     } catch (error) {
-        console.error('Lỗi upload ảnh:', error);
+        console.error('💥 Error uploading file:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: error.response?.data?.message || 'Upload ảnh thất bại',
+            detail: 'Upload file thất bại',
             life: 3000
         });
-    } finally {
-        uploadingImage.value = false;
-        // Reset input file
-        if (fileInput.value) {
-            fileInput.value.value = '';
-        }
+        return null;
     }
 }
 
-async function removeImage() {
-    if (!voucher.value.duongDanHinhAnh) return;
-
-    try {
-        // Nếu là ảnh được upload lên server (không phải URL external)
-        if (voucher.value.duongDanHinhAnh.startsWith('/uploads/')) {
-            const fileName = voucher.value.duongDanHinhAnh.split('/').pop();
-            await axios.delete(`http://localhost:8080/voucher/delete-image/${fileName}`);
-        }
-
-        voucher.value.duongDanHinhAnh = '';
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Đã xóa ảnh',
-            life: 3000
-        });
-    } catch (error) {
-        console.error('Lỗi xóa ảnh:', error);
-        // Vẫn xóa ảnh khỏi form dù có lỗi xóa file
-        voucher.value.duongDanHinhAnh = '';
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Đã xóa ảnh khỏi form (có thể file vẫn tồn tại trên server)',
-            life: 3000
-        });
-    }
-}
-
+// ===== SAVE VOUCHER =====
 async function saveVoucher() {
     submitted.value = true;
 
-    // Check trống các trường dữ liệu bắt buộc
+    // KIỂM TRA CƠ BẢN
     if (!voucher.value.maVoucher?.trim()) {
         toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Mã voucher là bắt buộc', life: 3000 });
         return;
@@ -576,29 +507,17 @@ async function saveVoucher() {
         toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Phần trăm giảm phải từ 1% đến 100%', life: 3000 });
         return;
     }
-    if (!voucher.value.giaTriGiamToiThieu || voucher.value.giaTriGiamToiThieu < 0) {
+    if (voucher.value.giaTriGiamToiThieu == null || voucher.value.giaTriGiamToiThieu < 0) {
         toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá trị đơn hàng tối thiểu phải >= 0', life: 3000 });
         return;
     }
-    if (!voucher.value.giaTriGiamToiDa || voucher.value.giaTriGiamToiDa <= 0) {
+    if (voucher.value.giaTriGiamToiDa == null || voucher.value.giaTriGiamToiDa <= 0) {
         toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá trị giảm tối đa phải > 0', life: 3000 });
         return;
     }
 
     // Validation theo loại giảm giá
-    if (voucher.value.loaiGiamGia === 'PHAN_TRAM') {
-        // Với phần trăm: kiểm tra giảm tối đa không vượt quá đơn hàng tối thiểu (chỉ cảnh báo)
-        if (voucher.value.giaTriGiamToiDa > voucher.value.giaTriGiamToiThieu && voucher.value.giaTriGiamToiThieu > 0) {
-            toast.add({
-                severity: 'warn',
-                summary: 'Cảnh báo',
-                detail: 'Với giảm theo %, số tiền giảm tối đa không nên lớn hơn giá trị đơn hàng tối thiểu',
-                life: 5000
-            });
-            // Không return, chỉ cảnh báo
-        }
-    } else if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
-        // Với giảm tiền mặt: giảm cố định không được lớn hơn đơn hàng tối thiểu
+    if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
         if (voucher.value.giaTriGiamToiDa > voucher.value.giaTriGiamToiThieu && voucher.value.giaTriGiamToiThieu > 0) {
             toast.add({
                 severity: 'error',
@@ -609,7 +528,8 @@ async function saveVoucher() {
             return;
         }
     }
-    if (!voucher.value.soLuong || voucher.value.soLuong < 0) {
+
+    if (voucher.value.soLuong == null || voucher.value.soLuong < 0) {
         toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Số lượng không hợp lệ', life: 3000 });
         return;
     }
@@ -622,7 +542,7 @@ async function saveVoucher() {
         return;
     }
 
-    // Validation: Kiểm tra ngày bắt đầu phải trước ngày kết thúc
+    // Kiểm tra ngày
     if (new Date(voucher.value.ngayBatDau) >= new Date(voucher.value.ngayKetThuc)) {
         toast.add({
             severity: 'warn',
@@ -639,7 +559,25 @@ async function saveVoucher() {
     }
 
     try {
-        loading.value = true;
+        uploading.value = true;
+
+        // NẾU CÓ FILE MỚI, UPLOAD TRƯỚC
+        if (selectedFile.value) {
+            const uploadedPath = await uploadFile(selectedFile.value);
+            if (uploadedPath) {
+                voucher.value.duongDanHinhAnh = uploadedPath;
+                console.log('✅ Image uploaded, path:', uploadedPath);
+            } else {
+                toast.add({
+                    severity: 'error',
+                    summary: 'Lỗi',
+                    detail: 'Upload file thất bại',
+                    life: 3000
+                });
+                return;
+            }
+        }
+
         const voucherData = {
             ...voucher.value,
             ngayBatDau: new Date(voucher.value.ngayBatDau).toISOString().split('T')[0],
@@ -647,6 +585,7 @@ async function saveVoucher() {
         };
 
         if (voucher.value.id) {
+            // CẬP NHẬT
             await axios.put(`http://localhost:8080/voucher/${voucher.value.id}`, voucherData);
             toast.add({
                 severity: 'success',
@@ -655,7 +594,7 @@ async function saveVoucher() {
                 life: 3000
             });
         } else {
-            voucherData.maVoucher = voucherData.maVoucher || createId();
+            // THÊM MỚI
             await axios.post('http://localhost:8080/voucher', voucherData);
             toast.add({
                 severity: 'success',
@@ -664,40 +603,29 @@ async function saveVoucher() {
                 life: 3000
             });
         }
+
         await fetchData();
         voucherDialog.value = false;
         voucher.value = {};
+        clearFile();
     } catch (error) {
-        console.error('Lỗi khi lưu voucher:', error.response?.data, error.response?.status);
+        console.error('💥 Save error:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: `Lưu voucher thất bại: ${error.response?.data?.message || error.message}`,
+            detail: `Lưu voucher thất bại: ${error.response?.data || error.message}`,
             life: 3000
         });
     } finally {
+        uploading.value = false;
         loading.value = false;
         submitted.value = false;
     }
 }
 
-function editVoucher(vouch) {
-    voucher.value = {
-        ...vouch,
-        giaTriGiam: vouch.giaTriGiam ?? 0,
-        giaTriGiamToiThieu: vouch.giaTriGiamToiThieu ?? 0,
-        giaTriGiamToiDa: vouch.giaTriGiamToiDa ?? 0,
-        soLuong: vouch.soLuong ?? 0,
-        ngayBatDau: vouch.ngayBatDau ? new Date(vouch.ngayBatDau) : null,
-        ngayKetThuc: vouch.ngayKetThuc ? new Date(vouch.ngayKetThuc) : null,
-        trangThai: vouch.trangThai ?? 1
-    };
-    submitted.value = false;
-    voucherDialog.value = true;
-}
-
-function confirmDeleteVoucher(vouch) {
-    voucher.value = vouch;
+// ===== DELETE FUNCTIONS =====
+function confirmDeleteVoucher(voucherData) {
+    voucher.value = voucherData;
     deleteVoucherDialog.value = true;
 }
 
@@ -715,7 +643,7 @@ async function deleteVoucher() {
             life: 3000
         });
     } catch (error) {
-        console.error('Lỗi khi xóa voucher:', error);
+        console.error('💥 Delete error:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
@@ -734,8 +662,8 @@ function confirmDeleteSelected() {
 async function deleteSelectedVouchers() {
     try {
         loading.value = true;
-        for (const vouch of selectedVouchers.value) {
-            await axios.delete(`http://localhost:8080/voucher/${vouch.id}`);
+        for (const voucherItem of selectedVouchers.value) {
+            await axios.delete(`http://localhost:8080/voucher/${voucherItem.id}`);
         }
         await fetchData();
         deleteVouchersDialog.value = false;
@@ -747,7 +675,7 @@ async function deleteSelectedVouchers() {
             life: 3000
         });
     } catch (error) {
-        console.error('Lỗi khi xóa nhiều voucher:', error);
+        console.error('💥 Delete multiple error:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
@@ -759,11 +687,11 @@ async function deleteSelectedVouchers() {
     }
 }
 
-async function changeStatus(vouch) {
+async function changeStatus(voucherData) {
     try {
         loading.value = true;
-        const updatedVoucher = { ...vouch, trangThai: vouch.trangThai === 1 ? 0 : 1 };
-        await axios.put(`http://localhost:8080/voucher/${vouch.id}`, updatedVoucher);
+        const updatedVoucher = { ...voucherData, trangThai: voucherData.trangThai === 1 ? 0 : 1 };
+        await axios.put(`http://localhost:8080/voucher/${voucherData.id}`, updatedVoucher);
         await fetchData();
         toast.add({
             severity: 'success',
@@ -772,7 +700,7 @@ async function changeStatus(vouch) {
             life: 3000
         });
     } catch (error) {
-        console.error('Lỗi khi cập nhật trạng thái:', error);
+        console.error('💥 Status change error:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
@@ -784,10 +712,23 @@ async function changeStatus(vouch) {
     }
 }
 
-function getStatusLabel(status) {
-    return status === 1 ? 'success' : 'danger';
+// ===== IMAGE PREVIEW =====
+function previewImage(voucherData) {
+    if (voucherData.duongDanHinhAnh) {
+        previewImageSrc.value = `http://localhost:8080${voucherData.duongDanHinhAnh}`;
+        previewImageName.value = voucherData.tenVoucher;
+        previewImagePath.value = voucherData.duongDanHinhAnh;
+        imagePreviewDialog.value = true;
+    }
 }
 
+function handleImageError(event) {
+    console.error('❌ Image load failed:', event.target.src);
+    event.target.src = '/images/placeholder.png';
+    event.target.onerror = null;
+}
+
+// ===== EXPORT CSV =====
 function exportCSV() {
     try {
         if (!vouchers.value || vouchers.value.length === 0) {
@@ -855,7 +796,7 @@ function exportCSV() {
             });
         }
     } catch (error) {
-        console.error('Error exporting CSV:', error);
+        console.error('💥 Export error:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
