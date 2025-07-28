@@ -6,7 +6,7 @@ const router = createRouter({
     routes: [
         // ROUTE USER - Trang chủ người dùng (KHÔNG CẦN ĐĂNG NHẬP)
         {
-            path: '/home',
+            path: '/',
             name: 'user-home',
             component: () => import('@/views/user/UserHome.vue'),
             meta: { requiresAuth: false }
@@ -16,6 +16,16 @@ const router = createRouter({
             name: 'products',
             component: () => import('@/views/user/product/ProductList.vue')
   },
+  {
+    path: '/card',
+    name: 'card',
+    component: () => import('@/views/user/card/Card.vue')
+},
+{
+    path: '/checkout',
+    name: 'checkout',
+    component: () => import('@/views/user/card/ThanhToan.vue')
+},
 //            {
 //             path: '/gioithieu',
 //             name: 'gioi-thieu',

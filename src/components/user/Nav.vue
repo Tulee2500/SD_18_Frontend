@@ -8,7 +8,7 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 // State
-const cartItemCount = ref(3);
+const cartItemCount = ref(0); // Thay đổi từ 3 thành 0
 const secondNavOpen = ref(false);
 const user = ref(null);
 const isUserDropdownOpen = ref(false);
@@ -46,12 +46,31 @@ const loadUserData = () => {
     }
 };
 
+// Hàm mới để đếm số lượng sản phẩm trong giỏ hàng
+const updateCartCount = () => {
+    try {
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        // Tính tổng số lượng của tất cả sản phẩm
+        cartItemCount.value = cart.reduce((total, item) => total + (item.quantity || 0), 0);
+    } catch (error) {
+        console.error('Error reading cart from localStorage:', error);
+        cartItemCount.value = 0;
+    }
+};
+
+// Hàm lắng nghe thay đổi localStorage
+const handleStorageChange = (e) => {
+    if (e.key === 'cart') {
+        updateCartCount();
+    }
+};
+
 const goToLogin = () => {
     router.push('/auth/login');
 };
 
 const goToCart = () => {
-    router.push('/cart');
+    router.push('/card');
 };
 
 const goToProfile = () => {
@@ -121,12 +140,17 @@ const handleClickOutside = (event) => {
 onMounted(() => {
     handleResize();
     loadUserData();
+    updateCartCount(); // Tải số lượng giỏ hàng khi component mount
+
+    // Lắng nghe sự kiện thay đổi
     window.addEventListener('resize', handleResize);
+    window.addEventListener('storage', handleStorageChange);
     document.addEventListener('click', handleClickOutside);
 });
 
 onUnmounted(() => {
     window.removeEventListener('resize', handleResize);
+    window.removeEventListener('storage', handleStorageChange);
     document.removeEventListener('click', handleClickOutside);
 });
 </script>
@@ -159,9 +183,9 @@ onUnmounted(() => {
                         <svg class="h-6 w-6 text-slate-600 transition-colors group-hover:text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m0 0h8" />
                         </svg>
-                        <!-- Cart Badge -->
+                        <!-- Cart Badge - Cập nhật hiển thị số lượng thực tế -->
                         <span v-if="cartItemCount > 0" class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md">
-                            {{ cartItemCount }}
+                            {{ cartItemCount > 99 ? '99+' : cartItemCount }}
                         </span>
                     </div>
 
@@ -207,28 +231,6 @@ onUnmounted(() => {
 
                                 <!-- Menu Items -->
                                 <div class="py-2">
-                                    <!-- <button
-                    @click="goToProfile"
-                    class="w-full flex items-center gap-3 px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    <span>Thông tin cá nhân</span>
-                  </button> -->
-
-                                    <!-- Admin/NhanVien Dashboard -->
-                                    <!-- <button
-                    v-if="user.vaiTro === 'ADMIN' || user.vaiTro === 'NHANVIEN'"
-                    @click="router.push('/dashboard'); isUserDropdownOpen = false;"
-                    class="w-full flex items-center gap-3 px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <span>Quản trị</span>
-                  </button> -->
-
                                     <div class="my-1 border-t border-gray-100"></div>
 
                                     <!-- Logout Button -->
@@ -301,5 +303,21 @@ onUnmounted(() => {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Cart badge animation */
+.cart-badge-enter-active,
+.cart-badge-leave-active {
+    transition: all 0.3s ease;
+}
+
+.cart-badge-enter-from {
+    opacity: 0;
+    transform: scale(0.5);
+}
+
+.cart-badge-leave-to {
+    opacity: 0;
+    transform: scale(0.5);
 }
 </style>
