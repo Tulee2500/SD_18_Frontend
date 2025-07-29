@@ -516,7 +516,7 @@
                                                 <th>Giá bán</th>
                                                 <th>Số lượng</th>
                                                 <th>Thành tiền</th>
-                                                <th v-if="canEditItems(selectedHoaDon)">Thao tác</th>
+                                                <!-- <th v-if="canEditItems(selectedHoaDon)">Thao tác</th> -->
                                             </tr>
                                         </thead>
                                         <tbody>

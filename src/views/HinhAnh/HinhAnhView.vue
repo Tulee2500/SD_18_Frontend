@@ -24,7 +24,7 @@
             currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} hình ảnh"
         >
             <template #header>
-                <div class="flex flex-wrap gap-2 items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
                     <h4 class="m-0">📋 Quản lý Hình Ảnh</h4>
                     <IconField>
                         <InputIcon>
@@ -37,22 +37,22 @@
 
             <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
             <Column field="id" header="ID" sortable style="min-width: 6rem"></Column>
-            
+
             <!-- CỘT HÌNH ẢNH -->
             <Column header="Hình ảnh" style="min-width: 12rem">
                 <template #body="slotProps">
                     <div class="flex justify-center">
-                        <img 
-                            :src="`http://localhost:8080${slotProps.data.duongDan}`" 
+                        <img
+                            :src="`http://localhost:8080${slotProps.data.duongDan}`"
                             :alt="slotProps.data.tenHinhAnh"
-                            class="w-20 h-20 object-cover rounded border shadow-sm cursor-pointer hover:scale-105 transition-transform"
+                            class="h-20 w-20 cursor-pointer rounded border object-cover shadow-sm transition-transform hover:scale-105"
                             @click="previewImage(slotProps.data)"
                             @error="handleImageError($event)"
                         />
                     </div>
                 </template>
             </Column>
-            
+
             <Column field="maHinhAnh" header="Mã Hình Ảnh" sortable style="min-width: 12rem"></Column>
             <Column field="tenHinhAnh" header="Tên File" sortable style="min-width: 20rem"></Column>
             <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
@@ -75,57 +75,39 @@
         <Dialog v-model:visible="hinhAnhDialog" :style="{ width: '500px' }" header="Chi tiết Hình Ảnh" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
-                    <label for="maHinhAnh" class="block font-bold mb-3">Mã Hình Ảnh</label>
+                    <label for="maHinhAnh" class="mb-3 block font-bold">Mã Hình Ảnh</label>
                     <InputText id="maHinhAnh" v-model.trim="hinhAnh.maHinhAnh" required="true" autofocus :invalid="submitted && !hinhAnh.maHinhAnh" fluid readonly="true" />
                     <small v-if="submitted && !hinhAnh.maHinhAnh" class="text-red-500">Mã Hình Ảnh là bắt buộc.</small>
                 </div>
-                
+
                 <!-- PHẦN UPLOAD FILE -->
                 <div>
-                    <label class="block font-bold mb-3">Chọn hình ảnh</label>
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer" @click="$refs.fileInput.click()">
-                        <input 
-                            type="file" 
-                            ref="fileInput"
-                            @change="handleFileSelect"
-                            accept="image/*"
-                            class="hidden"
-                        />
-                        
+                    <label class="mb-3 block font-bold">Chọn hình ảnh</label>
+                    <div class="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition-colors hover:border-blue-400" @click="$refs.fileInput.click()">
+                        <input type="file" ref="fileInput" @change="handleFileSelect" accept="image/*" class="hidden" />
+
                         <!-- Hiển thị hình ảnh preview -->
                         <div v-if="imagePreview" class="mb-4">
-                            <img :src="imagePreview" alt="Preview" class="max-w-full max-h-48 mx-auto rounded border shadow-sm" />
-                            <p class="text-sm text-gray-600 mt-2">{{ selectedFileName }}</p>
+                            <img :src="imagePreview" alt="Preview" class="mx-auto max-h-48 max-w-full rounded border shadow-sm" />
+                            <p class="mt-2 text-sm text-gray-600">{{ selectedFileName }}</p>
                         </div>
-                        
+
                         <!-- Nút chọn file -->
                         <div v-else class="mb-4">
-                            <i class="pi pi-cloud-upload text-4xl text-gray-400 mb-4"></i>
+                            <i class="pi pi-cloud-upload mb-4 text-4xl text-gray-400"></i>
                             <p class="text-gray-600">Nhấn để chọn hình ảnh</p>
                             <p class="text-sm text-gray-400">JPG, PNG, GIF (Tối đa 5MB)</p>
                         </div>
-                        
-                        <div class="flex gap-2 justify-center" @click.stop>
-                            <Button 
-                                label="Chọn file" 
-                                icon="pi pi-upload" 
-                                @click="$refs.fileInput.click()"
-                                severity="secondary"
-                            />
-                            <Button 
-                                v-if="imagePreview"
-                                label="Xóa" 
-                                icon="pi pi-times" 
-                                @click="clearFile"
-                                severity="danger"
-                                outlined
-                            />
+
+                        <div class="flex justify-center gap-2" @click.stop>
+                            <Button label="Chọn file" icon="pi pi-upload" @click="$refs.fileInput.click()" severity="secondary" />
+                            <Button v-if="imagePreview" label="Xóa" icon="pi pi-times" @click="clearFile" severity="danger" outlined />
                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <label for="trangThai" class="block font-bold mb-3">Trạng Thái</label>
+                    <label for="trangThai" class="mb-3 block font-bold">Trạng Thái</label>
                     <Select id="trangThai" v-model="hinhAnh.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
                 </div>
             </div>
@@ -138,11 +120,7 @@
         <!-- DIALOG XEM HÌNH ẢNH FULL SIZE -->
         <Dialog v-model:visible="imagePreviewDialog" :style="{ width: '800px' }" header="Xem hình ảnh" :modal="true">
             <div class="text-center">
-                <img 
-                    :src="previewImageSrc" 
-                    :alt="previewImageName"
-                    class="max-w-full max-h-96 object-contain rounded shadow"
-                />
+                <img :src="previewImageSrc" :alt="previewImageName" class="max-h-96 max-w-full rounded object-contain shadow" />
                 <div class="mt-4 text-sm text-gray-600">
                     <p><strong>Tên file:</strong> {{ previewImageName }}</p>
                     <p><strong>Đường dẫn:</strong> {{ previewImagePath }}</p>
@@ -181,10 +159,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useToast } from 'primevue/usetoast';
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
+import { useToast } from 'primevue/usetoast';
+import { onMounted, ref } from 'vue';
 
 const toast = useToast();
 const dt = ref();
@@ -252,7 +230,7 @@ function openNew() {
         tenHinhAnh: '',
         trangThai: 1
     };
-    
+
     clearFile();
     submitted.value = false;
     hinhAnhDialog.value = true;
@@ -268,7 +246,7 @@ function hideDialog() {
 function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     // Kiểm tra loại file
     if (!file.type.startsWith('image/')) {
         toast.add({
@@ -279,7 +257,7 @@ function handleFileSelect(event) {
         });
         return;
     }
-    
+
     // Kiểm tra kích thước file (5MB)
     if (file.size > 5 * 1024 * 1024) {
         toast.add({
@@ -290,13 +268,13 @@ function handleFileSelect(event) {
         });
         return;
     }
-    
+
     selectedFile.value = file;
     selectedFileName.value = file.name;
-    
+
     // CHỈ TỰ ĐỘNG ĐIỀN TÊN FILE
     hinhAnh.value.tenHinhAnh = file.name;
-    
+
     // Tạo preview
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -320,13 +298,13 @@ async function uploadFile(file) {
     try {
         const formData = new FormData();
         formData.append('file', file);
-        
+
         const response = await axios.post('http://localhost:8080/hinh-anh/upload', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
         });
-        
+
         return response.data.path;
     } catch (error) {
         console.error('Error uploading file:', error);
@@ -378,7 +356,7 @@ async function saveHinhAnh() {
 
     try {
         uploading.value = true;
-        
+
         // NẾU CÓ FILE MỚI, UPLOAD TRƯỚC
         if (selectedFile.value) {
             const uploadedPath = await uploadFile(selectedFile.value);
@@ -394,7 +372,7 @@ async function saveHinhAnh() {
                 return;
             }
         }
-        
+
         if (hinhAnh.value.id) {
             // CẬP NHẬT
             await axios.put(`http://localhost:8080/hinh-anh/${hinhAnh.value.id}`, hinhAnh.value);
@@ -414,7 +392,7 @@ async function saveHinhAnh() {
                 life: 3000
             });
         }
-        
+
         fetchData();
         hinhAnhDialog.value = false;
         hinhAnh.value = {};
@@ -435,18 +413,18 @@ async function saveHinhAnh() {
 // EDIT ĐƠN GIẢN
 function editHinhAnh(ha) {
     hinhAnh.value = { ...ha };
-    
+
     // Reset file upload khi edit
     selectedFile.value = null;
     selectedFileName.value = '';
     imagePreview.value = '';
-    
+
     // Hiển thị hình ảnh hiện có nếu có
     if (ha.duongDan) {
         imagePreview.value = `http://localhost:8080${ha.duongDan}`;
         selectedFileName.value = ha.tenHinhAnh;
     }
-    
+
     hinhAnhDialog.value = true;
 }
 
@@ -560,23 +538,22 @@ function exportCSV() {
 
         const headers = ['ID', 'Mã Hình Ảnh', 'Tên File', 'Trạng Thái'];
 
-        const csvData = ListHinhAnh.value.map(item => {
-            return [
-                item.id || '',
-                item.maHinhAnh || '',
-                item.tenHinhAnh || '',
-                item.trangThai === 1 ? 'Đã load' : 'Đang load'
-            ];
+        const csvData = ListHinhAnh.value.map((item) => {
+            return [item.id || '', item.maHinhAnh || '', item.tenHinhAnh || '', item.trangThai === 1 ? 'Đã load' : 'Đang load'];
         });
 
         const csvContent = [headers, ...csvData]
-            .map(row => row.map(field => {
-                const stringField = String(field);
-                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
-                    return `"${stringField.replace(/"/g, '""')}"`;
-                }
-                return stringField;
-            }).join(','))
+            .map((row) =>
+                row
+                    .map((field) => {
+                        const stringField = String(field);
+                        if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                            return `"${stringField.replace(/"/g, '""')}"`;
+                        }
+                        return stringField;
+                    })
+                    .join(',')
+            )
             .join('\n');
 
         const BOM = '\uFEFF';
@@ -584,11 +561,11 @@ function exportCSV() {
 
         const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        
+
         if (link.download !== undefined) {
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            
+
             const now = new Date();
             const dateStr = now.toISOString().split('T')[0];
             const filename = `HinhAnh-${dateStr}.csv`;
@@ -598,7 +575,7 @@ function exportCSV() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
+
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
