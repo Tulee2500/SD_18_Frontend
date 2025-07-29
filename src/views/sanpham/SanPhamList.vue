@@ -2209,7 +2209,8 @@ function collapseAll() {
                 </div>
 
                 <!-- PHẦN CHỌN HÌNH ẢNH - GIỐNG NHƯ CŨ -->
-                <!-- <div class="mt-4">
+                <!-- Trong template của detailDialog -->
+                <div class="mt-4" v-if="detail.isEditing">
                     <div class="flex justify-between items-center mb-3">
                         <label class="block font-bold">Hình ảnh sản phẩm</label>
                         <Button 
@@ -2219,16 +2220,16 @@ function collapseAll() {
                             @click="openImageSelection"
                             severity="secondary"
                         />
-                    </div> -->
+                    </div>
                     
                     <!-- Hiển thị hình ảnh đã chọn -->
-                    <!-- <div v-if="detail.selectedImage" class="p-3 border border-gray-200 rounded">
-                        <div class="flex items-center gap-4">
+                    <div v-if="detail.selectedImage" class="p-3 border border-gray-200 rounded">
+                        <div class="flex flex-col items-center">
                             <div class="relative group">
                                 <img 
                                     :src="detail.selectedImage.url || detail.selectedImage.preview" 
                                     :alt="detail.selectedImage.tenHinhAnh"
-                                    class="w-20 h-20 object-cover rounded border shadow-sm"
+                                    class="w-64 h-64 object-cover rounded border shadow-sm"
                                     @error="handleImageError($event)"
                                 />
                                 <Button 
@@ -2240,15 +2241,10 @@ function collapseAll() {
                                     @click="removeSelectedImage()"
                                 />
                             </div>
-                            <div class="flex-1">
-                                <div class="font-medium text-gray-900">{{ detail.selectedImage.maHinhAnh }}</div>
-                                <div class="text-sm text-gray-600">{{ detail.selectedImage.tenHinhAnh }}</div>
-                                <div class="text-xs text-gray-500 mt-1">{{ detail.selectedImage.duongDan }}</div>
-                                <Badge 
-                                    :value="detail.selectedImage.trangThai === 1 ? 'Sẵn sàng' : 'Đang xử lý'" 
-                                    :severity="detail.selectedImage.trangThai === 1 ? 'success' : 'warning'"
-                                    class="mt-2"
-                                />
+                            <div class="flex-1 text-center">
+                                <!-- <div class="font-medium text-gray-900">{{ detail.selectedImage.maHinhAnh }}</div> -->
+                                <div class="text-xl font-bold text-black-900">{{ detail.selectedImage.tenHinhAnh }}</div>
+                                <div class="text-xs text-black-500 mt-1">{{ detail.selectedImage.duongDan }}</div>
                             </div>
                         </div>
                     </div>
@@ -2257,7 +2253,7 @@ function collapseAll() {
                         <p>Chưa chọn hình ảnh nào</p>
                         <small>Nhấn "Chọn hình ảnh" để thêm hình ảnh cho sản phẩm</small>
                     </div>
-                </div> -->
+                </div>
 
               <!-- PREVIEW BIẾN THỂ SẼ ĐƯỢC TẠO - CHỈ HIỂN THI KHI THÊM MỚI -->
                 <div v-if="!detail.isEditing && getVariantPreview.length > 0" class="mt-4">
