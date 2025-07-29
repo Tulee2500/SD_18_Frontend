@@ -177,6 +177,7 @@ async function saveThuongHieu() {
     if (thuongHieu.value.maThuongHieu?.trim() && thuongHieu.value.tenThuongHieu?.trim()) {
         try {
             if (thuongHieu.value.id) {
+                // Cập nhật thương hiệu
                 await axios.put(`http://localhost:8080/thuong-hieu/${thuongHieu.value.id}`, thuongHieu.value);
                 toast.add({
                     severity: 'success',
@@ -185,7 +186,10 @@ async function saveThuongHieu() {
                     life: 3000
                 });
             } else {
-                requestData.maKhuyenMai = requestData.maKhuyenMai || createId();
+                // Tạo mới thương hiệu
+                // ✅ Sửa: Đảm bảo có mã thương hiệu trước khi gửi
+                thuongHieu.value.maThuongHieu = thuongHieu.value.maThuongHieu || createId();
+                
                 await axios.post('http://localhost:8080/thuong-hieu', thuongHieu.value);
                 toast.add({
                     severity: 'success',
@@ -194,16 +198,29 @@ async function saveThuongHieu() {
                     life: 3000
                 });
             }
+            
             fetchData();
             thuongHieuDialog.value = false;
             thuongHieu.value = {};
         } catch (error) {
             console.error('Error saving thương hiệu:', error);
+            
+            // ✅ Hiển thị lỗi chi tiết hơn
+            let errorMessage = 'Lưu thương hiệu thất bại';
+            
+            if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.response?.data) {
+                errorMessage = error.response.data;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
             toast.add({
                 severity: 'error',
                 summary: 'Lỗi',
-                detail: error.response?.data?.message || 'Lưu thương hiệu thất bại',
-                life: 3000
+                detail: errorMessage,
+                life: 5000
             });
         }
     } else {

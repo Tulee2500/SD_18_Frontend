@@ -13,10 +13,12 @@ import bigShoe8 from "../assets/images/product5.png";
 import bigShoe9 from "../assets/images/product6.png";
 import bigShoe10 from "../assets/images/product8(1).png";
 export const navLinks = [
+
     { href: "/", label: "Trang Chủ" },
     { href: "/gioithieu", label: "Giới Thiệu" },
     { href: "/products", label: "Sản Phẩm" },
     { href: "/lienhe", label: "Liên Hệ" },
+
 ];
 
 export const statistics = [

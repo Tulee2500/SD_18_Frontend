@@ -235,6 +235,7 @@ async function fetchData() {
     }
 }
 
+// Hàm tự động gen mã hình ảnh
 function createId() {
     let id = '';
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

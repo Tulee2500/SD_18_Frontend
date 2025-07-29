@@ -1,6 +1,6 @@
 <script setup>
 import FloatingConfigurator from '@/components/FloatingConfigurator.vue';
-import { ref, onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 const email = ref('');
 const password = ref('');
@@ -56,12 +56,14 @@ const login = async () => {
             return;
         }
 
+        console.log('🔄 Attempting login...');
+
         // Gọi API backend để đăng nhập
-        const response = await fetch('http://localhost:8080/auth/login', { // Bỏ /api
+        const response = await fetch('http://localhost:8080/auth/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                Accept: 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify({
@@ -72,13 +74,35 @@ const login = async () => {
         });
 
         const data = await response.json();
+        console.log('📝 Login response:', data);
 
         if (response.ok && data.success) {
             successMessage.value = 'Đăng nhập thành công!';
 
-            // Lưu token và thông tin user từ data.data
+            // Lưu token
             localStorage.setItem('auth_token', data.data.token);
-            localStorage.setItem('user_info', JSON.stringify(data.data.user));
+
+            // Tạo object user info đầy đủ với thông tin nhân viên
+            const userInfo = {
+                id: data.data.user.id,
+                email: data.data.user.email,
+                vaiTro: data.data.user.vaiTro,
+                maTaiKhoan: data.data.user.maTaiKhoan,
+
+                // Thêm thông tin nhân viên với nhiều fallback
+                tenNhanVien: data.data.user.tenNhanVien || data.data.user.hoTen || data.data.user.hoVaTen || data.data.user.fullName || data.data.user.name || data.data.user.email?.split('@')[0] || 'Nhân viên',
+
+                maNhanVien: data.data.user.maNhanVien || data.data.user.maNV || data.data.user.employeeCode || data.data.user.staffCode || data.data.user.maTaiKhoan || `NV${data.data.user.id}` || 'NV001',
+
+                // Backup fields
+                hoTen: data.data.user.hoTen || data.data.user.tenNhanVien || data.data.user.email?.split('@')[0] || 'Nhân viên'
+            };
+
+            // Log để debug
+            console.log('💾 Saving user info:', userInfo);
+
+            // Lưu thông tin user với key chính xác
+            localStorage.setItem('user_info', JSON.stringify(userInfo));
 
             // Lưu thông tin "Remember me"
             if (checked.value) {
@@ -88,6 +112,10 @@ const login = async () => {
                 localStorage.removeItem('rememberMe');
                 localStorage.removeItem('savedEmail');
             }
+
+            // Verify data đã được lưu
+            const savedUserInfo = localStorage.getItem('user_info');
+            console.log('✅ Verified saved user info:', JSON.parse(savedUserInfo));
 
             // Chuyển hướng theo role từ backend
             setTimeout(() => {
@@ -103,10 +131,23 @@ const login = async () => {
             errorMessage.value = data.message || 'Đăng nhập thất bại. Vui lòng thử lại.';
         }
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('❌ Login error:', error);
         errorMessage.value = 'Có lỗi xảy ra. Vui lòng thử lại.';
     } finally {
         isLoading.value = false;
+    }
+};
+
+// Thêm function để test thông tin user sau khi đăng nhập
+const testUserInfo = () => {
+    const userInfo = localStorage.getItem('user_info');
+    if (userInfo) {
+        const user = JSON.parse(userInfo);
+        console.log('🧪 Test - Current user info:', user);
+        console.log('👤 Ten nhan vien:', user.tenNhanVien);
+        console.log('🆔 Ma nhan vien:', user.maNhanVien);
+    } else {
+        console.log('❌ No user info found');
     }
 };
 
@@ -156,53 +197,39 @@ onMounted(() => {
 
 <template>
     <FloatingConfigurator />
-    <div class="bg-surface-50 dark:bg-surface-950 flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden">
+    <div class="flex min-h-screen min-w-[100vw] items-center justify-center overflow-hidden bg-surface-50 dark:bg-surface-950">
         <div class="flex flex-col items-center justify-center">
             <div style="border-radius: 56px; padding: 0.3rem; background: linear-gradient(180deg, var(--primary-color) 10%, rgba(33, 150, 243, 0) 30%)">
-                <div class="w-full bg-surface-0 dark:bg-surface-900 py-20 px-8 sm:px-20" style="border-radius: 53px">
-                    <div class="text-center mb-8">
-                        <svg viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="mb-8 w-16 shrink-0 mx-auto">
-                            <path d="M4 20C4 11.1634 11.1634 4 20 4H34C42.8366 4 50 11.1634 50 20V20C50 28.8366 42.8366 36 34 36H20C11.1634 36 4 28.8366 4 20V20Z" fill="var(--primary-color)"/>
-                            <path d="M20 12H34V28H20V12Z" fill="white"/>
+                <div class="w-full bg-surface-0 px-8 py-20 sm:px-20 dark:bg-surface-900" style="border-radius: 53px">
+                    <div class="mb-8 text-center">
+                        <svg viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-8 w-16 shrink-0">
+                            <path d="M4 20C4 11.1634 11.1634 4 20 4H34C42.8366 4 50 11.1634 50 20V20C50 28.8366 42.8366 36 34 36H20C11.1634 36 4 28.8366 4 20V20Z" fill="var(--primary-color)" />
+                            <path d="M20 12H34V28H20V12Z" fill="white" />
                         </svg>
-                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">
-                            Chào mừng đến với Sneaker Store!
-                        </div>
-                        <span class="text-muted-color font-medium">Đăng nhập để tiếp tục</span>
+                        <div class="mb-4 text-3xl font-medium text-surface-900 dark:text-surface-0">Chào mừng đến với Sneaker Store!</div>
+                        <span class="font-medium text-muted-color">Đăng nhập để tiếp tục</span>
                     </div>
 
                     <!-- Thông báo thành công -->
-                    <div v-if="successMessage" class="mb-4 p-3 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-md border border-green-200 dark:border-green-800">
+                    <div v-if="successMessage" class="mb-4 rounded-md border border-green-200 bg-green-100 p-3 text-green-700 dark:border-green-800 dark:bg-green-900 dark:text-green-300">
                         <i class="pi pi-check-circle mr-2"></i>
                         {{ successMessage }}
                     </div>
 
                     <!-- Thông báo lỗi -->
-                    <div v-if="errorMessage" class="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-md border border-red-200 dark:border-red-800">
+                    <div v-if="errorMessage" class="mb-4 rounded-md border border-red-200 bg-red-100 p-3 text-red-700 dark:border-red-800 dark:bg-red-900 dark:text-red-300">
                         <i class="pi pi-exclamation-triangle mr-2"></i>
                         {{ errorMessage }}
                     </div>
 
                     <form @submit.prevent="login">
                         <div class="mb-6">
-                            <label for="email1" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">
-                                Email <span class="text-red-500">*</span>
-                            </label>
-                            <InputText
-                                id="email1"
-                                type="email"
-                                placeholder="Nhập địa chỉ email"
-                                class="w-full md:w-[30rem]"
-                                v-model="email"
-                                :class="{ 'p-invalid': errorMessage && !email }"
-                                autocomplete="username"
-                            />
+                            <label for="email1" class="mb-2 block text-xl font-medium text-surface-900 dark:text-surface-0"> Email <span class="text-red-500">*</span> </label>
+                            <InputText id="email1" type="email" placeholder="Nhập địa chỉ email" class="w-full md:w-[30rem]" v-model="email" :class="{ 'p-invalid': errorMessage && !email }" autocomplete="username" />
                         </div>
 
                         <div class="mb-4">
-                            <label for="password1" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">
-                                Mật khẩu <span class="text-red-500">*</span>
-                            </label>
+                            <label for="password1" class="mb-2 block text-xl font-medium text-surface-900 dark:text-surface-0"> Mật khẩu <span class="text-red-500">*</span> </label>
                             <Password
                                 id="password1"
                                 v-model="password"
@@ -216,37 +243,21 @@ onMounted(() => {
                             />
                         </div>
 
-                        <div class="flex items-center justify-between mt-2 mb-8 gap-4">
+                        <div class="mb-8 mt-2 flex items-center justify-between gap-4">
                             <div class="flex items-center">
                                 <Checkbox v-model="checked" id="rememberme1" binary class="mr-2" />
-                                <label for="rememberme1" class="text-sm cursor-pointer">Ghi nhớ đăng nhập</label>
+                                <label for="rememberme1" class="cursor-pointer text-sm">Ghi nhớ đăng nhập</label>
                             </div>
-                            <span
-                                class="font-medium no-underline text-sm cursor-pointer text-primary hover:underline"
-                                @click="forgotPassword"
-                            >
-                                Quên mật khẩu?
-                            </span>
+                            <span class="cursor-pointer text-sm font-medium text-primary no-underline hover:underline" @click="forgotPassword"> Quên mật khẩu? </span>
                         </div>
 
-                        <Button
-                            type="submit"
-                            :label="isLoading ? 'Đang xử lý...' : 'Đăng nhập'"
-                            class="w-full mb-4"
-                            :disabled="isLoading"
-                            :loading="isLoading"
-                        />
+                        <Button type="submit" :label="isLoading ? 'Đang xử lý...' : 'Đăng nhập'" class="mb-4 w-full" :disabled="isLoading" :loading="isLoading" />
                     </form>
 
-              <!-- Register link -->
-                    <div class="text-center mt-8">
+                    <!-- Register link -->
+                    <div class="mt-8 text-center">
                         <span class="text-muted-color">Chưa có tài khoản? </span>
-                        <span
-                            class="font-medium cursor-pointer text-primary hover:underline"
-                            @click="goToRegister"
-                        >
-                            Đăng ký ngay
-                        </span>
+                        <span class="cursor-pointer font-medium text-primary hover:underline" @click="goToRegister"> Đăng ký ngay </span>
                     </div>
                 </div>
             </div>

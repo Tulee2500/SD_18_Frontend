@@ -31,9 +31,10 @@ const shippingInfo = ref({
 // Payment & Discount
 const discountCode = ref('');
 const discount = ref(0);
-const paymentMethod = ref('cod'); // cod, bank_transfer, etc.
+const paymentMethod = ref('cod');
 
 // Location Data
+const addressData = ref([]);
 const provinces = ref([]);
 const districts = ref([]);
 const wards = ref([]);
@@ -43,12 +44,10 @@ const loadUserInfo = () => {
   const savedUser = localStorage.getItem('user_info');
   if (savedUser) {
     userInfo.value = JSON.parse(savedUser);
-    // Pre-fill shipping info with user data
     shippingInfo.value.fullName = userInfo.value.hoTen || '';
     shippingInfo.value.email = userInfo.value.email || '';
     shippingInfo.value.phone = userInfo.value.soDienThoai || '';
   } else {
-    // Redirect to login if not authenticated
     router.push('/auth/login');
   }
 };
@@ -70,58 +69,114 @@ const loadCart = () => {
       totalPrice: Number(item.price) * Number(item.quantity)
     }));
   } else {
-    // Redirect to cart if empty
     router.push('/cart');
   }
 };
 
-// Load provinces/cities
-const loadProvinces = async () => {
+// Load address data from GitHub - giống code JavaScript gốc
+const loadAddressData = async () => {
+  console.log('🚀 Đang load dữ liệu địa chỉ từ GitHub...');
   try {
-    // This would typically call your backend API for provinces
-    // For demo, using static data
-    provinces.value = [
-      { id: 1, name: 'Hà Nội' },
-      { id: 2, name: 'TP. Hồ Chí Minh' },
-      { id: 3, name: 'Đà Nẵng' },
-      { id: 4, name: 'Hải Phòng' },
-      { id: 5, name: 'Cần Thơ' }
-    ];
+    const response = await axios({
+      url: "https://raw.githubusercontent.com/kenzouno1/DiaGioiHanhChinhVN/master/data.json",
+      method: "GET",
+      responseType: "json"
+    });
+
+    console.log('✅ Đã load được dữ liệu từ GitHub:', response.data.length, 'tỉnh/thành');
+    addressData.value = response.data;
+    renderProvinces(response.data);
+
   } catch (error) {
-    console.error('Error loading provinces:', error);
+    console.error('❌ Lỗi khi load từ GitHub:', error);
+    console.log('🔄 Sử dụng dữ liệu fallback...');
+    useFallbackData();
   }
 };
 
-// Load districts based on province
-const loadDistricts = async (provinceId) => {
-  try {
-    // This would call your backend API
-    districts.value = [
-      { id: 1, name: 'Quận Ba Đình' },
-      { id: 2, name: 'Quận Hoàn Kiếm' },
-      { id: 3, name: 'Quận Đống Đa' },
-      { id: 4, name: 'Quận Hai Bà Trưng' },
-      { id: 5, name: 'Quận Cầu Giấy' }
-    ];
-  } catch (error) {
-    console.error('Error loading districts:', error);
-  }
+// Fallback data nếu không kết nối được GitHub
+const useFallbackData = () => {
+  const fallbackData = [
+    {
+      Id: "01", Name: "Hà Nội",
+      Districts: [
+        {
+          Id: "001", Name: "Quận Ba Đình",
+          Wards: [
+            { Id: "00001", Name: "Phường Phúc Xá" },
+            { Id: "00004", Name: "Phường Trúc Bạch" },
+            { Id: "00006", Name: "Phường Vĩnh Phúc" }
+          ]
+        },
+        {
+          Id: "002", Name: "Quận Hoàn Kiếm",
+          Wards: [
+            { Id: "00019", Name: "Phường Phan Chu Trinh" },
+            { Id: "00022", Name: "Phường Hàng Trống" }
+          ]
+        }
+      ]
+    },
+    {
+      Id: "79", Name: "TP. Hồ Chí Minh",
+      Districts: [
+        {
+          Id: "760", Name: "Quận 1",
+          Wards: [
+            { Id: "26734", Name: "Phường Tân Định" },
+            { Id: "26737", Name: "Phường Đa Kao" }
+          ]
+        }
+      ]
+    }
+  ];
+
+  addressData.value = fallbackData;
+  renderProvinces(fallbackData);
+  showNotification('warning', 'Cảnh báo', 'Sử dụng dữ liệu mặc định');
 };
 
-// Load wards based on district
-const loadWards = async (districtId) => {
-  try {
-    // This would call your backend API
-    wards.value = [
-      { id: 1, name: 'Phường Phúc Xá' },
-      { id: 2, name: 'Phường Trúc Bạch' },
-      { id: 3, name: 'Phường Vĩnh Phúc' },
-      { id: 4, name: 'Phường Cống Vị' },
-      { id: 5, name: 'Phường Liễu Giai' }
-    ];
-  } catch (error) {
-    console.error('Error loading wards:', error);
+// Render provinces - chuyển đổi từ code JavaScript gốc
+const renderProvinces = (data) => {
+  provinces.value = [];
+  for (const x of data) {
+    provinces.value.push({ id: x.Id, name: x.Name });
   }
+  console.log('✅ Đã render', provinces.value.length, 'tỉnh/thành');
+};
+
+// Load districts based on province - giống logic code gốc
+const loadDistricts = (provinceId) => {
+  districts.value = [];
+  wards.value = [];
+
+  if (provinceId && addressData.value.length > 0) {
+    const result = addressData.value.filter(n => n.Id === provinceId);
+    if (result.length > 0 && result[0].Districts) {
+      for (const k of result[0].Districts) {
+        districts.value.push({ id: k.Id, name: k.Name });
+      }
+    }
+  }
+  console.log('✅ Đã load', districts.value.length, 'quận/huyện');
+};
+
+// Load wards based on district - giống logic code gốc
+const loadWards = (districtId) => {
+  wards.value = [];
+
+  if (districtId && shippingInfo.value.province && addressData.value.length > 0) {
+    const dataCity = addressData.value.filter((n) => n.Id === shippingInfo.value.province);
+    if (dataCity.length > 0 && dataCity[0].Districts) {
+      const dataWards = dataCity[0].Districts.filter(n => n.Id === districtId);
+      if (dataWards.length > 0 && dataWards[0].Wards) {
+        for (const w of dataWards[0].Wards) {
+          wards.value.push({ id: w.Id, name: w.Name });
+        }
+      }
+    }
+  }
+  console.log('✅ Đã load', wards.value.length, 'phường/xã');
 };
 
 // Province change handler
@@ -142,6 +197,22 @@ const onDistrictChange = () => {
   if (shippingInfo.value.district) {
     loadWards(shippingInfo.value.district);
   }
+};
+
+// Get address names for display
+const getProvinceName = (provinceId) => {
+  const province = provinces.value.find(p => p.id === provinceId);
+  return province ? province.name : '';
+};
+
+const getDistrictName = (districtId) => {
+  const district = districts.value.find(d => d.id === districtId);
+  return district ? district.name : '';
+};
+
+const getWardName = (wardId) => {
+  const ward = wards.value.find(w => w.id === wardId);
+  return ward ? ward.name : '';
 };
 
 // Apply discount code
@@ -241,9 +312,9 @@ const submitOrder = async () => {
         hoTen: shippingInfo.value.fullName,
         soDienThoai: shippingInfo.value.phone,
         diaChi: shippingInfo.value.address,
-        phuongXa: shippingInfo.value.ward,
-        quanHuyen: shippingInfo.value.district,
-        tinhThanh: shippingInfo.value.province,
+        phuongXa: getWardName(shippingInfo.value.ward),
+        quanHuyen: getDistrictName(shippingInfo.value.district),
+        tinhThanh: getProvinceName(shippingInfo.value.province),
         loaiDiaChi: shippingInfo.value.shippingType
       },
       ghiChu: shippingInfo.value.note,
@@ -259,7 +330,6 @@ const submitOrder = async () => {
 
     if (response.data.success) {
       orderSuccess.value = true;
-      // Clear cart
       localStorage.removeItem('cart');
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'cart',
@@ -269,7 +339,6 @@ const submitOrder = async () => {
       showNotification('success', 'Đặt hàng thành công!', 'Đơn hàng của bạn đã được ghi nhận');
       emit('order-success', response.data.data);
 
-      // Redirect to order success page after 2 seconds
       setTimeout(() => {
         router.push(`/order-success/${response.data.data.maDonHang}`);
       }, 2000);
@@ -282,6 +351,11 @@ const submitOrder = async () => {
   }
 };
 
+// Handle image error
+const handleImageError = (event) => {
+  event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMCAyMEg0NFY0NEgyMFYyMFoiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPHBhdGggZD0iTTI4IDI4TDM2IDM2TDQwIDMyIiBzdHJva2U9IiM5Q0EzQUYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=';
+};
+
 // Go back to cart
 const goBackToCart = () => {
   emit('go-back');
@@ -291,7 +365,7 @@ const goBackToCart = () => {
 onMounted(() => {
   loadUserInfo();
   loadCart();
-  loadProvinces();
+  loadAddressData();
 });
 </script>
 
@@ -301,7 +375,10 @@ onMounted(() => {
     <div v-if="notification.show"
          :class="[
            'fixed top-20 right-6 z-50 p-4 rounded-lg shadow-lg max-w-sm',
-           notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+           notification.type === 'success' ? 'bg-green-500 text-white' :
+           notification.type === 'warning' ? 'bg-yellow-500 text-white' :
+           notification.type === 'info' ? 'bg-blue-500 text-white' :
+           'bg-red-500 text-white'
          ]">
       <h4 class="font-bold">{{ notification.title }}</h4>
       <p class="text-sm">{{ notification.message }}</p>
@@ -505,10 +582,10 @@ onMounted(() => {
           <div class="space-y-3 mb-4 max-h-64 overflow-y-auto">
             <div v-for="item in cartItems" :key="item.id" class="flex gap-3 pb-3 border-b last:border-0">
               <img
-                :src="item.image"
+                :src="item.image || '/placeholder-shoe.png'"
                 :alt="item.name"
                 class="w-16 h-16 object-cover rounded"
-                @error="$event.target.src = '/placeholder-shoe.png'"
+                @error="handleImageError"
               />
               <div class="flex-1">
                 <h4 class="text-sm font-medium line-clamp-1">{{ item.name }}</h4>
