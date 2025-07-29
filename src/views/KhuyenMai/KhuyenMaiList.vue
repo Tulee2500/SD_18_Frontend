@@ -691,6 +691,9 @@ const totalPromotionValue = computed(() => {
 async function fetchData() {
     isLoading.value = true;
     try {
+        // Kiểm tra và reset giá cho các khuyến mãi không active trước
+        await checkAndResetAllInactivePrices();
+        
         const res = await axios.get('http://localhost:8080/khuyen-mai');
         khuyenMais.value = res.data;
     } catch (error) {
@@ -873,9 +876,35 @@ async function applyPromotionToProducts() {
     }
 }
 
+// Function để reset giá bán về giá gốc cho các sản phẩm của khuyến mãi không active
+async function resetPricesForInactivePromotion(promotionId) {
+    try {
+        await axios.put(`http://localhost:8080/khuyen-mai-chi-tiet/${promotionId}/reset-prices`);
+    } catch (error) {
+        console.error('Error resetting prices:', error);
+    }
+}
+
+// Function để kiểm tra và reset giá cho tất cả khuyến mãi không active  
+async function checkAndResetAllInactivePrices() {
+    try {
+        await axios.put('http://localhost:8080/khuyen-mai-chi-tiet/reset-all-inactive-prices');
+    } catch (error) {
+        console.error('Error resetting all inactive prices:', error);
+    }
+}
+
 // View products functions
 async function viewPromotionProducts(promotion) {
     selectedPromotionForView.value = promotion;
+    
+    // Kiểm tra trạng thái khuyến mãi và reset giá nếu cần
+    const status = getPromotionStatus(promotion);
+    if (status !== 'active') {
+        await resetPricesForInactivePromotion(promotion.id);
+        await fetchData(); // Refresh dữ liệu khuyến mãi
+    }
+    
     viewProductsDialog.value = true;
     await loadPromotionProducts(promotion.id);
 }
@@ -885,6 +914,21 @@ async function loadPromotionProducts(promotionId) {
     try {
         const res = await axios.get(`http://localhost:8080/khuyen-mai-chi-tiet/${promotionId}`);
         promotionProducts.value = res.data;
+        
+        // Kiểm tra trạng thái khuyến mãi và đảm bảo giá bán được hiển thị đúng
+        const promotion = selectedPromotionForView.value;
+        const status = getPromotionStatus(promotion);
+        
+        if (status !== 'active') {
+            // Nếu khuyến mãi không active, đảm bảo giá bán = giá gốc trong hiển thị
+            promotionProducts.value = promotionProducts.value.map(item => ({
+                ...item,
+                chiTietSanPham: {
+                    ...item.chiTietSanPham,
+                    giaBan: item.chiTietSanPham.giaGoc
+                }
+            }));
+        }
     } catch (error) {
         console.error('Error loading promotion products:', error);
         toast.add({
@@ -892,7 +936,7 @@ async function loadPromotionProducts(promotionId) {
             summary: 'Lỗi',
             detail: 'Không thể tải danh sách sản phẩm của khuyến mãi',
             life: 3000
-        });
+        })
     } finally {
         isLoadingPromotionProducts.value = false;
     }
