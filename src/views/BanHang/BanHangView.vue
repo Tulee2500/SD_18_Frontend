@@ -187,7 +187,8 @@
                                 <li class="page-item" :class="{ disabled: trangHienTai === 0 }">
                                     <a class="page-link" @click="chuyenTrang(trangHienTai - 1)" href="#" @click.prevent>
                                         <i class="bi bi-chevron-left"></i>
-                                    </a> q
+                                    </a>
+                                    q
                                 </li>
                                 <li class="page-item active">
                                     <span class="page-link">{{ trangHienTai + 1 }} / {{ tongSoTrang }}</span>
@@ -242,15 +243,20 @@
                         <div class="card-body">
                             <div v-if="khachHang" class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <div class="fw-bold">{{ khachHang.hoTen }}</div>
-                                    <small class="text-muted">{{ khachHang.sdt }}</small>
-                                    <div class="small text-primary">Điểm tích lũy: {{ khachHang.diemTichLuy || 0 }}</div>
+                                    <!-- ✅ SỬA: Hiển thị đầy đủ thông tin -->
+                                    <div class="fw-bold">{{ khachHang.hoTen || 'Chưa có tên' }}</div>
+                                    <small class="text-muted d-block">📞 {{ khachHang.sdt || 'Chưa có SĐT' }}</small>
+                                    <small class="text-muted d-block" v-if="khachHang.email"> ✉️ {{ khachHang.email }} </small>
+                                    <div class="small mt-1 text-primary">💎 Điểm tích lũy: {{ khachHang.diemTichLuy || 0 }} điểm</div>
                                 </div>
-                                <button @click="boKhachHang" class="btn btn-outline-danger btn-sm">
+                                <button @click="boKhachHang" class="btn btn-outline-danger btn-sm" title="Bỏ khách hàng">
                                     <i class="bi bi-x-lg"></i>
                                 </button>
                             </div>
-                            <div v-else class="text-muted text-center"><i class="bi bi-person me-2"></i>Khách lẻ</div>
+                            <div v-else class="text-muted py-2 text-center">
+                                <i class="bi bi-person me-2"></i>Khách lẻ
+                                <div class="small mt-1">Chưa chọn khách hàng</div>
+                            </div>
                         </div>
                     </div>
 
@@ -262,15 +268,38 @@
                         </div>
                         <div class="card-body">
                             <div v-if="voucher" class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="fw-bold">{{ voucher.tenVoucher }}</div>
-                                    <div class="text-success">Giảm {{ formatPrice(voucher.giaTriGiam) }}</div>
+                                <div class="d-flex align-items-center flex-grow-1">
+                                    <!-- ✅ THÊM: Hình ảnh voucher đã chọn -->
+                                    <div class="position-relative me-3" style="width: 48px; height: 48px; flex-shrink: 0">
+                                        <img :src="getVoucherImage(voucher)" :alt="voucher.tenVoucher" @error="handleVoucherImageError" class="w-100 h-100 rounded-3 object-fit-cover border-success border" style="border-width: 2px !important" />
+                                        <!-- Badge success indicator -->
+                                        <span class="position-absolute badge bg-success rounded-circle start-0 top-0" style="width: 16px; height: 16px; transform: translate(-50%, -50%); font-size: 0.6rem">
+                                            <i class="bi bi-check"></i>
+                                        </span>
+                                    </div>
+
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-truncate" style="max-width: 200px">{{ voucher.tenVoucher }}</div>
+                                        <div class="text-success small">
+                                            <i class="bi bi-tag-fill me-1"></i>
+                                            <span v-if="voucher.loaiGiamGia === 'PHAN_TRAM'"> Giảm {{ voucher.giaTriGiam }}% </span>
+                                            <span v-else> Giảm {{ formatPrice(voucher.giaTriGiam) }} </span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <button @click="boVoucher" class="btn btn-outline-danger btn-sm">
+
+                                <button @click="boVoucher" class="btn btn-outline-danger btn-sm ms-2" title="Bỏ voucher">
                                     <i class="bi bi-x-lg"></i>
                                 </button>
                             </div>
-                            <div v-else class="text-muted text-center"><i class="bi bi-ticket me-2"></i>Chưa có voucher</div>
+
+                            <div v-else class="text-muted py-2 text-center">
+                                <div class="mb-2">
+                                    <i class="bi bi-ticket display-6 text-muted"></i>
+                                </div>
+                                <div>Chưa có voucher</div>
+                                <small class="text-muted">Nhấn "Áp dụng" để chọn voucher</small>
+                            </div>
                         </div>
                     </div>
 
@@ -527,25 +556,59 @@
                                 <button @click="layDanhSachVoucher()" class="btn btn-outline-success">Tải lại voucher</button>
                             </div>
 
-                            <div class="list-group">
-                                <button v-for="voucher_item in danhSachVoucher" :key="voucher_item.id" @click="chonVoucher(voucher_item)" class="list-group-item list-group-item-action">
+                            <div v-else class="list-group">
+                                <button v-for="voucher_item in danhSachVoucher" :key="voucher_item.id" @click="chonVoucher(voucher_item)" class="list-group-item list-group-item-action p-3">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-success d-flex align-items-center justify-content-center me-3 rounded text-white" style="width: 48px; height: 48px">
-                                                <i class="bi bi-ticket"></i>
+                                        <div class="d-flex align-items-center flex-grow-1">
+                                            <!-- ✅ THÊM: Hiển thị hình ảnh voucher -->
+                                            <div class="position-relative me-3" style="width: 64px; height: 64px; flex-shrink: 0">
+                                                <img
+                                                    :src="getVoucherImage(voucher_item)"
+                                                    :alt="voucher_item.tenVoucher"
+                                                    @error="handleVoucherImageError"
+                                                    class="w-100 h-100 rounded-3 object-fit-cover border"
+                                                    style="border: 2px solid #e9ecef !important"
+                                                />
+                                                <!-- Badge loại voucher -->
+                                                <span class="position-absolute badge bg-success rounded-pill start-0 top-0" style="font-size: 0.6rem; transform: translate(-25%, -25%)">
+                                                    <i class="bi bi-ticket-fill"></i>
+                                                </span>
                                             </div>
-                                            <div>
-                                                <h6 class="mb-1">{{ voucher_item.tenVoucher }}</h6>
-                                                <!-- ✅ SỬA: Bỏ mô tả vì database không có -->
-                                                <p class="text-muted mb-1">Giảm {{ voucher_item.loaiGiamGia === 'PHAN_TRAM' ? voucher_item.giaTriGiam + '%' : formatPrice(voucher_item.giaTriGiam) }}</p>
-                                                <small class="text-success">Đơn tối thiểu: {{ formatPrice(voucher_item.giaTriDonHangToiThieu || 0) }}</small>
+
+                                            <div class="flex-grow-1">
+                                                <h6 class="fw-bold mb-1">{{ voucher_item.tenVoucher }}</h6>
+                                                <!-- ✅ SỬA: Hiển thị thông tin giảm giá rõ ràng hơn -->
+                                                <p class="text-muted small mb-1">
+                                                    <i class="bi bi-tag-fill text-success me-1"></i>
+                                                    <span v-if="voucher_item.loaiGiamGia === 'PHAN_TRAM'">
+                                                        Giảm {{ voucher_item.giaTriGiam }}%
+                                                        <span class="text-warning">(tối đa {{ formatPrice(voucher_item.giaTriGiamToiDa) }})</span>
+                                                    </span>
+                                                    <span v-else> Giảm {{ formatPrice(voucher_item.giaTriGiam) }} </span>
+                                                </p>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <small class="text-success">
+                                                        <i class="bi bi-cart-check me-1"></i>
+                                                        Đơn tối thiểu: {{ formatPrice(voucher_item.giaTriDonHangToiThieu || 0) }}
+                                                    </small>
+                                                    <small class="text-info">
+                                                        <i class="bi bi-box me-1"></i>
+                                                        Còn: {{ voucher_item.soLuongConLai }} lượt
+                                                    </small>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div class="text-end">
-                                            <span class="badge bg-success fs-6">
-                                                {{ voucher_item.loaiGiamGia === 'PHAN_TRAM' ? '-' + voucher_item.giaTriGiam + '%' : formatPrice(voucher_item.giaTriGiam) }}
-                                            </span>
-                                            <div class="small text-muted">HSD: {{ formatDate(voucher_item.ngayKetThuc) }}</div>
+
+                                        <div class="ms-3 text-end">
+                                            <!-- ✅ SỬA: Badge giá trị giảm đẹp hơn -->
+                                            <div class="mb-2">
+                                                <span v-if="voucher_item.loaiGiamGia === 'PHAN_TRAM'" class="badge bg-gradient fs-6 bg-primary px-3 py-2"> -{{ voucher_item.giaTriGiam }}% </span>
+                                                <span v-else class="badge bg-gradient bg-success fs-6 px-3 py-2"> -{{ formatPrice(voucher_item.giaTriGiam) }} </span>
+                                            </div>
+                                            <div class="small text-muted">
+                                                <i class="bi bi-calendar3 me-1"></i>
+                                                HSD: {{ formatDate(voucher_item.ngayKetThuc) }}
+                                            </div>
                                         </div>
                                     </div>
                                 </button>
@@ -559,19 +622,98 @@
             </div>
         </div>
 
-        <!-- QR Scanner Modal -->
+        <!-- QR Scanner Modal với Camera -->
         <div v-if="showQrScanner" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="modal-dialog">
+            <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title"><i class="bi bi-qr-code-scan me-2"></i>Quét mã QR</h5>
                         <button @click="showQrScanner = false" type="button" class="btn-close"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <input ref="qrInput" v-model="qrCode" type="text" placeholder="Nhập hoặc quét mã QR sản phẩm" @keyup.enter="quetQR" class="form-control" />
+                        <!-- Tab selection -->
+                        <ul class="nav nav-tabs mb-3">
+                            <li class="nav-item">
+                                <button class="nav-link" :class="{ active: qrMode === 'manual' }" @click="switchQrMode('manual')"><i class="bi bi-keyboard me-1"></i>Nhập thủ công</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" :class="{ active: qrMode === 'camera' }" @click="switchQrMode('camera')"><i class="bi bi-camera me-1"></i>Quét bằng camera</button>
+                            </li>
+                        </ul>
+
+                        <!-- Manual input -->
+                        <div v-if="qrMode === 'manual'" class="mb-3">
+                            <label class="form-label">Mã QR sản phẩm</label>
+                            <input ref="qrInput" v-model="qrCode" type="text" placeholder="Nhập mã QR sản phẩm (ví dụ: QR_1, QR_2...)" @keyup.enter="quetQR" class="form-control" />
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Nhập mã QR hoặc scan từ nhãn sản phẩm
+                            </div>
                         </div>
-                        <button @click="quetQR" :disabled="!qrCode.trim()" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Tìm sản phẩm</button>
+
+                        <!-- Camera scanner - cập nhật phần này trong template -->
+                        <div v-if="qrMode === 'camera'" class="mb-3">
+                            <label class="form-label">Camera Scanner</label>
+
+                            <!-- Camera container -->
+                            <div class="mb-2 rounded border p-2" style="min-height: 300px">
+                                <!-- Default state -->
+                                <div v-if="!cameraStarted && !cameraError" class="qr-loading-container">
+                                    <div class="text-center">
+                                        <i class="bi bi-camera display-4 text-muted"></i>
+                                        <p class="text-muted mt-3">Nhấn "Bắt đầu quét" để khởi động camera</p>
+                                        <button @click="startCamera" class="btn btn-success"><i class="bi bi-play me-1"></i>Bắt đầu quét</button>
+                                    </div>
+                                </div>
+
+                                <!-- Camera view -->
+                                <div v-if="cameraStarted && !cameraError" class="text-center">
+                                    <div id="qr-reader"></div>
+                                    <button @click="stopCamera" class="btn btn-danger btn-sm mt-2"><i class="bi bi-stop me-1"></i>Dừng camera</button>
+                                </div>
+
+                                <!-- Error state -->
+                                <div v-if="cameraError" class="qr-error-container">
+                                    <i class="bi bi-exclamation-triangle display-4 mb-3"></i>
+                                    <div class="text-center">
+                                        <p class="mb-3">{{ cameraError }}</p>
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <button @click="retryCamera" class="btn btn-warning btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Thử lại</button>
+                                            <button @click="switchQrMode('manual')" class="btn btn-outline-secondary btn-sm"><i class="bi bi-keyboard me-1"></i>Nhập thủ công</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- QR code result -->
+                            <div v-if="qrCode" class="qr-success-container">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                Đã quét được mã: <strong>{{ qrCode }}</strong>
+                            </div>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="d-flex gap-2">
+                            <button @click="quetQR" :disabled="!qrCode.trim() || loadingQR" class="btn btn-primary flex-grow-1">
+                                <span v-if="loadingQR" class="spinner-border spinner-border-sm me-2"></span>
+                                <i v-else class="bi bi-search me-1"></i>
+                                {{ loadingQR ? 'Đang tìm...' : 'Tìm sản phẩm' }}
+                            </button>
+
+                            <button @click="clearQrCode" v-if="qrCode" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+
+                        <!-- QR History (optional) -->
+                        <div v-if="qrHistory.length > 0" class="mt-3">
+                            <h6 class="text-muted"><i class="bi bi-clock-history me-1"></i>Lịch sử quét gần đây</h6>
+                            <div class="d-flex flex-wrap gap-1">
+                                <button v-for="item in qrHistory.slice(0, 5)" :key="item.qrCode" @click="qrCode = item.qrCode" class="btn btn-outline-info btn-sm" :title="item.productName">
+                                    {{ item.qrCode }}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -815,9 +957,45 @@
                             <div class="row mb-4">
                                 <div class="col-md-6">
                                     <h5>Thông tin khách hàng</h5>
-                                    <p class="mb-1"><strong>Họ tên:</strong> {{ khachHang?.hoTen || 'Khách lẻ' }}</p>
-                                    <p class="mb-1"><strong>Điện thoại:</strong> {{ khachHang?.sdt || 'N/A' }}</p>
-                                    <p class="mb-0"><strong>Điểm tích lũy:</strong> {{ khachHang?.diemTichLuy || 0 }} điểm</p>
+                                    <!-- ✅ SỬA: Sử dụng thông tin từ thongTinThanhToanCuoi hoặc khachHang hiện tại -->
+                                    <p class="mb-1">
+                                        <strong>Họ tên:</strong>
+                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.hoTen || khachHang?.hoTen || 'Khách lẻ' }}
+                                    </p>
+                                    <p class="mb-1">
+                                        <strong>Điện thoại:</strong>
+                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.sdt || khachHang?.sdt || 'N/A' }}
+                                    </p>
+                                    <p class="mb-1">
+                                        <strong>Email:</strong>
+                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.email || khachHang?.email || 'N/A' }}
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Điểm tích lũy:</strong>
+                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.diemTichLuy || khachHang?.diemTichLuy || 0 }} điểm
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Thông tin thanh toán</h5>
+                                    <p class="mb-1"><strong>Tiền mặt:</strong> {{ formatPrice(thongTinThanhToanCuoi?.tienMat || 0) }}</p>
+                                    <p class="mb-1"><strong>Chuyển khoản:</strong> {{ formatPrice(thongTinThanhToanCuoi?.chuyenKhoan || 0) }}</p>
+                                    <p class="mb-1"><strong>Tiền thừa:</strong> {{ formatPrice(thongTinThanhToanCuoi?.tienThua || 0) }}</p>
+                                    <p class="mb-0" v-if="thongTinThanhToanCuoi?.diemSuDung > 0"><strong>Điểm đã sử dụng:</strong> {{ thongTinThanhToanCuoi.diemSuDung }} điểm</p>
+                                </div>
+                            </div>
+
+                            <!-- ✅ SỬA: Phần chữ ký cuối hóa đơn -->
+                            <div class="row mt-5">
+                                <div class="col-6 text-center">
+                                    <p class="fw-bold">Người bán</p>
+                                    <br /><br /><br />
+                                    <p>{{ nhanVienInfo.tenNhanVien }}</p>
+                                </div>
+                                <div class="col-6 text-center">
+                                    <p class="fw-bold">Người mua</p>
+                                    <br /><br /><br />
+                                    <!-- ✅ SỬA: Hiển thị tên khách hàng thực tế -->
+                                    <p>{{ thongTinThanhToanCuoi?.khachHangInfo?.hoTen || khachHang?.hoTen || '.........................' }}</p>
                                 </div>
                             </div>
 
@@ -826,6 +1004,7 @@
                                     <thead class="table-light">
                                         <tr>
                                             <th>STT</th>
+                                            <th>Mã sản phẩm</th>
                                             <th>Tên sản phẩm</th>
                                             <th>Màu sắc</th>
                                             <th>Kích cỡ</th>
@@ -837,6 +1016,7 @@
                                     <tbody>
                                         <tr v-for="(item, index) in sanPhamDaThanhToan" :key="index">
                                             <td>{{ index + 1 }}</td>
+                                            <td>{{ item.maSanPham }}</td>
                                             <td>{{ item.tenSanPham }}</td>
                                             <td>{{ item.mauSac?.tenMau || 'N/A' }}</td>
                                             <td>{{ item.kichCo?.tenKichCo || 'N/A' }}</td>
@@ -915,8 +1095,8 @@
     </div>
 </template>
 <script>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
-
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 export default {
     name: 'BanHangTaiQuay',
     setup() {
@@ -1684,27 +1864,6 @@ export default {
             }
         };
 
-        const quetQR = async () => {
-            if (!qrCode.value.trim()) return;
-
-            try {
-                const data = await apiCall(`${API_BASE_URL}/san-pham/scan-qr`, {
-                    method: 'POST',
-                    body: JSON.stringify({ qrCode: qrCode.value })
-                });
-
-                if (data.success) {
-                    showQrScanner.value = false;
-                    qrCode.value = '';
-                    await themVaoHoaDon(data.data);
-                } else {
-                    showToastMessage(data.message || 'Không tìm thấy sản phẩm', 'error');
-                }
-            } catch (error) {
-                showToastMessage('Lỗi quét QR code', 'error');
-            }
-        };
-
         // =================== CUSTOMER FUNCTIONS ===================
         const loadDanhSachKhachHang = async () => {
             if (loadingCustomers.value) return;
@@ -2052,20 +2211,42 @@ export default {
                     sanPhamDaThanhToan.value = [...sanPhamDaChon.value];
                     tongQuanDaThanhToan.value = { ...tongQuan.value };
                     voucherDaThanhToan.value = voucher.value ? { ...voucher.value } : null;
+
+                    // ✅ SỬA: Lưu thông tin khách hàng đầy đủ để in
+                    const khachHangDaThanhToan = khachHang.value
+                        ? {
+                              id: khachHang.value.id,
+                              hoTen: khachHang.value.hoTen || 'Khách lẻ',
+                              sdt: khachHang.value.sdt || 'N/A',
+                              email: khachHang.value.email || 'N/A',
+                              diemTichLuy: khachHang.value.diemTichLuy || 0
+                          }
+                        : {
+                              id: null,
+                              hoTen: 'Khách lẻ',
+                              sdt: 'N/A',
+                              email: 'N/A',
+                              diemTichLuy: 0
+                          };
+
                     thongTinThanhToanCuoi.value = {
                         ...thongTinThanhToan.value,
-                        tienThua: tinhTienThua()
+                        tienThua: tinhTienThua(),
+                        khachHangInfo: khachHangDaThanhToan // ✅ THÊM: Lưu info khách hàng
                     };
 
                     showPaymentModal.value = false;
 
+                    // Reset form
                     thongTinThanhToan.value = {
                         tienMat: 0,
                         chuyenKhoan: 0,
                         ghiChu: '',
                         diemSuDung: 0
                     };
-                    khachHang.value = null;
+
+                    // ✅ SỬA: KHÔNG reset khachHang để giữ thông tin cho lần in
+                    // khachHang.value = null; // ← XÓA dòng này
                     voucher.value = null;
 
                     await layDanhSachHoaDonCho();
@@ -2092,6 +2273,94 @@ export default {
             } finally {
                 loadingPayment.value = false;
             }
+        };
+
+        const getVoucherImage = (voucher) => {
+            try {
+                // Kiểm tra có đường dẫn hình ảnh không
+                if (!voucher?.duongDanHinhAnh) {
+                    return getDefaultVoucherImage(voucher);
+                }
+
+                let imagePath = voucher.duongDanHinhAnh;
+
+                // Nếu đã là URL đầy đủ thì return luôn
+                if (imagePath.startsWith('http')) {
+                    return imagePath;
+                }
+
+                // Xử lý đường dẫn tương đối
+                if (imagePath.startsWith('/voucher/')) {
+                    // Đường dẫn: /voucher/images/voucher_xxx.jpg
+                    return `http://localhost:8080${imagePath}`;
+                } else if (imagePath.startsWith('/images/')) {
+                    // Đường dẫn: /images/voucher_xxx.jpg
+                    return `http://localhost:8080/voucher${imagePath}`;
+                } else if (!imagePath.startsWith('/')) {
+                    // Đường dẫn: voucher_xxx.jpg
+                    return `http://localhost:8080/voucher/images/${imagePath}`;
+                } else {
+                    // Đường dẫn khác
+                    return `http://localhost:8080${imagePath}`;
+                }
+            } catch (error) {
+                console.warn('Error getting voucher image:', error);
+                return getDefaultVoucherImage(voucher);
+            }
+        };
+
+        // Function lấy hình ảnh mặc định cho voucher
+        const getDefaultVoucherImage = (voucher) => {
+            // Tạo hình ảnh mặc định dựa trên loại voucher
+            const voucherType = voucher?.loaiGiamGia || 'DEFAULT';
+
+            switch (voucherType) {
+                case 'PHAN_TRAM':
+                    return 'https://via.placeholder.com/64x64/28a745/ffffff?text=%25'; // Màu xanh với %
+                case 'SO_TIEN_CO_DINH':
+                case 'FIXED':
+                    return 'https://via.placeholder.com/64x64/dc3545/ffffff?text=₫'; // Màu đỏ với ₫
+                case 'SHIPPING':
+                    return 'https://via.placeholder.com/64x64/17a2b8/ffffff?text=🚚'; // Màu xanh dương với truck
+                default:
+                    return 'https://via.placeholder.com/64x64/6c757d/ffffff?text=🎫'; // Màu xám với ticket
+            }
+        };
+
+        // Function xử lý lỗi hình ảnh voucher
+        const handleVoucherImageError = (event) => {
+            console.warn('Voucher image load failed:', event.target.src);
+            // Thay thế bằng hình mặc định
+            const voucher = event.target.getAttribute('data-voucher');
+            event.target.src = getDefaultVoucherImage(voucher ? JSON.parse(voucher) : null);
+        };
+
+        // ✅ THÊM: Function tạo gradient background cho voucher card
+        const getVoucherGradient = (voucher) => {
+            const type = voucher?.loaiGiamGia || 'DEFAULT';
+
+            switch (type) {
+                case 'PHAN_TRAM':
+                    return 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'; // Xanh lá
+                case 'SO_TIEN_CO_DINH':
+                case 'FIXED':
+                    return 'linear-gradient(135deg, #dc3545 0%, #fd7e14 100%)'; // Đỏ cam
+                case 'SHIPPING':
+                    return 'linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%)'; // Xanh tím
+                default:
+                    return 'linear-gradient(135deg, #6c757d 0%, #495057 100%)'; // Xám
+            }
+        };
+
+        // ✅ THÊM: Function hiển thị voucher đã chọn với hình ảnh
+        const getSelectedVoucherDisplay = () => {
+            if (!voucher.value) return null;
+
+            return {
+                ...voucher.value,
+                imageUrl: getVoucherImage(voucher.value),
+                gradient: getVoucherGradient(voucher.value)
+            };
         };
 
         const printInvoice = () => {
@@ -2151,10 +2420,34 @@ export default {
 
         watch(showQrScanner, (newVal) => {
             if (newVal) {
+                // Reset state khi mở modal
+                qrCode.value = '';
+                qrMode.value = 'manual';
+                cameraError.value = '';
+                cameraStarted.value = false;
+                loadingQR.value = false;
+
                 nextTick(() => {
                     qrInput.value?.focus();
                 });
+
+                console.log('🎯 QR Scanner modal opened');
+            } else {
+                // Cleanup khi đóng modal
+                stopCamera();
+                qrCode.value = '';
+                qrMode.value = 'manual';
+                cameraError.value = '';
+                loadingQR.value = false;
+
+                console.log('🎯 QR Scanner modal closed');
             }
+        });
+
+        onUnmounted(() => {
+            // Cleanup camera khi component unmount
+            stopCamera();
+            console.log('🧹 Component cleanup completed');
         });
 
         watch(showCreateCustomerForm, (newVal) => {
@@ -2163,6 +2456,273 @@ export default {
                 newCustomerErrors.value = {};
             }
         });
+
+        // =================== QR SCANNER FUNCTIONS ===================
+
+        const switchQrMode = async (mode) => {
+            if (qrMode.value === mode) return;
+
+            // Dừng camera nếu đang chạy
+            if (qrMode.value === 'camera' && cameraStarted.value) {
+                await stopCamera();
+            }
+
+            qrMode.value = mode;
+
+            if (mode === 'manual') {
+                // Focus vào input field
+                await nextTick();
+                qrInput.value?.focus();
+            } else if (mode === 'camera') {
+                // Đợi DOM render trước khi start camera
+                await nextTick();
+
+                // Đợi thêm một chút để đảm bảo element đã sẵn sàng
+                setTimeout(() => {
+                    startCamera();
+                }, 100);
+            }
+        };
+
+        const startCamera = async () => {
+            try {
+                cameraError.value = '';
+
+                // Đợi DOM render xong
+                await nextTick();
+
+                // Kiểm tra element có tồn tại không
+                const qrReaderElement = document.getElementById('qr-reader');
+                if (!qrReaderElement) {
+                    throw new Error('Element #qr-reader không tìm thấy. Vui lòng thử lại.');
+                }
+
+                // Dừng camera cũ nếu có
+                if (html5QrCode) {
+                    try {
+                        await html5QrCode.stop();
+                        await html5QrCode.clear();
+                    } catch (e) {
+                        console.warn('Cleanup camera cũ:', e);
+                    }
+                }
+
+                cameraStarted.value = true;
+
+                // Khởi tạo Html5Qrcode
+                html5QrCode = new Html5Qrcode('qr-reader');
+
+                const config = {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0,
+                    disableFlip: false
+                };
+
+                // Thử camera sau trước, nếu không có thì dùng camera trước
+                const cameraConstraints = [
+                    { facingMode: 'environment' }, // Camera sau
+                    { facingMode: 'user' }, // Camera trước
+                    'environment', // Fallback
+                    'user' // Fallback
+                ];
+
+                let cameraStarted = false;
+                let lastError = null;
+
+                for (const constraint of cameraConstraints) {
+                    try {
+                        console.log('🎥 Thử khởi động camera với constraint:', constraint);
+
+                        await html5QrCode.start(
+                            constraint,
+                            config,
+                            (decodedText, decodedResult) => {
+                                console.log('✅ QR Code detected:', decodedText);
+                                qrCode.value = decodedText;
+
+                                // Tự động tìm sản phẩm sau khi quét
+                                setTimeout(() => {
+                                    quetQR();
+                                }, 300);
+                            },
+                            (errorMessage) => {
+                                // Lỗi quét - bình thường, bỏ qua
+                            }
+                        );
+
+                        cameraStarted = true;
+                        console.log('📷 Camera started successfully');
+                        break;
+                    } catch (error) {
+                        console.warn(`❌ Camera constraint ${JSON.stringify(constraint)} failed:`, error);
+                        lastError = error;
+
+                        // Dọn dẹp trước khi thử constraint tiếp theo
+                        if (html5QrCode) {
+                            try {
+                                html5QrCode.clear();
+                            } catch (e) {
+                                // Ignore cleanup errors
+                            }
+                        }
+
+                        continue;
+                    }
+                }
+
+                if (!cameraStarted) {
+                    throw lastError || new Error('Không thể khởi động bất kỳ camera nào');
+                }
+            } catch (error) {
+                console.error('❌ Camera start error:', error);
+                cameraStarted.value = false;
+
+                // Xử lý các loại lỗi khác nhau
+                if (error.name === 'NotAllowedError') {
+                    cameraError.value = 'Bạn cần cho phép truy cập camera để sử dụng tính năng này. Vui lòng nhấn "Allow" khi trình duyệt hỏi.';
+                } else if (error.name === 'NotFoundError') {
+                    cameraError.value = 'Không tìm thấy camera trên thiết bị này.';
+                } else if (error.name === 'NotReadableError') {
+                    cameraError.value = 'Camera đang được sử dụng bởi ứng dụng khác. Vui lòng đóng các ứng dụng khác và thử lại.';
+                } else if (error.name === 'OverconstrainedError') {
+                    cameraError.value = 'Camera không hỗ trợ cấu hình yêu cầu.';
+                } else if (error.message.includes('not found')) {
+                    cameraError.value = 'Element camera chưa sẵn sàng. Vui lòng thử lại.';
+                } else {
+                    cameraError.value = `Lỗi khởi động camera: ${error.message}`;
+                }
+            }
+        };
+
+        const stopCamera = async () => {
+            if (html5QrCode) {
+                try {
+                    console.log('🛑 Stopping camera...');
+
+                    // Kiểm tra trạng thái trước khi stop
+                    const state = html5QrCode.getState();
+                    if (state === Html5QrcodeScannerState.SCANNING) {
+                        await html5QrCode.stop();
+                    }
+
+                    // Clear element
+                    await html5QrCode.clear();
+                    html5QrCode = null;
+
+                    console.log('📷 Camera stopped successfully');
+                } catch (error) {
+                    console.warn('⚠️ Lỗi dừng camera:', error);
+
+                    // Force cleanup
+                    html5QrCode = null;
+
+                    // Clear HTML element manually
+                    const qrReaderElement = document.getElementById('qr-reader');
+                    if (qrReaderElement) {
+                        qrReaderElement.innerHTML = '';
+                    }
+                }
+            }
+
+            cameraStarted.value = false;
+            cameraError.value = '';
+        };
+
+        const retryCamera = () => {
+            cameraError.value = '';
+            cameraStarted.value = false;
+            startCamera();
+        };
+
+        const clearQrCode = () => {
+            qrCode.value = '';
+        };
+
+        const saveQRHistory = (qrCode, productName) => {
+            const historyItem = {
+                qrCode,
+                productName,
+                timestamp: new Date()
+            };
+
+            // Tránh trùng lặp
+            const existingIndex = qrHistory.value.findIndex((item) => item.qrCode === qrCode);
+            if (existingIndex > -1) {
+                qrHistory.value.splice(existingIndex, 1);
+            }
+
+            qrHistory.value.unshift(historyItem);
+
+            // Giới hạn 10 item
+            if (qrHistory.value.length > 10) {
+                qrHistory.value = qrHistory.value.slice(0, 10);
+            }
+        };
+
+        const quetQR = async () => {
+            if (!qrCode.value.trim() || loadingQR.value) return;
+
+            loadingQR.value = true;
+            try {
+                console.log('🔍 Scanning QR code:', qrCode.value);
+
+                const data = await apiCall(`${API_BASE_URL}/san-pham/scan-qr`, {
+                    method: 'POST',
+                    body: JSON.stringify({ qrCode: qrCode.value.trim() })
+                });
+
+                if (data.success && data.data) {
+                    // Lưu vào history
+                    saveQRHistory(qrCode.value, data.data.tenSanPham);
+
+                    // Dừng camera nếu đang chạy
+                    if (cameraStarted.value) {
+                        stopCamera();
+                    }
+
+                    // Đóng modal và thêm vào hóa đơn
+                    showQrScanner.value = false;
+                    qrCode.value = '';
+
+                    await themVaoHoaDon(data.data);
+                    showToastMessage(`✅ Đã thêm ${data.data.tenSanPham} vào hóa đơn!`);
+                } else {
+                    showToastMessage(data.message || 'Không tìm thấy sản phẩm với mã QR này', 'error');
+                }
+            } catch (error) {
+                console.error('❌ QR scan error:', error);
+                showToastMessage('Lỗi quét QR code: ' + error.message, 'error');
+            } finally {
+                loadingQR.value = false;
+            }
+        };
+        const qrMode = ref('manual'); // 'manual' hoặc 'camera'
+        const cameraError = ref('');
+        const cameraStarted = ref(false);
+        const loadingQR = ref(false);
+        const qrHistory = ref([]);
+        let html5QrCode = null;
+
+        const debugQRScanner = () => {
+            console.log('🔍 QR Scanner Debug Info:');
+            console.log('- qrMode:', qrMode.value);
+            console.log('- cameraStarted:', cameraStarted.value);
+            console.log('- cameraError:', cameraError.value);
+            console.log('- qrCode:', qrCode.value);
+            console.log('- html5QrCode instance:', !!html5QrCode);
+
+            const element = document.getElementById('qr-reader');
+            console.log('- #qr-reader element:', element);
+            console.log('- element innerHTML:', element?.innerHTML.length, 'chars');
+        };
+
+        const testQRWithoutCamera = () => {
+            // Test với mã QR giả
+            qrCode.value = 'TEST_QR_123';
+            console.log('🧪 Testing with fake QR code:', qrCode.value);
+            quetQR();
+        };
 
         // =================== RETURN ===================
         return {
@@ -2284,7 +2844,25 @@ export default {
             getMauHex,
             getProductImage,
             handleImageError,
-            getStockBadgeClass
+            getStockBadgeClass,
+            getVoucherImage,
+            handleVoucherImageError,
+            getDefaultVoucherImage,
+            getVoucherGradient,
+            getSelectedVoucherDisplay,
+            qrMode,
+            cameraError,
+            cameraStarted,
+            loadingQR,
+            qrHistory,
+            debugQRScanner,
+            testQRWithoutCamera,
+            switchQrMode,
+            startCamera,
+            stopCamera,
+            retryCamera,
+            clearQrCode,
+            quetQR
         };
     }
 };
@@ -2824,6 +3402,221 @@ export default {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+    }
+}
+.voucher-image {
+    transition: all 0.3s ease;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.voucher-image:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Voucher Card Hover Effect */
+.voucher-card {
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    border: 2px solid transparent;
+}
+
+.voucher-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: #28a745;
+}
+
+/* Voucher Badge Styles */
+.voucher-badge {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 8px 16px;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.voucher-badge-percentage {
+    background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+}
+
+/* Voucher Type Indicators */
+.voucher-type-percent {
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.voucher-type-fixed {
+    background: linear-gradient(135deg, #dc3545, #fd7e14);
+}
+
+.voucher-type-shipping {
+    background: linear-gradient(135deg, #17a2b8, #6f42c1);
+}
+
+/* Voucher Modal Enhancements */
+.voucher-modal .list-group-item {
+    border-radius: 12px !important;
+    margin-bottom: 8px;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.voucher-modal .list-group-item:hover {
+    border-color: #28a745;
+    box-shadow: 0 4px 16px rgba(40, 167, 69, 0.1);
+    transform: translateY(-1px);
+}
+
+/* Voucher Image Placeholder */
+.voucher-placeholder {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: #6c757d;
+    border-radius: 12px;
+}
+
+/* Selected Voucher Highlight */
+.voucher-selected {
+    border-color: #28a745 !important;
+    background-color: rgba(40, 167, 69, 0.05);
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+}
+
+/* Responsive Voucher Images */
+@media (max-width: 768px) {
+    .voucher-image {
+        width: 40px !important;
+        height: 40px !important;
+    }
+
+    .voucher-modal .voucher-image {
+        width: 48px !important;
+        height: 48px !important;
+    }
+}
+
+/* Loading Shimmer Effect for Voucher Images */
+.voucher-loading {
+    background: linear-gradient(-90deg, #f0f0f0 0%, #e0e0e0 50%, #f0f0f0 100%);
+    background-size: 400% 400%;
+    animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 0% 0%;
+    }
+    100% {
+        background-position: -135% 0%;
+    }
+}
+
+/* Voucher Success Animation */
+.voucher-success {
+    animation: bounceIn 0.6s ease-out;
+}
+
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+/* Thêm CSS này vào phần <style scoped>: */
+
+/* QR Scanner Container */
+#qr-reader {
+    width: 100% !important;
+    min-height: 300px;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* QR Scanner Video */
+#qr-reader video {
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+/* QR Scanner Canvas */
+#qr-reader canvas {
+    border-radius: 8px;
+}
+
+/* QR Scanner UI fixes */
+#qr-reader > div {
+    width: 100% !important;
+}
+
+#qr-reader img[alt='Info icon'] {
+    display: none !important;
+}
+
+#qr-reader img[alt='Camera based scan'] {
+    display: none !important;
+}
+
+/* Loading state for QR container */
+.qr-loading-container {
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #dee2e6;
+}
+
+/* QR Scanner Error State */
+.qr-error-container {
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fff5f5;
+    border: 2px dashed #fecaca;
+    border-radius: 8px;
+    color: #dc2626;
+}
+
+/* QR Scanner Success State */
+.qr-success-container {
+    background: #f0fdf4;
+    border: 2px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+/* Modal dialog fixes for mobile */
+@media (max-width: 768px) {
+    #qr-reader {
+        min-height: 250px;
+    }
+
+    .modal-lg {
+        margin: 0.5rem;
+        max-width: calc(100vw - 1rem);
     }
 }
 </style>
