@@ -86,7 +86,10 @@
                     </div>
                     <div class="flex-grow-1">
                       <h5 class="mb-1">{{ form.hoTen }}</h5>
-                      <p class="text-muted mb-1">{{ form.email }}</p>
+                      <p class="text-muted mb-1">
+                        <i class="fas fa-envelope me-1"></i>
+                        {{ currentEmail || 'Chưa có email' }}
+                      </p>
                       <small class="text-success fw-semibold">{{ form.maNhanVien }}</small>
                     </div>
                     <div class="text-end">
@@ -136,23 +139,26 @@
                 </div>
               </div>
 
-              <!-- Row 2: Email và SĐT -->
+              <!-- Row 2: Tài khoản và SĐT -->
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label class="form-label fw-semibold">
-                    <i class="fas fa-envelope text-success me-2"></i>
-                    Email
+                    <i class="fas fa-link text-success me-2"></i>
+                    Tài khoản liên kết
                   </label>
-                  <input 
-                    type="email" 
-                    v-model="form.email" 
-                    class="form-control form-control-lg"
-                    :class="{ 'is-invalid': errors.email }"
-                    placeholder="example@company.com"
-                  />
-                  <div v-if="errors.email" class="invalid-feedback">
-                    {{ errors.email }}
-                  </div>
+                  <select 
+                    v-model="form.idTaiKhoan" 
+                    class="form-select form-select-lg"
+                    @change="onTaiKhoanChange"
+                  >
+                    <option :value="null">-- Không liên kết --</option>
+                    <option v-for="tk in availableAccounts" :key="tk.id" :value="tk.id">
+                      {{ tk.email }} ({{ tk.maTaiKhoan }})
+                    </option>
+                  </select>
+                  <small class="form-text text-muted">
+                    {{ form.idTaiKhoan ? 'Nhân viên có thể đăng nhập hệ thống' : 'Nhân viên chỉ bán hàng trực tiếp' }}
+                  </small>
                 </div>
 
                 <div class="col-md-6 mb-3">
@@ -192,7 +198,7 @@
                 </select>
                 <div class="form-text">
                   <i class="fas fa-info-circle me-1"></i>
-                  Thay đổi trạng thái sẽ ảnh hưởng đến quyền truy cập hệ thống
+                  Thay đổi trạng thái sẽ ảnh hưởng đến quyền truy cập hệ thống của nhân viên
                 </div>
               </div>
 
@@ -249,15 +255,15 @@
               <div class="col-md-3">
                 <div class="p-3">
                   <i class="fas fa-calendar-plus fa-2x text-info mb-2"></i>
-                  <h6 class="fw-bold">Ngày Vào Làm</h6>
-                  <small class="text-muted">{{ formatDate(new Date()) }}</small>
+                  <h6 class="fw-bold">Ngày Tạo</h6>
+                  <small class="text-muted">{{ formatDate(form.ngayTao) }}</small>
                 </div>
               </div>
               <div class="col-md-3">
                 <div class="p-3">
-                  <i class="fas fa-edit fa-2x text-warning mb-2"></i>
-                  <h6 class="fw-bold">Lần Cập Nhật</h6>
-                  <small class="text-muted">{{ updateCount }} lần</small>
+                  <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                  <h6 class="fw-bold">Cập Nhật Lần Cuối</h6>
+                  <small class="text-muted">{{ formatDate(form.ngayCapNhat) }}</small>
                 </div>
               </div>
               <div class="col-md-3">
@@ -269,9 +275,9 @@
               </div>
               <div class="col-md-3">
                 <div class="p-3">
-                  <i class="fas fa-building fa-2x text-primary mb-2"></i>
-                  <h6 class="fw-bold">Phòng Ban</h6>
-                  <small class="text-muted">Nhân sự</small>
+                  <i class="fas fa-key fa-2x text-primary mb-2"></i>
+                  <h6 class="fw-bold">Quyền Truy Cập</h6>
+                  <small class="text-muted">{{ form.idTaiKhoan ? 'Có tài khoản' : 'Không có' }}</small>
                 </div>
               </div>
             </div>
@@ -315,17 +321,19 @@ export default {
     return {
       form: null,
       originalForm: null, // Store original data for reset
+      availableAccounts: [],
+      currentEmail: '',
       isLoading: true,
       isUpdating: false,
       showSuccess: false,
       errorMessage: '',
       loadError: '',
-      errors: {},
-      updateCount: 0
+      errors: {}
     };
   },
   async mounted() {
     await this.loadEmployeeData();
+    await this.loadAvailableAccounts();
   },
   methods: {
     async loadEmployeeData() {
@@ -338,8 +346,15 @@ export default {
         this.form = { ...res.data };
         this.originalForm = { ...res.data }; // Store original data
         
-        // Simulate update count (you can get this from API)
-        this.updateCount = Math.floor(Math.random() * 15) + 1;
+        // Lấy email từ tài khoản nếu có
+        if (this.form.idTaiKhoan) {
+          try {
+            const tkRes = await axios.get(`http://localhost:8080/tai-khoan/${this.form.idTaiKhoan}`);
+            this.currentEmail = tkRes.data.email;
+          } catch (error) {
+            console.log('Could not load account email');
+          }
+        }
         
       } catch (error) {
         console.error('Error loading employee:', error);
@@ -353,6 +368,34 @@ export default {
         }
       } finally {
         this.isLoading = false;
+      }
+    },
+
+    async loadAvailableAccounts() {
+      try {
+        const res = await axios.get('http://localhost:8080/tai-khoan');
+        // Lọc chỉ lấy tài khoản nhân viên (vaiTro = 1)
+        this.availableAccounts = res.data.filter(tk => tk.vaiTro === 1);
+        
+        // Thêm tài khoản hiện tại nếu có
+        if (this.form?.idTaiKhoan) {
+          const currentAccount = res.data.find(tk => tk.id === this.form.idTaiKhoan);
+          if (currentAccount && !this.availableAccounts.find(tk => tk.id === currentAccount.id)) {
+            this.availableAccounts.push(currentAccount);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading accounts:', error);
+      }
+    },
+
+    onTaiKhoanChange() {
+      // Cập nhật email hiển thị khi thay đổi tài khoản
+      if (this.form.idTaiKhoan) {
+        const account = this.availableAccounts.find(tk => tk.id === this.form.idTaiKhoan);
+        this.currentEmail = account ? account.email : '';
+      } else {
+        this.currentEmail = '';
       }
     },
 
@@ -373,14 +416,6 @@ export default {
         this.errors.hoTen = 'Họ tên không được để trống';
       } else if (this.form.hoTen.length < 2) {
         this.errors.hoTen = 'Họ tên phải có ít nhất 2 ký tự';
-      }
-      
-      // Validate Email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!this.form.email?.trim()) {
-        this.errors.email = 'Email không được để trống';
-      } else if (!emailRegex.test(this.form.email)) {
-        this.errors.email = 'Email không đúng định dạng';
       }
       
       // Validate SĐT
@@ -406,11 +441,26 @@ export default {
       this.showSuccess = false;
 
       try {
-        await axios.put(`http://localhost:8080/nhan-vien/${id}`, this.form);
+        // Chuẩn bị dữ liệu theo đúng DTO
+        const requestData = {
+          id: this.form.id,
+          maNhanVien: this.form.maNhanVien,
+          hoTen: this.form.hoTen,
+          sdt: this.form.sdt,
+          trangThai: this.form.trangThai,
+          idTaiKhoan: this.form.idTaiKhoan,
+          idDiaChi: this.form.idDiaChi
+        };
+
+        // Nếu có email từ tài khoản được chọn, thêm vào
+        if (this.currentEmail) {
+          requestData.email = this.currentEmail;
+        }
+
+        await axios.put(`http://localhost:8080/nhan-vien/${id}`, requestData);
         
         // Show success message
         this.showSuccess = true;
-        this.updateCount++;
         
         // Update original form data
         this.originalForm = { ...this.form };
@@ -428,7 +478,7 @@ export default {
         } else if (error.response?.status === 404) {
           this.errorMessage = 'Không tìm thấy nhân viên để cập nhật.';
         } else if (error.response?.status === 409) {
-          this.errorMessage = 'Mã nhân viên hoặc email đã tồn tại.';
+          this.errorMessage = 'Mã nhân viên đã tồn tại.';
         } else {
           this.errorMessage = error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật. Vui lòng thử lại.';
         }
@@ -443,6 +493,7 @@ export default {
         this.errors = {};
         this.errorMessage = '';
         this.showSuccess = false;
+        this.onTaiKhoanChange(); // Update email display
       }
     },
 
@@ -461,11 +512,14 @@ export default {
     },
 
     formatDate(date) {
+      if (!date) return 'N/A';
       return new Intl.DateTimeFormat('vi-VN', {
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
-      }).format(date);
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(new Date(date));
     }
   }
 };

@@ -70,12 +70,12 @@
                 </div>
               </div>
 
-              <!-- Row 2: Email và SĐT -->
+              <!-- Row 2: Email (nếu tạo tài khoản mới) và SĐT -->
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label class="form-label fw-semibold">
                     <i class="fas fa-envelope text-primary me-2"></i>
-                    Email
+                    Email (cho tài khoản mới)
                   </label>
                   <input 
                     type="email" 
@@ -83,11 +83,14 @@
                     class="form-control form-control-lg"
                     :class="{ 'is-invalid': errors.email }"
                     placeholder="example@email.com"
-                    required 
+                    :disabled="form.idTaiKhoan"
                   />
                   <div v-if="errors.email" class="invalid-feedback">
                     {{ errors.email }}
                   </div>
+                  <small class="form-text text-muted">
+                    Để trống nếu không muốn tạo tài khoản
+                  </small>
                 </div>
 
                 <div class="col-md-6 mb-3">
@@ -109,29 +112,46 @@
                 </div>
               </div>
 
-              <!-- Trạng Thái -->
-              <div class="mb-4">
-                <label class="form-label fw-semibold">
-                  <i class="fas fa-toggle-on text-primary me-2"></i>
-                  Trạng Thái
-                </label>
-                <select 
-                  v-model="form.trangThai" 
-                  class="form-select form-select-lg"
-                >
-                  <option :value="1">
-                    🟢 Hoạt động
-                  </option>
-                  <option :value="0">
-                    🔴 Ngưng hoạt động
-                  </option>
-                </select>
-              </div>
+              <!-- Row 3: Liên kết tài khoản và Trạng thái -->
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-semibold">
+                    <i class="fas fa-link text-primary me-2"></i>
+                    Liên kết với tài khoản có sẵn
+                  </label>
+                  <select 
+                    v-model="form.idTaiKhoan" 
+                    class="form-select form-select-lg"
+                    @change="onTaiKhoanChange"
+                  >
+                    <option :value="null">-- Không liên kết --</option>
+                    <option v-for="tk in availableAccounts" :key="tk.id" :value="tk.id">
+                      {{ tk.email }} ({{ tk.maTaiKhoan }})
+                    </option>
+                  </select>
+                  <small class="form-text text-muted">
+                    Chọn tài khoản có sẵn hoặc để trống để tạo mới
+                  </small>
+                </div>
 
-              <!-- Hidden fields -->
-              <input type="hidden" v-model="form.viDiem" />
-              <input type="hidden" v-model="form.taiKhoan" />
-              <input type="hidden" v-model="form.diaChi" />
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-semibold">
+                    <i class="fas fa-toggle-on text-primary me-2"></i>
+                    Trạng Thái
+                  </label>
+                  <select 
+                    v-model="form.trangThai" 
+                    class="form-select form-select-lg"
+                  >
+                    <option :value="1">
+                      🟢 Hoạt động
+                    </option>
+                    <option :value="0">
+                      🔴 Ngưng hoạt động
+                    </option>
+                  </select>
+                </div>
+              </div>
 
               <!-- Success Message -->
               <div v-if="showSuccess" class="alert alert-success alert-dismissible fade show" role="alert">
@@ -176,29 +196,16 @@
         <!-- Additional Info Card -->
         <div class="card mt-4 border-0 shadow-sm">
           <div class="card-body">
-            <div class="row text-center">
-              <div class="col-md-4">
-                <div class="p-3">
-                  <i class="fas fa-shield-alt fa-2x text-success mb-2"></i>
-                  <h6 class="fw-bold">Bảo Mật</h6>
-                  <small class="text-muted">Thông tin được mã hóa an toàn</small>
-                </div>
-              </div>
-              <div class="col-md-4">
-                <div class="p-3">
-                  <i class="fas fa-clock fa-2x text-info mb-2"></i>
-                  <h6 class="fw-bold">Nhanh Chóng</h6>
-                  <small class="text-muted">Xử lý trong vài giây</small>
-                </div>
-              </div>
-              <div class="col-md-4">
-                <div class="p-3">
-                  <i class="fas fa-sync-alt fa-2x text-warning mb-2"></i>
-                  <h6 class="fw-bold">Đồng Bộ</h6>
-                  <small class="text-muted">Cập nhật realtime</small>
-                </div>
-              </div>
-            </div>
+            <h6 class="card-title">
+              <i class="fas fa-info-circle me-2"></i>
+              Lưu ý quan trọng
+            </h6>
+            <ul class="mb-0">
+              <li>Khách hàng có thể được tạo <strong>không cần tài khoản</strong> (mua hàng trực tiếp)</li>
+              <li>Nếu muốn khách hàng đăng nhập online, hãy <strong>nhập email</strong> để tạo tài khoản</li>
+              <li>Có thể liên kết với <strong>tài khoản có sẵn</strong> từ danh sách</li>
+              <li>Email trong hệ thống được lưu ở bảng <strong>tai_khoan</strong>, không phải khach_hang</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -216,20 +223,44 @@ export default {
       form: {
         maKhachHang: '',
         hoTen: '',
-        email: '',
+        email: '', // Email cho tài khoản mới
         sdt: '',
         trangThai: 1,
-        viDiem: 1,
-        taiKhoan: 1,
-        diaChi: 1,
+        idTaiKhoan: null,
+        idViDiem: null,
+        idDiaChi: null
       },
+      availableAccounts: [],
       isLoading: false,
       showSuccess: false,
       errorMessage: '',
       errors: {}
     };
   },
+  async mounted() {
+    await this.loadAvailableAccounts();
+    if (!this.form.maKhachHang) {
+      this.generateCustomerCode();
+    }
+  },
   methods: {
+    async loadAvailableAccounts() {
+      try {
+        const res = await axios.get('http://localhost:8080/tai-khoan');
+        // Lọc chỉ lấy tài khoản khách hàng (vaiTro = 0) chưa được liên kết
+        this.availableAccounts = res.data.filter(tk => tk.vaiTro === 0);
+      } catch (error) {
+        console.error('Error loading accounts:', error);
+      }
+    },
+
+    onTaiKhoanChange() {
+      // Nếu chọn tài khoản có sẵn, xóa email
+      if (this.form.idTaiKhoan) {
+        this.form.email = '';
+      }
+    },
+
     validateForm() {
       this.errors = {};
       
@@ -247,12 +278,12 @@ export default {
         this.errors.hoTen = 'Họ tên phải có ít nhất 2 ký tự';
       }
       
-      // Validate Email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!this.form.email.trim()) {
-        this.errors.email = 'Email không được để trống';
-      } else if (!emailRegex.test(this.form.email)) {
-        this.errors.email = 'Email không đúng định dạng';
+      // Validate Email - chỉ khi có nhập và không chọn tài khoản có sẵn
+      if (this.form.email && !this.form.idTaiKhoan) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(this.form.email)) {
+          this.errors.email = 'Email không đúng định dạng';
+        }
       }
       
       // Validate SĐT
@@ -277,7 +308,23 @@ export default {
       this.showSuccess = false;
 
       try {
-        await axios.post('http://localhost:8080/khach-hang', this.form);
+        // Chuẩn bị dữ liệu gửi lên
+        const requestData = {
+          maKhachHang: this.form.maKhachHang,
+          hoTen: this.form.hoTen,
+          sdt: this.form.sdt,
+          trangThai: this.form.trangThai,
+          idTaiKhoan: this.form.idTaiKhoan,
+          idViDiem: this.form.idViDiem,
+          idDiaChi: this.form.idDiaChi
+        };
+
+        // Thêm email nếu cần tạo tài khoản mới
+        if (this.form.email && !this.form.idTaiKhoan) {
+          requestData.email = this.form.email;
+        }
+
+        const response = await axios.post('http://localhost:8080/khach-hang', requestData);
         
         // Show success message
         this.showSuccess = true;
@@ -294,7 +341,13 @@ export default {
         console.error('Error creating customer:', error);
         
         if (error.response?.status === 400) {
-          this.errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.';
+          // Xử lý lỗi validation từ server
+          if (error.response.data.errors) {
+            this.errors = error.response.data.errors;
+            this.errorMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.';
+          } else {
+            this.errorMessage = error.response.data.error || 'Dữ liệu không hợp lệ.';
+          }
         } else if (error.response?.status === 409) {
           this.errorMessage = 'Mã khách hàng hoặc email đã tồn tại.';
         } else {
@@ -312,24 +365,18 @@ export default {
         email: '',
         sdt: '',
         trangThai: 1,
-        viDiem: 1,
-        taiKhoan: 1,
-        diaChi: 1,
+        idTaiKhoan: null,
+        idViDiem: null,
+        idDiaChi: null
       };
       this.errors = {};
+      this.generateCustomerCode();
     },
 
     // Auto-generate customer code
     generateCustomerCode() {
       const timestamp = Date.now().toString().slice(-6);
       this.form.maKhachHang = `KH${timestamp}`;
-    }
-  },
-
-  mounted() {
-    // Auto-generate customer code if empty
-    if (!this.form.maKhachHang) {
-      this.generateCustomerCode();
     }
   }
 };

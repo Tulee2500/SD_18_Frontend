@@ -70,12 +70,12 @@
                 </div>
               </div>
 
-              <!-- Row 2: Email và SĐT -->
+              <!-- Row 2: Email (cho tài khoản mới) và SĐT -->
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label class="form-label fw-semibold">
                     <i class="fas fa-envelope text-success me-2"></i>
-                    Email
+                    Email (cho tài khoản mới)
                   </label>
                   <input 
                     type="email" 
@@ -83,11 +83,14 @@
                     class="form-control form-control-lg"
                     :class="{ 'is-invalid': errors.email }"
                     placeholder="example@company.com"
-                    required 
+                    :disabled="form.idTaiKhoan"
                   />
                   <div v-if="errors.email" class="invalid-feedback">
                     {{ errors.email }}
                   </div>
+                  <small class="form-text text-muted">
+                    Để trống nếu không muốn tạo tài khoản đăng nhập
+                  </small>
                 </div>
 
                 <div class="col-md-6 mb-3">
@@ -109,28 +112,46 @@
                 </div>
               </div>
 
-              <!-- Trạng Thái -->
-              <div class="mb-4">
-                <label class="form-label fw-semibold">
-                  <i class="fas fa-toggle-on text-success me-2"></i>
-                  Trạng Thái
-                </label>
-                <select 
-                  v-model="form.trangThai" 
-                  class="form-select form-select-lg"
-                >
-                  <option :value="1">
-                    🟢 Hoạt động
-                  </option>
-                  <option :value="0">
-                    🔴 Ngưng hoạt động
-                  </option>
-                </select>
-              </div>
+              <!-- Row 3: Tài khoản và Trạng thái -->
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-semibold">
+                    <i class="fas fa-link text-success me-2"></i>
+                    Liên kết với tài khoản có sẵn
+                  </label>
+                  <select 
+                    v-model="form.idTaiKhoan" 
+                    class="form-select form-select-lg"
+                    @change="onTaiKhoanChange"
+                  >
+                    <option :value="null">-- Không liên kết --</option>
+                    <option v-for="tk in availableAccounts" :key="tk.id" :value="tk.id">
+                      {{ tk.email }} ({{ tk.maTaiKhoan }})
+                    </option>
+                  </select>
+                  <small class="form-text text-muted">
+                    Chọn tài khoản có sẵn hoặc nhập email để tạo mới
+                  </small>
+                </div>
 
-              <!-- Hidden fields -->
-              <input type="hidden" v-model="form.taiKhoan" />
-              <input type="hidden" v-model="form.diaChi" />
+                <div class="col-md-6 mb-3">
+                  <label class="form-label fw-semibold">
+                    <i class="fas fa-toggle-on text-success me-2"></i>
+                    Trạng Thái
+                  </label>
+                  <select 
+                    v-model="form.trangThai" 
+                    class="form-select form-select-lg"
+                  >
+                    <option :value="1">
+                      🟢 Đang làm việc
+                    </option>
+                    <option :value="0">
+                      🔴 Nghỉ việc
+                    </option>
+                  </select>
+                </div>
+              </div>
 
               <!-- Success Message -->
               <div v-if="showSuccess" class="alert alert-success alert-dismissible fade show" role="alert">
@@ -176,41 +197,18 @@
         <div class="card mt-4 border-0 shadow-sm">
           <div class="card-header bg-light">
             <h6 class="card-title mb-0">
-              <i class="fas fa-briefcase me-2"></i>
-              Quyền Lợi Nhân Viên
+              <i class="fas fa-info-circle me-2"></i>
+              Lưu ý quan trọng
             </h6>
           </div>
           <div class="card-body">
-            <div class="row text-center">
-              <div class="col-md-3">
-                <div class="p-3">
-                  <i class="fas fa-shield-alt fa-2x text-success mb-2"></i>
-                  <h6 class="fw-bold">Bảo Hiểm</h6>
-                  <small class="text-muted">Bảo hiểm y tế & xã hội</small>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="p-3">
-                  <i class="fas fa-graduation-cap fa-2x text-info mb-2"></i>
-                  <h6 class="fw-bold">Đào Tạo</h6>
-                  <small class="text-muted">Phát triển kỹ năng</small>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="p-3">
-                  <i class="fas fa-calendar-check fa-2x text-warning mb-2"></i>
-                  <h6 class="fw-bold">Nghỉ Phép</h6>
-                  <small class="text-muted">12 ngày phép/năm</small>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="p-3">
-                  <i class="fas fa-trophy fa-2x text-danger mb-2"></i>
-                  <h6 class="fw-bold">Thưởng</h6>
-                  <small class="text-muted">Thưởng hiệu suất</small>
-                </div>
-              </div>
-            </div>
+            <ul class="mb-0">
+              <li>Nhân viên có thể được tạo <strong>không cần tài khoản</strong> (nhân viên bán hàng trực tiếp)</li>
+              <li>Nếu muốn nhân viên đăng nhập hệ thống, hãy <strong>nhập email</strong> để tạo tài khoản</li>
+              <li>Có thể liên kết với <strong>tài khoản nhân viên có sẵn</strong> từ danh sách</li>
+              <li>Email trong hệ thống được lưu ở bảng <strong>tai_khoan</strong>, không phải nhan_vien</li>
+              <li>Mã nhân viên nên theo format: <strong>NV + số</strong> (VD: NV001, NV002)</li>
+            </ul>
           </div>
         </div>
 
@@ -252,19 +250,43 @@ export default {
       form: {
         maNhanVien: '',
         hoTen: '',
-        email: '',
+        email: '', // Email cho tài khoản mới
         sdt: '',
         trangThai: 1,
-        taiKhoan: 1,
-        diaChi: 1,
+        idTaiKhoan: null,
+        idDiaChi: null
       },
+      availableAccounts: [],
       isLoading: false,
       showSuccess: false,
       errorMessage: '',
       errors: {}
     };
   },
+  async mounted() {
+    await this.loadAvailableAccounts();
+    if (!this.form.maNhanVien) {
+      this.generateEmployeeCode();
+    }
+  },
   methods: {
+    async loadAvailableAccounts() {
+      try {
+        const res = await axios.get('http://localhost:8080/tai-khoan');
+        // Lọc chỉ lấy tài khoản nhân viên (vaiTro = 1) chưa được liên kết
+        this.availableAccounts = res.data.filter(tk => tk.vaiTro === 1);
+      } catch (error) {
+        console.error('Error loading accounts:', error);
+      }
+    },
+
+    onTaiKhoanChange() {
+      // Nếu chọn tài khoản có sẵn, xóa email
+      if (this.form.idTaiKhoan) {
+        this.form.email = '';
+      }
+    },
+
     validateForm() {
       this.errors = {};
       
@@ -284,12 +306,12 @@ export default {
         this.errors.hoTen = 'Họ tên phải có ít nhất 2 ký tự';
       }
       
-      // Validate Email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!this.form.email.trim()) {
-        this.errors.email = 'Email không được để trống';
-      } else if (!emailRegex.test(this.form.email)) {
-        this.errors.email = 'Email không đúng định dạng';
+      // Validate Email - chỉ khi có nhập và không chọn tài khoản có sẵn
+      if (this.form.email && !this.form.idTaiKhoan) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(this.form.email)) {
+          this.errors.email = 'Email không đúng định dạng';
+        }
       }
       
       // Validate SĐT
@@ -314,7 +336,22 @@ export default {
       this.showSuccess = false;
 
       try {
-        await axios.post('http://localhost:8080/nhan-vien', this.form);
+        // Chuẩn bị dữ liệu gửi lên
+        const requestData = {
+          maNhanVien: this.form.maNhanVien,
+          hoTen: this.form.hoTen,
+          sdt: this.form.sdt,
+          trangThai: this.form.trangThai,
+          idTaiKhoan: this.form.idTaiKhoan,
+          idDiaChi: this.form.idDiaChi
+        };
+
+        // Thêm email nếu cần tạo tài khoản mới
+        if (this.form.email && !this.form.idTaiKhoan) {
+          requestData.email = this.form.email;
+        }
+
+        await axios.post('http://localhost:8080/nhan-vien', requestData);
         
         // Show success message
         this.showSuccess = true;
@@ -349,12 +386,13 @@ export default {
         email: '',
         sdt: '',
         trangThai: 1,
-        taiKhoan: 1,
-        diaChi: 1,
+        idTaiKhoan: null,
+        idDiaChi: null
       };
       this.errors = {};
       this.errorMessage = '';
       this.showSuccess = false;
+      this.generateEmployeeCode();
     },
 
     // Auto-generate employee code
@@ -371,13 +409,6 @@ export default {
       this.form.email = 'nhanvien@company.com';
       this.form.sdt = '0123456789';
       this.form.trangThai = 1;
-    }
-  },
-
-  mounted() {
-    // Auto-generate employee code if empty
-    if (!this.form.maNhanVien) {
-      this.generateEmployeeCode();
     }
   }
 };

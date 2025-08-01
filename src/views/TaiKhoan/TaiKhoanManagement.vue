@@ -383,18 +383,18 @@ export default {
             trangThai: undefined
         });
 
-        // Updated role options for Integer values
+        // Updated role options to match backend enum
         const roleOptions = ref([
             { label: 'Tất cả vai trò', value: '' },
-            { label: 'Khách hàng', value: 0 },
-            { label: 'Nhân viên', value: 1 },
-            { label: 'Admin', value: 2 }
+            { label: 'Khách hàng', value: 'USER' },
+            { label: 'Nhân viên', value: 'NHANVIEN' },
+            { label: 'Admin', value: 'ADMIN' }
         ]);
 
         const roleOptionsForForm = ref([
-            { label: 'Khách hàng', value: 0 },
-            { label: 'Nhân viên', value: 1 },
-            { label: 'Admin', value: 2 }
+            { label: 'Khách hàng', value: 'USER' },
+            { label: 'Nhân viên', value: 'NHANVIEN' },
+            { label: 'Admin', value: 'ADMIN' }
         ]);
 
         const statusOptions = ref([
@@ -417,11 +417,11 @@ export default {
         const getRoleLabel = (vaiTro) => {
             console.log('🏷️ Getting role label for:', vaiTro, typeof vaiTro);
             switch (vaiTro) {
-                case 0:
+                case 'USER':
                     return 'Khách hàng';
-                case 1:
+                case 'NHANVIEN':
                     return 'Nhân viên';
-                case 2:
+                case 'ADMIN':
                     return 'Admin';
                 default:
                     console.warn('⚠️ Unknown role:', vaiTro);
@@ -431,11 +431,11 @@ export default {
 
         const getRoleSeverity = (vaiTro) => {
             switch (vaiTro) {
-                case 0:
+                case 'USER':
                     return 'primary'; // Khách hàng
-                case 1:
+                case 'NHANVIEN':
                     return 'success'; // Nhân viên
-                case 2:
+                case 'ADMIN':
                     return 'warn'; // Admin
                 default:
                     return 'secondary';
@@ -444,15 +444,34 @@ export default {
 
         const getRoleIcon = (vaiTro) => {
             switch (vaiTro) {
-                case 0:
+                case 'USER':
                     return 'pi pi-user'; // Khách hàng
-                case 1:
+                case 'NHANVIEN':
                     return 'pi pi-user-edit'; // Nhân viên
-                case 2:
+                case 'ADMIN':
                     return 'pi pi-crown'; // Admin
                 default:
                     return 'pi pi-question';
             }
+        };
+
+        // Convert enum to display value for form validation
+        const getVaiTroValue = (vaiTro) => {
+            // If it's already a string (enum), return as is
+            if (typeof vaiTro === 'string') return vaiTro;
+            
+            // If it's a number, convert to enum string
+            switch (vaiTro) {
+                case 0: return 'USER';
+                case 1: return 'NHANVIEN';
+                case 2: return 'ADMIN';
+                default: return vaiTro;
+            }
+        };
+
+        // Check if role needs detailed info (USER and NHANVIEN)
+        const needsDetailedInfo = (vaiTro) => {
+            return vaiTro === 'USER' || vaiTro === 'NHANVIEN';
         };
 
         // Data fetching
@@ -460,35 +479,35 @@ export default {
             isLoading.value = true;
             console.log('🔄 Đang tải dữ liệu tài khoản...');
             try {
-                const res = await axios.get('http://localhost:8080/tai-khoan');
+                const res = await axios.get('http://localhost:8080/api/tai-khoan');
                 console.log('✅ Response status:', res.status);
                 console.log('✅ Raw response data:', res.data);
-                console.log('✅ Data length:', res.data ? res.data.length : 'null/undefined');
 
-                if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-                    console.log('✅ First account sample:', res.data[0]);
-                    console.log('✅ Account fields:', Object.keys(res.data[0]));
+                if (res.data && Array.isArray(res.data)) {
+                    accounts.value = res.data;
+                    console.log('✅ Loaded', accounts.value.length, 'accounts');
+                    
+                    // Debug first account
+                    if (accounts.value.length > 0) {
+                        console.log('🔍 First account:', accounts.value[0]);
+                        console.log('🔍 vaiTro type:', typeof accounts.value[0].vaiTro);
+                        console.log('🔍 vaiTro value:', accounts.value[0].vaiTro);
+                    }
+                } else {
+                    accounts.value = [];
+                    console.warn('⚠️ No data or invalid format');
                 }
-
-                accounts.value = res.data || [];
-                console.log('✅ Accounts set to:', accounts.value);
-                console.log('✅ Accounts length:', accounts.value.length);
             } catch (error) {
                 console.error('❌ Error fetching data:', error);
-                console.error('❌ Error response:', error.response);
-                console.error('❌ Error status:', error.response?.status);
-                console.error('❌ Error data:', error.response?.data);
-                console.error('❌ Error message:', error.message);
-
                 toast.add({
                     severity: 'error',
                     summary: 'Lỗi kết nối',
                     detail: `Không thể tải dữ liệu: ${error.message}`,
                     life: 5000
                 });
+                accounts.value = [];
             } finally {
                 isLoading.value = false;
-                console.log('🏁 Loading completed');
             }
         };
 
@@ -552,7 +571,7 @@ export default {
 
         const onRoleChange = () => {
             // Reset thông tin chi tiết khi thay đổi vai trò
-            if (newAccount.value.vaiTro === 2) {
+            if (newAccount.value.vaiTro === 'ADMIN') {
                 // Admin
                 newAccount.value.hoTen = '';
                 newAccount.value.sdt = '';
@@ -623,7 +642,7 @@ export default {
             }
 
             // Additional validation for employee and customer roles
-            if (newAccount.value.vaiTro === 0 || newAccount.value.vaiTro === 1) {
+            if (needsDetailedInfo(newAccount.value.vaiTro)) {
                 if (!newAccount.value.hoTen?.trim() || !newAccount.value.sdt?.trim() || !newAccount.value.diaChi?.tenTinh?.trim() || !newAccount.value.diaChi?.tenHuyen?.trim() || !newAccount.value.diaChi?.tenPhuong?.trim()) {
                     toast.add({
                         severity: 'warn',
@@ -636,7 +655,7 @@ export default {
             }
 
             try {
-                await axios.post('http://localhost:8080/tai-khoan', newAccount.value);
+                await axios.post('http://localhost:8080/api/tai-khoan', newAccount.value);
 
                 toast.add({
                     severity: 'success',
@@ -682,7 +701,7 @@ export default {
             }
 
             try {
-                await axios.put(`http://localhost:8080/tai-khoan/${editAccountData.value.id}`, {
+                await axios.put(`http://localhost:8080/api/tai-khoan/${editAccountData.value.id}`, {
                     email: editAccountData.value.email,
                     matKhau: editAccountData.value.matKhau || undefined,
                     vaiTro: editAccountData.value.vaiTro,
@@ -726,7 +745,7 @@ export default {
 
         const deleteAccount = async () => {
             try {
-                await axios.delete(`http://localhost:8080/tai-khoan/${selectedAccountForDelete.value.id}`);
+                await axios.delete(`http://localhost:8080/api/tai-khoan/${selectedAccountForDelete.value.id}`);
                 await fetchData();
                 deleteAccountDialog.value = false;
                 selectedAccountForDelete.value = null;
@@ -750,7 +769,7 @@ export default {
         const changeStatus = async (acc) => {
             try {
                 const newStatus = acc.trangThai === 1 ? 0 : 1;
-                await axios.put(`http://localhost:8080/tai-khoan/${acc.id}`, {
+                await axios.put(`http://localhost:8080/api/tai-khoan/${acc.id}`, {
                     email: acc.email,
                     vaiTro: acc.vaiTro,
                     trangThai: newStatus
@@ -780,7 +799,7 @@ export default {
         const deleteSelectedAccounts = async () => {
             try {
                 for (const acc of selectedAccounts.value) {
-                    await axios.delete(`http://localhost:8080/tai-khoan/${acc.id}`);
+                    await axios.delete(`http://localhost:8080/api/tai-khoan/${acc.id}`);
                 }
                 await fetchData();
                 deleteAccountsDialog.value = false;
@@ -816,9 +835,18 @@ export default {
 
                 const headers = ['ID', 'Mã Tài Khoản', 'Email', 'Vai Trò', 'Trạng Thái', 'Ngày Tạo'];
 
-                const csvData = accounts.value.map((item) => [item.id || '', item.maTaiKhoan || '', item.email || '', getRoleLabel(item.vaiTro), item.trangThai === 1 ? 'Hoạt động' : 'Ngưng hoạt động', formatDate(item.ngayTao)]);
+                const csvData = accounts.value.map((item) => [
+                    item.id || '', 
+                    item.maTaiKhoan || '', 
+                    item.email || '', 
+                    getRoleLabel(item.vaiTro), 
+                    item.trangThai === 1 ? 'Hoạt động' : 'Ngưng hoạt động', 
+                    formatDate(item.ngayTao)
+                ]);
 
-                const csvContent = [headers, ...csvData].map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
+                const csvContent = [headers, ...csvData].map((row) => 
+                    row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                ).join('\n');
 
                 const BOM = '\uFEFF';
                 const csvWithBOM = BOM + csvContent;
@@ -889,6 +917,8 @@ export default {
             getRoleLabel,
             getRoleSeverity,
             getRoleIcon,
+            getVaiTroValue,
+            needsDetailedInfo,
             fetchData,
             openNew,
             onRoleChange,
