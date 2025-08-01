@@ -73,19 +73,17 @@ const loadCart = () => {
   }
 };
 
-// Load address data from GitHub - giống code JavaScript gốc
+// Load address data from GitHub - sửa CORS
 const loadAddressData = async () => {
   console.log('🚀 Đang load dữ liệu địa chỉ từ GitHub...');
   try {
-    const response = await axios({
-      url: "https://raw.githubusercontent.com/kenzouno1/DiaGioiHanhChinhVN/master/data.json",
-      method: "GET",
-      responseType: "json"
-    });
+    // Sử dụng fetch thay vì axios để tránh CORS preflight
+    const response = await fetch("https://raw.githubusercontent.com/kenzouno1/DiaGioiHanhChinhVN/master/data.json");
+    const data = await response.json();
 
-    console.log('✅ Đã load được dữ liệu từ GitHub:', response.data.length, 'tỉnh/thành');
-    addressData.value = response.data;
-    renderProvinces(response.data);
+    console.log('✅ Đã load được dữ liệu từ GitHub:', data.length, 'tỉnh/thành');
+    addressData.value = data;
+    renderProvinces(data);
 
   } catch (error) {
     console.error('❌ Lỗi khi load từ GitHub:', error);

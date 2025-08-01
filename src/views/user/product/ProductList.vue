@@ -60,93 +60,15 @@
                 </div>
               </div>
             </div>
-          <!-- Products Grid -->
-          <div v-else class="products-grid">
-            <div
-              v-for="(product, index) in filteredProducts"
-              :key="product.id"
-              @click="goToProductDetail(product)"
-              class="product-card"
-              :style="{ animationDelay: `${index * 0.1}s` }"
-            >
-              <!-- Product Image Container -->
-              <div class="product-image-container">
-                <!-- Nếu có ảnh thì hiển thị ảnh -->
-                <div v-if="product.imgUrl" class="product-image-wrapper">
-                  <img
-                    :src="product.imgUrl"
-                    :alt="product.label"
-                    class="product-image"
-                    @error="handleImageError"
-                  />
-                </div>
 
-                <!-- Nếu không có ảnh thì hiển thị placeholder -->
-                <div v-else class="product-placeholder">
-                  <svg viewBox="0 0 120 80" class="placeholder-icon">
-                    <defs>
-                      <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#e5e7eb"/>
-                        <stop offset="50%" stop-color="#f3f4f6"/>
-                        <stop offset="100%" stop-color="#e5e7eb"/>
-                      </linearGradient>
-                    </defs>
-                    <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)"/>
-                    <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db"/>
+            <div class="sidebar-footer">
+              <div class="filter-section">
+                <h4 class="filter-title">Bộ lọc nâng cao</h4>
+                <button class="filter-btn">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
                   </svg>
-                </div>
-
-                <!-- Product Badge -->
-                <div class="product-badge">
-                  <span>Mới</span>
-                </div>
-
-                <!-- Hover Overlay -->
-                <div class="product-overlay">
-                  <div class="quick-view-btn">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Product Info -->
-              <div class="product-info">
-                <!-- Rating -->
-                <div class="product-rating">
-                  <div class="stars">
-                    <span
-                      v-for="i in 5"
-                      :key="i"
-                      class="star"
-                      :class="{ filled: i <= Math.floor(product.rating) }"
-                    >
-                      ★
-                    </span>
-                  </div>
-                  <span class="rating-value">({{ product.rating }})</span>
-                </div>
-
-                <!-- Product Name -->
-                <h3 class="product-name">{{ product.label }}</h3>
-
-                <!-- Product Price -->
-                <div class="price-container">
-                  <p class="product-price">₫{{ formatPrice(product.price) }}</p>
-                  <p class="price-label">Giá tốt nhất</p>
-                </div>
-
-                <!-- Add to Cart Button -->
-                <button class="add-to-cart-btn" @click.stop="addToCart(product)">
-                  <span class="btn-content">
-                    <svg class="cart-icon" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2z"/>
-                      <path d="M1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
-                    </svg>
-                    <span class="btn-text">Thêm vào giỏ</span>
-                  </span>
-                  <div class="btn-background"></div>
+                  <span>Lọc sản phẩm</span>
                 </button>
               </div>
             </div>
@@ -197,27 +119,29 @@
               >
                 <!-- Product Image Container -->
                 <div class="product-image-container">
-                  <div class="product-image-wrapper">
+                  <!-- Nếu có ảnh thì hiển thị ảnh -->
+                  <div v-if="product.imgUrl" class="product-image-wrapper">
                     <img
-                      v-if="product.imgUrl"
                       :src="product.imgUrl"
                       :alt="product.label"
                       class="product-image"
                       @error="handleImageError"
                     />
-                    <div v-else class="product-placeholder">
-                      <svg viewBox="0 0 120 80" class="placeholder-icon">
-                        <defs>
-                          <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#e5e7eb"/>
-                            <stop offset="50%" stop-color="#f3f4f6"/>
-                            <stop offset="100%" stop-color="#e5e7eb"/>
-                          </linearGradient>
-                        </defs>
-                        <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)"/>
-                        <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db"/>
-                      </svg>
-                    </div>
+                  </div>
+
+                  <!-- Nếu không có ảnh thì hiển thị placeholder -->
+                  <div v-else class="product-placeholder">
+                    <svg viewBox="0 0 120 80" class="placeholder-icon">
+                      <defs>
+                        <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stop-color="#e5e7eb"/>
+                          <stop offset="50%" stop-color="#f3f4f6"/>
+                          <stop offset="100%" stop-color="#e5e7eb"/>
+                        </linearGradient>
+                      </defs>
+                      <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)"/>
+                      <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db"/>
+                    </svg>
                   </div>
 
                   <!-- Product Badge -->
@@ -295,34 +219,16 @@
     </div>
   </template>
 
-<script>
-import Nav from '@/components/user/Nav.vue';
-import ScrollToggler from '@/components/user/ScrollToggler.vue';
-import Footer from '@/views/user/Footer.vue';
-import axios from 'axios';
-import Hero from '../Hero.vue';
+  <script>
+  import Nav from '@/components/user/Nav.vue';
+  import ScrollToggler from '@/components/user/ScrollToggler.vue';
+  import Footer from '@/views/user/Footer.vue';
+  import axios from 'axios';
+  import Hero from '../Hero.vue';
 
-export default {
-  name: 'ProductList',
+  export default {
+    name: 'ProductList',
 
-  components: {
-    Nav,
-    Footer,
-    Hero,
-    ScrollToggler
-  },
-
-  data() {
-    return {
-      products: [],
-      categories: [],
-      selectedCategory: null,
-      cartItems: 0,
-      loading: true,
-      loadingCategories: true,
-      isMobileMenuOpen: false
-    }
-  },
     components: {
       Nav,
       Footer,
@@ -330,240 +236,81 @@ export default {
       ScrollToggler
     },
 
-
-  methods: {
-    selectCategory(categoryId) {
-      this.selectedCategory = categoryId;
-      this.isMobileMenuOpen = false;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    },
-
-    scrollToProducts() {
-      if (this.$refs.productsSection) {
-        this.$refs.productsSection.scrollIntoView({ behavior: 'smooth' });
+    data() {
+      return {
+        products: [],
+        categories: [],
+        selectedCategory: null,
+        cartItems: 0,
+        loading: true,
+        loadingCategories: true,
+        isMobileMenuOpen: false
       }
     },
 
-    goToProductDetail(product) {
-      // Chuyển đến trang chi tiết với id của chi tiết sản phẩm đầu tiên
-      this.$router.push({
-        name: 'product',
-        params: { id: product.firstDetailId || product.id }
-      });
-    },
-
-    addToCart(product) {
-      this.cartItems++;
-      console.log('Added to cart:', product);
-      this.$emit('add-to-cart', product);
-
-      // Hiển thị thông báo thành công
-      this.$toast?.success(`Đã thêm ${product.label} vào giỏ hàng!`) ||
-      alert(`Đã thêm ${product.label} vào giỏ hàng!`);
-    },
-
-    handleImageError(event) {
-      // Ẩn ảnh lỗi và hiển thị placeholder
-      event.target.style.display = 'none';
-      // Tìm và hiển thị placeholder nếu có
-      const placeholder = event.target.parentElement.querySelector('.product-placeholder');
-      if (placeholder) {
-        placeholder.style.display = 'flex';
-      }
-    },
-
-    formatPrice(price) {
-      if (!price) return '0';
-      return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    },
-
-    async fetchCategories() {
-      try {
-        this.loadingCategories = true;
-        const response = await axios.get('http://localhost:8080/danh-muc');
-        this.categories = response.data.filter(cat => cat.trangThai === 1);
-        console.log('Categories loaded:', this.categories.length);
-      } catch (error) {
-        console.error("Lỗi khi gọi API danh mục:", error);
-        this.categories = [];
-      } finally {
-        this.loadingCategories = false;
-      }
-    },
-
-    async fetchProducts() {
-      try {
-        this.loading = true;
-
-        // Gọi cả 2 API
-        const [productsResponse, detailsResponse] = await Promise.all([
-          axios.get('http://localhost:8080/api/san-pham'),
-          axios.get('http://localhost:8080/api/san-pham-chi-tiet')
-        ]);
-
-        console.log('Products API Response:', productsResponse.data);
-        console.log('Details API Response:', detailsResponse.data);
-
-        if (!productsResponse.data || productsResponse.data.length === 0) {
-          console.warn('No products data received from API');
-          this.products = [];
-          return;
+    computed: {
+      filteredProducts() {
+        if (!this.selectedCategory) {
+          return this.products;
         }
+        return this.products.filter(product =>
+          product.categoryId === this.selectedCategory
+        );
+      },
 
-        // Tạo map để lưu chi tiết đầu tiên, giá thấp nhất và hình ảnh của mỗi sản phẩm
-        const firstDetailMap = new Map();
-        const priceMap = new Map();
-        const imageMap = new Map();
+      selectedCategoryName() {
+        if (!this.selectedCategory) {
+          return 'Phổ Biến';
+        }
+        const category = this.categories.find(cat => cat.id === this.selectedCategory);
+        return category ? category.tenDanhMuc : 'Phổ Biến';
+      },
 
-        // Xử lý dữ liệu chi tiết sản phẩm
-        detailsResponse.data.forEach(detail => {
-          if (detail.sanPham?.id) {
-            const productId = detail.sanPham.id;
-
-            // Lưu chi tiết đầu tiên của mỗi sản phẩm
-            if (!firstDetailMap.has(productId)) {
-              firstDetailMap.set(productId, detail.id);
-            }
-
-            // Xử lý giá - lấy giá thấp nhất
-            if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
-              priceMap.set(productId, {
-                giaBan: detail.giaBan,
-                giaGoc: detail.giaGoc
-              });
-            }
-
-            // Xử lý hình ảnh - lấy hình ảnh đầu tiên
-            if (!imageMap.has(productId) && detail.hinhAnh) {
-              let imageUrl = '';
-              if (typeof detail.hinhAnh === 'object') {
-                imageUrl = detail.hinhAnh.duongDan ||
-                           detail.hinhAnh.url ||
-                           detail.hinhAnh.path ||
-                           detail.hinhAnh.link ||
-                           detail.hinhAnh.src || '';
-              } else if (typeof detail.hinhAnh === 'string') {
-                imageUrl = detail.hinhAnh;
-              }
-
-              if (imageUrl && !imageUrl.startsWith('http')) {
-                imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-              }
-
-              if (imageUrl) {
-                imageMap.set(productId, imageUrl);
-              }
-            }
-          }
-        });
-
-        // Map sản phẩm với thông tin từ chi tiết
-        this.products = productsResponse.data.map((p, index) => {
-          if (index < 3) {
-            console.log(`Product ${index + 1} full data:`, p);
-          }
-
-          // Lấy thông tin từ các map
-          const priceInfo = priceMap.get(p.id) || { giaBan: 0, giaGoc: 0 };
-          const imageUrl = imageMap.get(p.id) || null;
-          const firstDetailId = firstDetailMap.get(p.id);
-
-          const product = {
-            id: p.id,
-            firstDetailId: firstDetailId, // ID của chi tiết đầu tiên để navigation
-            imgUrl: imageUrl,
-            label: p.tenSanPham || 'Sản phẩm không tên',
-            price: priceInfo.giaBan,
-            originalPrice: priceInfo.giaGoc,
-            rating: 4.5 + (Math.random() * 0.5), // Random rating từ 4.5-5.0
-            brandId: p.thuongHieu?.id,
-            brandName: p.thuongHieu?.tenThuongHieu || '',
-            categoryId: p.danhMuc?.id,
-            categoryName: p.danhMuc?.tenDanhMuc || '',
-            materialId: p.chatLieu?.id,
-            materialName: p.chatLieu?.tenChatLieu || '',
-            soleId: p.deGiay?.id,
-            soleName: p.deGiay?.tenDeGiay || '',
-            maSanPham: p.maSanPham,
-            soLuong: p.soLuong || 0,
-            trangThai: p.trangThai
-          };
-
-          if (index < 3) {
-            console.log(`Processed product ${index + 1}:`, product);
-          }
-
-          return product;
-        });
-
-        console.log('Total processed products:', this.products.length);
-        console.log('Products with prices:', this.products.filter(p => p.price > 0).length);
-        console.log('Products with images:', this.products.filter(p => p.imgUrl).length);
-
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        console.error("Error details:", {
-          message: error.message,
-          response: error.response,
-          request: error.request
-        });
-        this.products = [];
-      } finally {
-        this.loading = false;
+      totalProducts() {
+        return this.products.length;
       }
     },
 
-    // Method để get random products - sẽ được gọi từ Product.vue
-    getRandomProducts(excludeProductId = null, count = 4) {
-      let availableProducts = this.products;
+    methods: {
+      selectCategory(categoryId) {
+        this.selectedCategory = categoryId;
+        this.isMobileMenuOpen = false;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      },
 
-      // Loại trừ sản phẩm hiện tại nếu có
-      if (excludeProductId) {
-        availableProducts = this.products.filter(p => p.id !== excludeProductId);
-      }
+      scrollToProducts() {
+        if (this.$refs.productsSection) {
+          this.$refs.productsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      },
 
-      // Shuffle và lấy số lượng cần thiết
-      const shuffled = availableProducts.sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, count);
-    }
-  },
+      goToProductDetail(product) {
+        // Chuyển đến trang chi tiết với id của chi tiết sản phẩm đầu tiên
+        this.$router.push({
+          name: 'product',
+          params: { id: product.firstDetailId || product.id }
+        });
+      },
 
-  mounted() {
-    console.log('ProductList component mounted');
-    this.fetchCategories();
-    this.fetchProducts();
-  },
+      addToCart(product) {
+        this.cartItems++;
+        console.log('Added to cart:', product);
+        this.$emit('add-to-cart', product);
 
-  beforeUnmount() {
-    console.log('ProductList component unmounting');
-  },
+        // Hiển thị thông báo thành công
+        this.$toast?.success(`Đã thêm ${product.label} vào giỏ hàng!`) ||
+        alert(`Đã thêm ${product.label} vào giỏ hàng!`);
+      },
 
-  // Expose methods cho component khác có thể gọi
-  expose() {
-    return {
-      getRandomProducts: this.getRandomProducts,
-      products: this.products
-    };
-  }
-
-  // Chuyển hướng sang trang giỏ hàng
-  this.$router.push('/card');
-},
-
-
-.mobile-close-btn {
-  display: none;
-  background: none;
-  border: none;
-  padding: 0.5rem;
-  cursor: pointer;
-  color: #64748b;
-
-  svg {
-    width: 24px;
-    height: 24px;
-  }
-}
+      handleImageError(event) {
+        // Ẩn ảnh lỗi và hiển thị placeholder
+        event.target.style.display = 'none';
+        // Tìm và hiển thị placeholder nếu có
+        const placeholder = event.target.parentElement.querySelector('.product-placeholder');
+        if (placeholder) {
+          placeholder.style.display = 'flex';
+        }
+      },
 
       formatPrice(price) {
         if (!price) return '0';
@@ -587,73 +334,101 @@ export default {
       async fetchProducts() {
         try {
           this.loading = true;
-          const response = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
-          console.log('API Response:', response.data); // Debug toàn bộ response
 
-          // Kiểm tra xem có dữ liệu không
-          if (!response.data || response.data.length === 0) {
+          // Gọi cả 2 API
+          const [productsResponse, detailsResponse] = await Promise.all([
+            axios.get('http://localhost:8080/api/san-pham'),
+            axios.get('http://localhost:8080/api/san-pham-chi-tiet')
+          ]);
+
+          console.log('Products API Response:', productsResponse.data);
+          console.log('Details API Response:', detailsResponse.data);
+
+          if (!productsResponse.data || productsResponse.data.length === 0) {
             console.warn('No products data received from API');
             this.products = [];
             return;
           }
 
-          // Log chi tiết sản phẩm đầu tiên để xem cấu trúc
-          console.log('First product detail:', response.data[0]);
+          // Tạo map để lưu chi tiết đầu tiên, giá thấp nhất và hình ảnh của mỗi sản phẩm
+          const firstDetailMap = new Map();
+          const priceMap = new Map();
+          const imageMap = new Map();
 
-          this.products = response.data.map((p, index) => {
-            // Log chi tiết cho vài sản phẩm đầu
+          // Xử lý dữ liệu chi tiết sản phẩm
+          detailsResponse.data.forEach(detail => {
+            if (detail.sanPham?.id) {
+              const productId = detail.sanPham.id;
+
+              // Lưu chi tiết đầu tiên của mỗi sản phẩm
+              if (!firstDetailMap.has(productId)) {
+                firstDetailMap.set(productId, detail.id);
+              }
+
+              // Xử lý giá - lấy giá thấp nhất
+              if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
+                priceMap.set(productId, {
+                  giaBan: detail.giaBan,
+                  giaGoc: detail.giaGoc
+                });
+              }
+
+              // Xử lý hình ảnh - lấy hình ảnh đầu tiên
+              if (!imageMap.has(productId) && detail.hinhAnh) {
+                let imageUrl = '';
+                if (typeof detail.hinhAnh === 'object') {
+                  imageUrl = detail.hinhAnh.duongDan ||
+                             detail.hinhAnh.url ||
+                             detail.hinhAnh.path ||
+                             detail.hinhAnh.link ||
+                             detail.hinhAnh.src || '';
+                } else if (typeof detail.hinhAnh === 'string') {
+                  imageUrl = detail.hinhAnh;
+                }
+
+                if (imageUrl && !imageUrl.startsWith('http')) {
+                  imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
+                }
+
+                if (imageUrl) {
+                  imageMap.set(productId, imageUrl);
+                }
+              }
+            }
+          });
+
+          // Map sản phẩm với thông tin từ chi tiết
+          this.products = productsResponse.data.map((p, index) => {
             if (index < 3) {
               console.log(`Product ${index + 1} full data:`, p);
-              console.log(`Product ${index + 1} image data:`, {
-                hinhAnh: p.hinhAnh,
-                hinhAnhType: typeof p.hinhAnh,
-                hinhAnhKeys: p.hinhAnh ? Object.keys(p.hinhAnh) : null
-              });
             }
 
-            // Thử các cách khác nhau để lấy URL ảnh
-            let imageUrl = '';
-            if (p.hinhAnh) {
-              // Nếu hinhAnh là object
-              if (typeof p.hinhAnh === 'object') {
-                imageUrl = p.hinhAnh.url ||
-                          p.hinhAnh.duongDan ||
-                          p.hinhAnh.path ||
-                          p.hinhAnh.link ||
-                          p.hinhAnh.src ||
-                          '';
-              }
-              // Nếu hinhAnh là string (URL trực tiếp)
-              else if (typeof p.hinhAnh === 'string') {
-                imageUrl = p.hinhAnh;
-              }
-            }
-
-            // Đảm bảo URL đầy đủ nếu là relative path
-            if (imageUrl && !imageUrl.startsWith('http')) {
-              imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-            }
+            // Lấy thông tin từ các map
+            const priceInfo = priceMap.get(p.id) || { giaBan: 0, giaGoc: 0 };
+            const imageUrl = imageMap.get(p.id) || null;
+            const firstDetailId = firstDetailMap.get(p.id);
 
             const product = {
               id: p.id,
+              firstDetailId: firstDetailId, // ID của chi tiết đầu tiên để navigation
               imgUrl: imageUrl,
-              label: p.sanPham?.tenSanPham || 'Sản phẩm không tên',
-              price: p.giaBan || 0,
-              originalPrice: p.giaGoc || 0,
-              rating: 4.8,
-              colorId: p.mauSac?.id,
-              colorName: p.mauSac?.tenMauSac || '',
-              sizeId: p.kichCo?.id,
-              sizeName: p.kichCo?.tenKichCo || '',
-              productId: p.sanPham?.id,
-              categoryId: p.sanPham?.danhMuc?.id,
-              categoryName: p.sanPham?.danhMuc?.tenDanhMuc || '',
-              maChiTiet: p.maChiTiet,
+              label: p.tenSanPham || 'Sản phẩm không tên',
+              price: priceInfo.giaBan,
+              originalPrice: priceInfo.giaGoc,
+              rating: 4.5 + (Math.random() * 0.5), // Random rating từ 4.5-5.0
+              brandId: p.thuongHieu?.id,
+              brandName: p.thuongHieu?.tenThuongHieu || '',
+              categoryId: p.danhMuc?.id,
+              categoryName: p.danhMuc?.tenDanhMuc || '',
+              materialId: p.chatLieu?.id,
+              materialName: p.chatLieu?.tenChatLieu || '',
+              soleId: p.deGiay?.id,
+              soleName: p.deGiay?.tenDeGiay || '',
+              maSanPham: p.maSanPham,
               soLuong: p.soLuong || 0,
               trangThai: p.trangThai
             };
 
-            // Log sản phẩm đã xử lý
             if (index < 3) {
               console.log(`Processed product ${index + 1}:`, product);
             }
@@ -662,25 +437,34 @@ export default {
           });
 
           console.log('Total processed products:', this.products.length);
+          console.log('Products with prices:', this.products.filter(p => p.price > 0).length);
           console.log('Products with images:', this.products.filter(p => p.imgUrl).length);
-          console.log('Products without images:', this.products.filter(p => !p.imgUrl).length);
-
-          // Log một vài sản phẩm có ảnh
-          const productsWithImages = this.products.filter(p => p.imgUrl).slice(0, 3);
-          console.log('Sample products with images:', productsWithImages);
 
         } catch (error) {
           console.error("Error fetching products:", error);
           console.error("Error details:", {
             message: error.message,
             response: error.response,
-            request: error.request,
-            stack: error.stack
+            request: error.request
           });
           this.products = [];
         } finally {
           this.loading = false;
         }
+      },
+
+      // Method để get random products - sẽ được gọi từ Product.vue
+      getRandomProducts(excludeProductId = null, count = 4) {
+        let availableProducts = this.products;
+
+        // Loại trừ sản phẩm hiện tại nếu có
+        if (excludeProductId) {
+          availableProducts = this.products.filter(p => p.id !== excludeProductId);
+        }
+
+        // Shuffle và lấy số lượng cần thiết
+        const shuffled = availableProducts.sort(() => 0.5 - Math.random());
+        return shuffled.slice(0, count);
       }
     },
 
@@ -692,9 +476,18 @@ export default {
 
     beforeUnmount() {
       console.log('ProductList component unmounting');
+    },
+
+    // Expose methods cho component khác có thể gọi
+    expose() {
+      return {
+        getRandomProducts: this.getRandomProducts,
+        products: this.products
+      };
     }
   }
   </script>
+
   <style lang="scss" scoped>
   .nike-complete-layout {
     font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -746,7 +539,6 @@ export default {
     color: #FF6452;
   }
 
-
   .mobile-close-btn {
     display: none;
     background: none;
@@ -776,115 +568,8 @@ export default {
       border-radius: 12px;
     }
   }
-/* Products Grid - Adjusted for smaller width */
-.products-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  margin-top: 3rem;
-}
 
-.product-card {
-  background: white;
-  border-radius: 24px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  position: relative;
-  animation: slideUp 0.6s ease-out forwards;
-  opacity: 0;
-  transform: translateY(30px);
-
-  &:hover {
-    transform: translateY(-12px) scale(1.02);
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-
-    .product-image {
-      transform: scale(1.05);
-    }
-
-    .product-overlay {
-      opacity: 1;
-    }
-
-    .add-to-cart-btn {
-      .btn-background {
-        transform: scaleX(1);
-      }
-    }
-  }
-}
-
-.product-image-container {
-  position: relative;
-  background: transparent;
-  padding: 2.5rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 280px;
-  overflow: hidden;
-}
-
-.product-image-wrapper {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.product-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.1));
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.product-placeholder {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  .placeholder-icon {
-    width: 120px;
-    height: 80px;
-    opacity: 0.6;
-  }
-}
-
-.product-badge {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  background: linear-gradient(135deg, #FF6452, #ff8a80);
-  color: white;
-  padding: 0.4rem 1rem;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  box-shadow: 0 4px 15px rgba(255, 100, 82, 0.4);
-  z-index: 2;
-}
-
-.product-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 100, 82, 0.9), rgba(255, 138, 128, 0.9));
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  opacity: 0;
-  transition: all 0.3s ease;
-
-  .quick-view-btn {
-    background: white;
-    color: #FF6452;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
+  .category-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1167,14 +852,9 @@ export default {
       transform: translateY(-12px) scale(1.02);
       box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
 
-     .product-image {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
-    transition: all 0.3s ease;
-  }
-
+      .product-image {
+        transform: scale(1.05);
+      }
 
       .product-overlay {
         opacity: 1;
@@ -1190,7 +870,7 @@ export default {
 
   .product-image-container {
     position: relative;
-    background: transparent; // bỏ nền
+    background: transparent;
     padding: 2.5rem;
     display: flex;
     justify-content: center;
@@ -1198,6 +878,7 @@ export default {
     height: 280px;
     overflow: hidden;
   }
+
   .product-image-wrapper {
     width: 100%;
     height: 100%;

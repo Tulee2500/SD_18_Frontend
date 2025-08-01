@@ -4,12 +4,23 @@ import axios from 'axios';
 
 // Reactive data
 const cartItems = ref([]);
-const loadingImages = ref(new Set());
 const isLoadingCart = ref(false);
-const isSavingCart = ref(false); // Thêm flag để tránh infinite loop
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8080';
+
+// Auth helper
+const getAuthToken = () => {
+  return localStorage.getItem('auth_token');
+};
+
+const getUserId = () => {
+  const userInfo = localStorage.getItem('user_info');
+  if (userInfo) {
+    return JSON.parse(userInfo).id;
+  }
+  return null;
+};
 
 // Helper function for color mapping
 const getColorHex = (tenMau) => {
@@ -36,169 +47,167 @@ const getColorHex = (tenMau) => {
 // Build full image URL from backend path
 const buildImageUrl = (imagePath) => {
   if (!imagePath) return '/placeholder-shoe.png';
-
-  if (imagePath.startsWith('http')) {
-    return imagePath;
-  }
-
+  if (imagePath.startsWith('http')) return imagePath;
   return `${API_BASE_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
 };
 
-// Fetch product detail to get updated image and info
-const fetchProductDetail = async (productDetailId) => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/api/san-pham-chi-tiet/${productDetailId}`);
-    return response.data;
-  } catch (error) {
-    console.error(`Error fetching product detail ${productDetailId}:`, error);
-    return null;
-  }
-};
-
-// Update cart item with fresh data from backend
-const updateCartItemWithBackendData = async (cartItem) => {
-  try {
-    loadingImages.value.add(cartItem.id);
-
-    const productDetail = await fetchProductDetail(cartItem.id);
-    if (productDetail) {
-      const imageUrl = productDetail.hinhAnh?.duongDan
-        ? buildImageUrl(productDetail.hinhAnh.duongDan)
-        : '/placeholder-shoe.png';
-
-      const updatedItem = {
-        ...cartItem,
-        name: productDetail.sanPham?.tenSanPham || cartItem.name,
-        image: imageUrl,
-        price: productDetail.giaBan || cartItem.price,
-        stock: productDetail.soLuong || cartItem.stock,
-        color: productDetail.mauSac ? {
-          id: productDetail.mauSac.id,
-          name: productDetail.mauSac.tenMauSac,
-          code: productDetail.mauSac.maMauSac
-        } : cartItem.color,
-        size: productDetail.kichCo?.tenKichCo || cartItem.size,
-        code: `MSL${productDetail.id || cartItem.id}`,
-        points: Math.floor((productDetail.giaBan || cartItem.price) / 100)
-      };
-
-      return updatedItem;
-    }
-
-    return cartItem;
-  } catch (error) {
-    console.error('Error updating cart item with backend data:', error);
-    return cartItem;
-  } finally {
-    loadingImages.value.delete(cartItem.id);
-  }
-};
-
-// Load cart from localStorage - FIXED VERSION
-const loadCartFromStorage = async () => {
-  if (isLoadingCart.value) return; // Tránh load đồng thời
+// 🛒 Load cart from backend
+// 🛒 Load cart from backend - CLEAN VERSION (CHỈ DÙNG JWT)
+const loadCartFromBackend = async () => {
+  if (isLoadingCart.value) return;
 
   try {
     isLoadingCart.value = true;
-    const savedCart = localStorage.getItem('cart');
+    console.log('🔄 Loading cart from backend...');
+    console.log('🔐 Auth token:', getAuthToken() ? 'Present' : 'Missing');
 
-    if (savedCart) {
-      const parsedCart = JSON.parse(savedCart);
-
-      // Chỉ load dữ liệu cơ bản từ localStorage trước
-      const initialCartItems = parsedCart.map(item => ({
-        id: item.productDetailId || item.productId || item.id,
-        name: item.name || 'Sản phẩm không xác định',
-        code: `MSL${item.productDetailId || item.productId || Math.floor(Math.random() * 1000)}`,
-        image: buildImageUrl(item.image) || '/placeholder-shoe.png',
-        price: Number(item.price) || 0,
-        quantity: Number(item.quantity) || 1,
-        points: Math.floor((Number(item.price) || 0) / 100),
-        size: item.size?.name || item.size || null,
-        color: item.color || null,
-        stock: Number(item.stock) || 10,
-        totalPrice: item.totalPrice || ((Number(item.price) || 0) * (Number(item.quantity) || 1))
-      }));
-
-      cartItems.value = initialCartItems;
-
-      // Chỉ update backend data khi cần thiết (không phải lúc nào cũng gọi API)
-      // Có thể thêm flag để kiểm soát việc này
-      const shouldRefreshFromBackend = sessionStorage.getItem('shouldRefreshCart') === 'true';
-
-      if (shouldRefreshFromBackend) {
-        const updatedCartItems = await Promise.all(
-          initialCartItems.map(item => updateCartItemWithBackendData(item))
-        );
-
-        cartItems.value = updatedCartItems;
-        sessionStorage.removeItem('shouldRefreshCart'); // Chỉ refresh 1 lần
-
-        // Lưu lại với dữ liệu mới NHƯNG KHÔNG trigger storage event
-        saveCartToStorageQuiet();
+    const response = await axios.get(`${API_BASE_URL}/api/gio-hang/current`, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+        'Content-Type': 'application/json'
       }
-    }
+    });
+
+    console.log('✅ Cart loaded from backend:', response.data);
+
+    // Backend trả về array của CartItemResponse
+    cartItems.value = response.data.map(item => ({
+      id: item.id,
+      productDetailId: item.productDetailId,
+      name: item.name,
+      code: item.code,
+      image: buildImageUrl(item.image),
+      price: item.price,
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color,
+      stock: item.stock,
+      points: item.points || 0,
+      totalPrice: item.totalPrice
+    }));
+
+    console.log('📦 Mapped cart items:', cartItems.value);
+
   } catch (error) {
-    console.error('Error loading cart from localStorage:', error);
-    cartItems.value = [];
+    console.error('❌ Error loading cart from backend:', error);
+
+    if (error.response?.status === 401) {
+      showNotification('error', 'Phiên đăng nhập hết hạn', 'Vui lòng đăng nhập lại');
+      setTimeout(() => {
+        window.location.href = '/auth/login';
+      }, 2000);
+    } else if (error.response?.status === 400) {
+      console.error('Backend error:', error.response.data);
+      showNotification('error', 'Lỗi', error.response.data || 'Không thể tải giỏ hàng');
+    } else {
+      showNotification('error', 'Lỗi', 'Không thể tải giỏ hàng');
+    }
   } finally {
     isLoadingCart.value = false;
   }
 };
 
-// Save cart to localStorage - FIXED VERSION
-const saveCartToStorage = () => {
-  if (isSavingCart.value) return; // Tránh save đồng thời
+// ✏️ Update quantity - CLEAN VERSION
+const updateQuantity = async (cartItemId, newQuantity) => {
+  if (newQuantity < 1) return;
+
+  const item = cartItems.value.find(item => item.id === cartItemId);
+  if (item && newQuantity > item.stock) {
+    showNotification(
+      'warning',
+      'Vượt quá số lượng',
+      `Số lượng không được vượt quá ${item.stock} sản phẩm có sẵn!`
+    );
+    return;
+  }
 
   try {
-    isSavingCart.value = true;
-    const cartData = cartItems.value.map(item => ({
-      productId: item.id,
-      productDetailId: item.id,
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity,
-      totalPrice: item.price * item.quantity,
-      color: item.color,
-      size: item.size ? { name: item.size } : null,
-      image: item.image,
-      stock: item.stock
-    }));
+    console.log(`🔄 Updating quantity for item ${cartItemId} to ${newQuantity}`);
 
-    localStorage.setItem('cart', JSON.stringify(cartData));
+    const response = await axios.put(`${API_BASE_URL}/api/gio-hang/update/${cartItemId}`, {
+      soLuong: newQuantity
+    }, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
-    // Dispatch storage event cho other components
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'cart',
-      newValue: JSON.stringify(cartData)
-    }));
+    console.log('✅ Quantity updated:', response.data);
+
+    // Update local state
+    const updatedItem = response.data;
+    cartItems.value = cartItems.value.map(item =>
+      item.id === cartItemId ? {
+        ...item,
+        quantity: updatedItem.quantity,
+        totalPrice: updatedItem.totalPrice
+      } : item
+    );
+
+    showNotification('success', 'Cập nhật thành công', 'Đã cập nhật số lượng sản phẩm');
+    window.dispatchEvent(new CustomEvent('cartUpdated'));
+
   } catch (error) {
-    console.error('Error saving cart to localStorage:', error);
-  } finally {
-    isSavingCart.value = false;
+    console.error('❌ Error updating quantity:', error);
+    showNotification('error', 'Lỗi', 'Không thể cập nhật số lượng');
   }
 };
 
-// Save without triggering storage event - để tránh infinite loop
-const saveCartToStorageQuiet = () => {
-  try {
-    const cartData = cartItems.value.map(item => ({
-      productId: item.id,
-      productDetailId: item.id,
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity,
-      totalPrice: item.price * item.quantity,
-      color: item.color,
-      size: item.size ? { name: item.size } : null,
-      image: item.image,
-      stock: item.stock
-    }));
+// 🗑️ Remove item - CLEAN VERSION
+const removeItem = async (cartItemId) => {
+  const item = cartItems.value.find(item => item.id === cartItemId);
+  if (!confirm(`Bạn có chắc chắn muốn xóa "${item?.name || 'sản phẩm này'}"?`)) return;
 
-    localStorage.setItem('cart', JSON.stringify(cartData));
-    // KHÔNG dispatch storage event
+  try {
+    console.log(`🔄 Removing item ${cartItemId}`);
+
+    await axios.delete(`${API_BASE_URL}/api/gio-hang/remove/${cartItemId}`, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('✅ Item removed from backend');
+
+    // Update local state
+    cartItems.value = cartItems.value.filter(item => item.id !== cartItemId);
+
+    showNotification('success', 'Đã xóa sản phẩm', `"${item?.name}" đã được xóa khỏi giỏ hàng`);
+    window.dispatchEvent(new CustomEvent('cartUpdated'));
+
   } catch (error) {
-    console.error('Error saving cart to localStorage quietly:', error);
+    console.error('❌ Error removing item:', error);
+    showNotification('error', 'Lỗi', 'Không thể xóa sản phẩm');
+  }
+};
+
+// 🧹 Clear cart - CLEAN VERSION
+const clearCart = async () => {
+  if (!confirm('Bạn có chắc chắn muốn xóa tất cả sản phẩm trong giỏ hàng?')) return;
+
+  try {
+    console.log('🔄 Clearing cart...');
+
+    await axios.delete(`${API_BASE_URL}/api/gio-hang/clear`, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('✅ Cart cleared from backend');
+
+    const itemCount = cartItems.value.length;
+    cartItems.value = [];
+
+    showNotification('success', 'Đã xóa giỏ hàng', `Đã xóa ${itemCount} sản phẩm khỏi giỏ hàng`);
+    window.dispatchEvent(new CustomEvent('cartUpdated'));
+
+  } catch (error) {
+    console.error('❌ Error clearing cart:', error);
+    showNotification('error', 'Lỗi', 'Không thể xóa giỏ hàng');
   }
 };
 
@@ -228,82 +237,6 @@ const showNotification = (type, title, message, duration = 3000) => {
 const hideNotification = () => {
   notification.value.show = false;
 };
-
-// Cart operations with notifications
-const updateQuantity = (id, newQuantity) => {
-  if (newQuantity < 1) return;
-
-  const item = cartItems.value.find(item => item.id === id);
-  if (item && newQuantity > item.stock) {
-    showNotification(
-      'warning',
-      'Vượt quá số lượng',
-      `Số lượng không được vượt quá ${item.stock} sản phẩm có sẵn!`
-    );
-    return;
-  }
-
-  cartItems.value = cartItems.value.map(item =>
-    item.id === id ? { ...item, quantity: newQuantity } : item
-  );
-  saveCartToStorage();
-
-  showNotification(
-    'success',
-    'Cập nhật thành công',
-    `Đã cập nhật số lượng sản phẩm`
-  );
-};
-
-const removeItem = (id) => {
-  const item = cartItems.value.find(item => item.id === id);
-  if (confirm(`Bạn có chắc chắn muốn xóa "${item?.name || 'sản phẩm này'}"?`)) {
-    cartItems.value = cartItems.value.filter(item => item.id !== id);
-    saveCartToStorage();
-
-    showNotification(
-      'success',
-      'Đã xóa sản phẩm',
-      `"${item?.name || 'Sản phẩm'}" đã được xóa khỏi giỏ hàng`
-    );
-  }
-};
-
-const refreshItem = (id) => {
-  const item = cartItems.value.find(item => item.id === id);
-  cartItems.value = cartItems.value.map(item =>
-    item.id === id ? { ...item, quantity: 1 } : item
-  );
-  saveCartToStorage();
-
-  showNotification(
-    'info',
-    'Đã reset số lượng',
-    `"${item?.name || 'Sản phẩm'}" đã được reset về số lượng 1`
-  );
-};
-
-const clearCart = () => {
-  if (confirm('Bạn có chắc chắn muốn xóa tất cả sản phẩm trong giỏ hàng?')) {
-    const itemCount = cartItems.value.length;
-    cartItems.value = [];
-    localStorage.removeItem('cart');
-
-    // Dispatch event để notify other components
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'cart',
-      newValue: null
-    }));
-
-    showNotification(
-      'success',
-      'Đã xóa giỏ hàng',
-      `Đã xóa ${itemCount} sản phẩm khỏi giỏ hàng`
-    );
-  }
-};
-
-// Discount operations with notifications - REMOVED
 
 // Navigation functions
 const continueShopping = () => {
@@ -363,28 +296,57 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('vi-VN').format(amount);
 };
 
-// Storage event handler - FIXED VERSION
-const handleStorageChange = (e) => {
-  if (e.key === 'card' && !isSavingCart.value && !isLoadingCart.value) {
-    // Chỉ reload khi không phải do chính component này trigger
-    loadCartFromStorage();
+// Listen for cart updates from other components
+const handleCartUpdated = () => {
+  console.log('🔄 Cart updated event received, reloading...');
+  loadCartFromBackend();
+};
+
+// Check auth and redirect if needed
+const checkAuth = () => {
+  if (!getAuthToken() || !getUserId()) {
+    showNotification('error', 'Chưa đăng nhập', 'Vui lòng đăng nhập để xem giỏ hàng');
+    setTimeout(() => {
+      window.location.href = '/auth/login';
+    }, 2000);
+    return false;
   }
+  return true;
 };
 
 // Lifecycle hooks
 onMounted(() => {
-  // Set flag để refresh data từ backend 1 lần khi mount
-  sessionStorage.setItem('shouldRefreshCart', 'true');
-  loadCartFromStorage();
-  window.addEventListener('storage', handleStorageChange);
+  console.log('🚀 Cart component mounted');
+
+  if (checkAuth()) {
+    loadCartFromBackend();
+  }
+
+  // Listen for cart updates
+  window.addEventListener('cartUpdated', handleCartUpdated);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('storage', handleStorageChange);
+  window.removeEventListener('cartUpdated', handleCartUpdated);
 });
 </script>
 
 <template>
+  <!-- Notification -->
+  <Transition name="slide-fade">
+    <div v-if="notification.show"
+         :class="[
+           'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm',
+           notification.type === 'success' ? 'bg-green-500 text-white' :
+           notification.type === 'warning' ? 'bg-yellow-500 text-white' :
+           notification.type === 'info' ? 'bg-blue-500 text-white' :
+           'bg-red-500 text-white'
+         ]">
+      <h4 class="font-bold">{{ notification.title }}</h4>
+      <p class="text-sm">{{ notification.message }}</p>
+    </div>
+  </Transition>
+
   <div class="w-full mx-auto p-4 sm:p-6 bg-gray-50 min-h-screen">
     <div class="bg-white rounded-lg shadow-lg overflow-hidden">
       <!-- Header -->
@@ -410,7 +372,13 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="flex flex-col lg:flex-row gap-6 p-4 sm:p-6">
+      <!-- Loading State -->
+      <div v-if="isLoadingCart" class="text-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+        <p class="text-gray-600">Đang tải giỏ hàng...</p>
+      </div>
+
+      <div v-else class="flex flex-col lg:flex-row gap-6 p-4 sm:p-6">
         <!-- Cart Items -->
         <div class="flex-1">
           <!-- Empty Cart State -->
@@ -455,7 +423,7 @@ onUnmounted(() => {
                       :src="item.image"
                       :alt="item.name"
                       class="w-full h-full object-cover rounded-lg"
-                      @error="$event.target.src = '/api/placeholder/80/80'"
+                      @error="handleImageError"
                     />
                   </div>
                 </div>
@@ -487,7 +455,6 @@ onUnmounted(() => {
                 <!-- Quantity Controls -->
                 <div class="col-span-2">
                   <div class="space-y-2">
-                    <!-- Quantity Input with buttons -->
                     <div class="flex border rounded-md overflow-hidden bg-white max-w-40">
                       <button
                         @click="updateQuantity(item.id, item.quantity - 1)"
@@ -512,7 +479,6 @@ onUnmounted(() => {
                         +
                       </button>
                     </div>
-                    <!-- Stock info -->
                     <div class="text-xs text-gray-500">
                       {{ item.quantity }} / {{ item.stock }}
                     </div>
@@ -565,7 +531,7 @@ onUnmounted(() => {
                       :src="item.image"
                       :alt="item.name"
                       class="w-full h-full object-cover rounded-lg"
-                      @error="$event.target.src = '/api/placeholder/80/80'"
+                      @error="handleImageError"
                     />
                   </div>
 
@@ -609,7 +575,6 @@ onUnmounted(() => {
 
                 <!-- Mobile Quantity and Price -->
                 <div class="mt-4 space-y-3">
-                  <!-- Quantity Control -->
                   <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-600">Số lượng:</span>
                     <div class="flex items-center gap-3">
@@ -641,7 +606,6 @@ onUnmounted(() => {
                     </div>
                   </div>
 
-                  <!-- Price Information -->
                   <div class="flex justify-between">
                     <div class="text-left">
                       <div class="text-sm text-gray-600">Đơn giá:</div>
@@ -660,7 +624,6 @@ onUnmounted(() => {
 
         <!-- Order Summary -->
         <div class="w-full lg:w-96" v-if="cartItems.length > 0">
-          <!-- Order Summary -->
           <div class="bg-white border rounded-lg p-6 sticky top-6">
             <h3 class="font-bold text-lg text-gray-800 mb-4">📋 Tóm tắt đơn hàng</h3>
 
@@ -689,7 +652,6 @@ onUnmounted(() => {
               <span class="text-orange-600">{{ formatCurrency(total) }}đ</span>
             </div>
 
-            <!-- Action Buttons -->
             <div class="space-y-3">
               <button
                 @click="proceedToCheckout"
@@ -705,12 +667,6 @@ onUnmounted(() => {
                 🛍️ TIẾP TỤC MUA SẮM
               </button>
             </div>
-
-            <!-- Security Badge -->
-            <!-- <div class="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
-              <span>🔒</span>
-              <span>Thanh toán bảo mật SSL</span>
-            </div> -->
           </div>
         </div>
       </div>
@@ -719,26 +675,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.tooltip {
-  position: relative;
-}
-
-.tooltip:hover::after {
-  content: attr(title);
-  position: absolute;
-  background: #333;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-  z-index: 10;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -746,7 +682,24 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* Animation for items */
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.slide-fade-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.slide-fade-enter-from {
+  transform: translateX(20px);
+  opacity: 0;
+}
+
+.slide-fade-leave-to {
+  transform: translateX(20px);
+  opacity: 0;
+}
+
 @keyframes slideIn {
   from {
     opacity: 0;
