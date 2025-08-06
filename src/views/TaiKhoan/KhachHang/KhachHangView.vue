@@ -395,6 +395,38 @@ const statusOptionsForForm = ref([
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidPhone = (phone) => /^[0-9]{10}$/.test(phone);
+// Trong NhanVienView.vue và KhachHangView.vue
+function getDefaultAddress(item) {
+    console.log('🏠 Getting address for:', item.hoTen);
+    console.log('📦 Item data:', {
+        danhSachDiaChi: item.danhSachDiaChi,
+        diaChiMacDinh: item.diaChiMacDinh,
+        idDiaChi: item.idDiaChi
+    });
+   if (!item.danhSachDiaChi || item.danhSachDiaChi.length === 0) {
+        console.log('❌ No danhSachDiaChi found');
+        return 'Chưa có địa chỉ';
+    }
+    
+    console.log('✅ Found addresses:', item.danhSachDiaChi.length);
+    
+    // Ưu tiên địa chỉ mặc định
+    if (item.diaChiMacDinh) {
+        console.log('✅ Using default address:', item.diaChiMacDinh);
+        if (item.diaChiMacDinh.diaChiDayDu) {
+            return truncateAddress(item.diaChiMacDinh.diaChiDayDu);
+        }
+        return truncateAddress(formatAddressFromInfo(item.diaChiMacDinh));
+    }
+    
+    // Nếu không có mặc định, lấy địa chỉ đầu tiên
+    console.log('ℹ️ Using first address:', item.danhSachDiaChi[0]);
+    const firstAddr = item.danhSachDiaChi[0];
+    if (firstAddr.diaChiDayDu) {
+        return truncateAddress(firstAddr.diaChiDayDu);
+    }
+    return truncateAddress(formatAddressFromInfo(firstAddr));
+}
 
 onMounted(() => {
     console.log('🚀 Component mounted, calling fetchData...');
@@ -431,7 +463,15 @@ async function fetchData() {
                     totalPages: res.data.totalPages,
                     currentPage: res.data.currentPage
                 });
-                customers.value = res.data.content; // Fix: Set customers.value here
+                customers.value = res.data.content; 
+                console.log('🔍 DEBUG - First customer address data:');
+                if (res.data.content.length > 0) {
+                    const firstCustomer = res.data.content[0];
+                    console.log('Customer:', firstCustomer.hoTen);
+                    console.log('danhSachDiaChi:', firstCustomer.danhSachDiaChi);
+                    console.log('diaChiMacDinh:', firstCustomer.diaChiMacDinh);
+                    console.log('idDiaChi:', firstCustomer.idDiaChi);
+                }// Fix: Set customers.value here
                 if (res.data.content.length > 0) {
                     console.log('📋 Sample item:', res.data.content[0]);
                     console.log('📋 Item keys:', Object.keys(res.data.content[0]));
@@ -813,40 +853,22 @@ function viewAllAddresses(customer) {
     selectedCustomerAddresses.value = customer;
     addressListDialog.value = true;
 }
+function truncateAddress(address) {
+    if (!address) return '';
+    return address.length > 50 ? address.substring(0, 50) + '...' : address;
+}
 function editAddress(address, customer) {
-    // Logic để mở form sửa địa chỉ
     console.log('Edit address:', address, 'for customer:', customer);
-    toast.add({
-        severity: 'info',
-        summary: 'Thông báo',
-        detail: 'Chức năng sửa địa chỉ sẽ được triển khai',
-        life: 3000
-    });
+    // TODO: Implement edit address functionality
 }
-
-// Xóa địa chỉ
 function deleteAddress(address) {
-    // Logic để xóa địa chỉ
     console.log('Delete address:', address);
-    toast.add({
-        severity: 'info',
-        summary: 'Thông báo', 
-        detail: 'Chức năng xóa địa chỉ sẽ được triển khai',
-        life: 3000
-    });
+    // TODO: Implement delete address functionality  
 }
 
-// Thêm địa chỉ mới
 function addNewAddress() {
-    if (!selectedCustomerAddresses.value) return;
-    
-    console.log('Add new address for customer:', selectedCustomerAddresses.value);
-    toast.add({
-        severity: 'info',
-        summary: 'Thông báo',
-        detail: 'Chức năng thêm địa chỉ mới sẽ được triển khai', 
-        life: 3000
-    });
+    console.log('Add new address');
+    // TODO: Implement add address functionality
 }
 </script>
 

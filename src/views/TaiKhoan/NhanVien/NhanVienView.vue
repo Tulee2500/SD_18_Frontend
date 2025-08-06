@@ -74,6 +74,32 @@
                     </div>
                 </template>
             </Column>
+            <Column header="Địa chỉ" style="min-width: 20rem">
+    <template #body="slotProps">
+        <!-- Hiển thị địa chỉ từ danhSachDiaChi -->
+        <div v-if="slotProps.data.danhSachDiaChi && slotProps.data.danhSachDiaChi.length > 0" class="flex items-center gap-2">
+            <Button icon="pi pi-map-marker" outlined severity="info" size="small" @click="viewAddress(slotProps.data)" title="Xem địa chỉ" />
+            <div class="flex flex-col">
+                <span class="text-sm">{{ getDefaultAddress(slotProps.data) }}</span>
+                <span class="text-green-600 text-xs font-semibold">
+                    {{ slotProps.data.danhSachDiaChi.length }} địa chỉ
+                </span>
+            </div>
+        </div>
+        <div v-else class="text-muted text-sm">
+            <i class="pi pi-map-marker mr-1"></i>
+            Chưa có địa chỉ
+        </div>
+    </template>
+</Column>
+            <Column field="diemTichLuy" header="Điểm tích lũy" sortable style="width: 10rem">
+                <template #body="slotProps">
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-star-fill text-yellow-500"></i>
+                        <span class="font-semibold">{{ slotProps.data.diemTichLuy || 0 }}</span>
+                    </div>
+                </template>
+            </Column>
             <Column field="trangThai" header="Trạng thái" sortable style="width: 12rem">
                 <template #body="slotProps">
                     <Tag :value="slotProps.data.trangThai === 1 ? 'Hoạt động' : 'Ngưng'" :severity="slotProps.data.trangThai === 1 ? 'success' : 'danger'">
@@ -118,6 +144,8 @@
                         <div><strong>Họ tên:</strong> {{ viewingEmployee.hoTen }}</div>
                         <div><strong>Email:</strong> {{ viewingEmployee.email }}</div>
                         <div><strong>SĐT:</strong> {{ viewingEmployee.sdt }}</div>
+                        <div><strong>Điểm tích lũy:</strong> {{ viewingEmployee.diemTichLuy || 0 }}</div>
+                        <div><strong>ID Địa chỉ:</strong> {{ viewingEmployee.idDiaChi || 'Chưa có' }}</div>
                         <div>
                             <strong>Trạng thái:</strong>
                             <Tag :value="viewingEmployee.trangThai === 1 ? 'Hoạt động' : 'Ngưng'" :severity="viewingEmployee.trangThai === 1 ? 'success' : 'danger'" />
@@ -126,10 +154,57 @@
                         <div><strong>Cập nhật:</strong> {{ formatDate(viewingEmployee.ngayCapNhat) }}</div>
                     </div>
                 </div>
+
+                <!-- Thông tin địa chỉ -->
+                <div class="rounded-lg bg-blue-50 p-4">
+                    <h6 class="mb-3 font-semibold text-blue-700">Địa chỉ:</h6>
+                    <div v-if="viewingEmployee.danhSachDiaChi && viewingEmployee.danhSachDiaChi.length > 0" class="space-y-2">
+                        <div v-for="(diaChi, index) in viewingEmployee.danhSachDiaChi" :key="index" class="border rounded p-2" :class="{ 'border-green-500 bg-green-50': diaChi.isDefault }">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-sm mb-1">{{ diaChi.diaChiDayDu }}</p>
+                                    <p class="text-xs text-muted">{{ diaChi.diaChiChiTiet }}</p>
+                                </div>
+                                <Tag v-if="diaChi.isDefault" value="Mặc định" severity="success" />
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="text-muted text-sm">
+                        Chưa có địa chỉ
+                    </div>
+                </div>
             </div>
             <template #footer>
                 <Button label="Đóng" icon="pi pi-times" text @click="viewDialog = false" />
                 <Button label="Sửa" icon="pi pi-pencil" @click="editFromView" />
+            </template>
+        </Dialog>
+
+        <!-- Address Dialog -->
+        <Dialog v-model:visible="addressDialog" :style="{ width: '600px' }" header="Chi tiết địa chỉ" :modal="true">
+            <div v-if="viewingAddressEmployee">
+                <div v-if="viewingAddressEmployee.danhSachDiaChi && viewingAddressEmployee.danhSachDiaChi.length > 0" class="space-y-3">
+                    <div v-for="(diaChi, index) in viewingAddressEmployee.danhSachDiaChi" :key="index" class="border rounded p-3" :class="{ 'border-green-500 bg-green-50': diaChi.isDefault }">
+                        <div class="flex justify-between items-start mb-2">
+                            <h6 class="font-semibold">Địa chỉ {{ index + 1 }}</h6>
+                            <Tag v-if="diaChi.isDefault" value="Mặc định" severity="success" />
+                        </div>
+                        <div class="text-sm space-y-1">
+                            <p><strong>Địa chỉ:</strong> {{ diaChi.diaChiDayDu }}</p>
+                            <p><strong>Chi tiết:</strong> {{ diaChi.diaChiChiTiet }}</p>
+                            <p><strong>Phường/Xã:</strong> {{ diaChi.tenPhuong }} ({{ diaChi.maPhuong }})</p>
+                            <p><strong>Quận/Huyện:</strong> {{ diaChi.tenHuyen }} ({{ diaChi.maHuyen }})</p>
+                            <p><strong>Tỉnh/TP:</strong> {{ diaChi.tenTinh }} ({{ diaChi.maTinh }})</p>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center text-muted">
+                    <i class="pi pi-map-marker text-3xl mb-2"></i>
+                    <p>Nhân viên chưa có địa chỉ</p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Đóng" icon="pi pi-times" @click="addressDialog = false" />
             </template>
         </Dialog>
 
@@ -217,6 +292,8 @@ const deleteEmployeesDialog = ref(false);
 const employee = ref({});
 const viewingEmployee = ref(null);
 const selectedEmployees = ref();
+const addressDialog = ref(false);
+const viewingAddressEmployee = ref(null);
 const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
@@ -245,6 +322,46 @@ onMounted(() => {
     fetchData();
 });
 
+// ===== HELPER FUNCTIONS - CHỈ ĐỊNH NGHĨA MỘT LẦN =====
+// Trong NhanVienView.vue và KhachHangView.vue
+function getDefaultAddress(item) {
+    console.log('Getting default address for:', item.hoTen);
+    console.log('danhSachDiaChi:', item.danhSachDiaChi);
+    console.log('diaChiMacDinh:', item.diaChiMacDinh);
+    
+    if (!item.danhSachDiaChi || item.danhSachDiaChi.length === 0) {
+        return 'Chưa có địa chỉ';
+    }
+    
+    // Ưu tiên địa chỉ mặc định
+    if (item.diaChiMacDinh && item.diaChiMacDinh.diaChiDayDu) {
+        return truncateAddress(item.diaChiMacDinh.diaChiDayDu);
+    }
+    
+    // Nếu không có mặc định, lấy địa chỉ đầu tiên
+    const firstAddr = item.danhSachDiaChi[0];
+    return truncateAddress(firstAddr.diaChiDayDu || formatAddressFromInfo(firstAddr));
+}
+
+function formatAddressFromInfo(address) {
+    if (!address) return 'Chưa có địa chỉ';
+    
+    const parts = [
+        address.diaChiChiTiet,
+        address.tenPhuong,
+        address.tenHuyen,
+        address.tenTinh
+    ].filter(part => part && part.trim() !== '');
+    
+    return parts.length > 0 ? parts.join(', ') : 'Chưa có địa chỉ';
+}
+
+function truncateAddress(address) {
+    if (!address) return '';
+    return address.length > 50 ? address.substring(0, 50) + '...' : address;
+}
+
+// ===== DATA FETCHING =====
 async function fetchData() {
     isLoading.value = true;
     try {
@@ -258,10 +375,18 @@ async function fetchData() {
         });
 
         if (res.data && res.data.content) {
-            employees.value = res.data.content; // ✅ ĐÚNG: sử dụng employees
+            employees.value = res.data.content;
             console.log(`✅ Loaded ${res.data.content.length} employees`);
+            
+            // ===== DEBUG LOG =====
+            if (res.data.content.length > 0) {
+                const firstEmployee = res.data.content[0];
+                console.log('📋 First employee:', firstEmployee.hoTen);
+                console.log('🏠 Addresses:', firstEmployee.danhSachDiaChi);
+                console.log('🏡 Default address:', firstEmployee.diaChiMacDinh);
+            }
         } else {
-            employees.value = []; // ✅ ĐÚNG: sử dụng employees
+            employees.value = [];
         }
     } catch (error) {
         console.error('❌ Error fetching employees:', error);
@@ -277,11 +402,11 @@ async function fetchData() {
             toast.add({
                 severity: 'error',
                 summary: 'Lỗi',
-                detail: 'Không thể tải danh sách nhân viên', // ✅ SỬA: nhân viên thay vì khách hàng
+                detail: 'Không thể tải danh sách nhân viên',
                 life: 3000
             });
         }
-        employees.value = []; // ✅ ĐÚNG: sử dụng employees
+        employees.value = [];
     } finally {
         isLoading.value = false;
     }
@@ -294,6 +419,12 @@ const filteredEmployees = computed(() => {
     }
     return filtered;
 });
+
+// ===== DIALOG FUNCTIONS =====
+function viewAddress(emp) {
+    viewingAddressEmployee.value = emp;
+    addressDialog.value = true;
+}
 
 function viewEmployee(emp) {
     viewingEmployee.value = { ...emp };
@@ -308,8 +439,9 @@ function editFromView() {
         email: viewingEmployee.value.email,
         sdt: viewingEmployee.value.sdt,
         trangThai: viewingEmployee.value.trangThai,
-        taiKhoan: viewingEmployee.value.taiKhoan,
-        diaChi: viewingEmployee.value.diaChi
+        idTaiKhoan: viewingEmployee.value.idTaiKhoan,
+        idDiaChi: viewingEmployee.value.idDiaChi,
+        diemTichLuy: viewingEmployee.value.diemTichLuy
     };
     viewDialog.value = false;
     employeeDialog.value = true;
@@ -323,8 +455,9 @@ function editEmployee(emp) {
         email: emp.email,
         sdt: emp.sdt,
         trangThai: emp.trangThai,
-        taiKhoan: emp.taiKhoan,
-        diaChi: emp.diaChi
+        idTaiKhoan: emp.idTaiKhoan,
+        idDiaChi: emp.idDiaChi,
+        diemTichLuy: emp.diemTichLuy
     };
     employeeDialog.value = true;
 }
@@ -335,6 +468,7 @@ function hideDialog() {
     employee.value = {};
 }
 
+// ===== SAVE/UPDATE FUNCTIONS =====
 async function saveEmployee() {
     submitted.value = true;
     saving.value = true;
@@ -351,7 +485,6 @@ async function saveEmployee() {
     }
 
     try {
-        // Chuẩn bị dữ liệu theo format DTO
         const employeeData = {
             id: employee.value.id,
             maNhanVien: employee.value.maNhanVien,
@@ -359,8 +492,8 @@ async function saveEmployee() {
             email: employee.value.email,
             sdt: employee.value.sdt,
             trangThai: employee.value.trangThai,
-            idTaiKhoan: employee.value.taiKhoan,
-            idDiaChi: employee.value.diaChi
+            idTaiKhoan: employee.value.idTaiKhoan,
+            idDiaChi: employee.value.idDiaChi
         };
 
         await axios.put(`http://localhost:8080/api/nhan-vien/${employee.value.id}`, employeeData);
@@ -396,6 +529,7 @@ async function saveEmployee() {
     }
 }
 
+// ===== DELETE FUNCTIONS =====
 function confirmDeleteEmployee(emp) {
     employee.value = emp;
     deleteEmployeeDialog.value = true;
@@ -427,6 +561,7 @@ async function deleteEmployee() {
     }
 }
 
+// ===== STATUS CHANGE =====
 async function changeStatus(emp) {
     try {
         const newStatus = emp.trangThai === 1 ? 0 : 1;
@@ -437,8 +572,8 @@ async function changeStatus(emp) {
             email: emp.email,
             sdt: emp.sdt,
             trangThai: newStatus,
-            idTaiKhoan: emp.taiKhoan,
-            idDiaChi: emp.diaChi
+            idTaiKhoan: emp.idTaiKhoan,
+            idDiaChi: emp.idDiaChi
         };
 
         await axios.put(`http://localhost:8080/api/nhan-vien/${emp.id}`, updateData);
@@ -460,6 +595,7 @@ async function changeStatus(emp) {
     }
 }
 
+// ===== BULK DELETE =====
 function confirmDeleteSelected() {
     deleteEmployeesDialog.value = true;
 }
@@ -492,6 +628,7 @@ async function deleteSelectedEmployees() {
     }
 }
 
+// ===== EXPORT =====
 async function exportCSV() {
     exporting.value = true;
     try {
@@ -505,8 +642,18 @@ async function exportCSV() {
             return;
         }
 
-        const headers = ['ID', 'Mã Nhân Viên', 'Họ Tên', 'Email', 'SĐT', 'Trạng Thái', 'Ngày Tạo'];
-        const csvData = employees.value.map((item) => [item.id || '', item.maNhanVien || '', item.hoTen || '', item.email || '', item.sdt || '', item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động', formatDate(item.ngayTao)]);
+        const headers = ['ID', 'Mã Nhân Viên', 'Họ Tên', 'Email', 'SĐT', 'Điểm Tích Lũy', 'Địa Chỉ', 'Trạng Thái', 'Ngày Tạo'];
+        const csvData = employees.value.map((item) => [
+            item.id || '', 
+            item.maNhanVien || '', 
+            item.hoTen || '', 
+            item.email || '', 
+            item.sdt || '', 
+            item.diemTichLuy || 0,
+            getDefaultAddress(item), // Sử dụng function đã định nghĩa
+            item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động', 
+            formatDate(item.ngayTao)
+        ]);
 
         const csvContent = [headers, ...csvData].map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
 
@@ -539,6 +686,7 @@ async function exportCSV() {
     }
 }
 
+// ===== UTILITY FUNCTIONS =====
 function goToAccountManagement() {
     router.push('/tai-khoan');
 }
@@ -557,11 +705,65 @@ function getInitials(name) {
               .slice(0, 2)
         : '';
 }
-</script>
-
-<style scoped>
+</script><style scoped>
 .card {
     border: none;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Styles cho cột Địa chỉ */
+.pi-map-marker {
+    color: #3b82f6;
+}
+
+/* Styles cho cột Điểm tích lũy */
+.pi-star-fill {
+    color: #fbbf24;
+}
+
+/* Text muted style */
+.text-muted {
+    color: #6c757d;
+}
+
+/* Success text color */
+.text-green-600 {
+    color: #16a34a;
+}
+
+/* Font sizes */
+.text-sm {
+    font-size: 0.875rem;
+}
+
+.text-xs {
+    font-size: 0.75rem;
+}
+
+/* Font weight */
+.font-semibold {
+    font-weight: 600;
+}
+
+/* Flex utilities */
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    flex-direction: column;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.gap-2 {
+    gap: 0.5rem;
+}
+
+/* Spacing */
+.mr-1 {
+    margin-right: 0.25rem;
 }
 </style>
