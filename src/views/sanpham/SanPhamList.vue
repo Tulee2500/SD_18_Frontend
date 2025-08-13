@@ -208,17 +208,24 @@ async function saveQuickAdd() {
     quickAddSubmitted.value = true;
     const config = quickAddTypes[quickAddType.value];
     
-    // Validate required fields
+    // Kiểm tra tất cả trường bắt buộc
+    const requiredFields = [];
+    
     for (const field of config.fields) {
         if (field.required && (!quickAddItem.value[field.key] || !quickAddItem.value[field.key].toString().trim())) {
-            toast.add({ 
-                severity: 'warn', 
-                summary: 'Cảnh báo', 
-                detail: `${field.label} là bắt buộc`, 
-                life: 3000 
-            });
-            return;
+            requiredFields.push(field.label);
         }
+    }
+    
+    // Nếu có trường nào chưa điền thì hiển thị thông báo chung
+    if (requiredFields.length > 0) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Vui lòng điền đầy đủ thông tin', 
+            detail: `Các trường bắt buộc: ${requiredFields.join(', ')}`, 
+            life: 4000 
+        });
+        return;
     }
     
     // Validate format mã màu trước khi kiểm tra trùng lặp
@@ -226,7 +233,7 @@ async function saveQuickAdd() {
         if (!quickAddItem.value.maMau.match(/^#[0-9A-Fa-f]{6}$/)) {
             toast.add({ 
                 severity: 'warn', 
-                summary: 'Cảnh báo', 
+                summary: 'Định dạng không hợp lệ', 
                 detail: 'Mã màu phải có định dạng hex hợp lệ (Ví dụ: #FF0000)', 
                 life: 3000 
             });
@@ -243,7 +250,7 @@ async function saveQuickAdd() {
     if (checkDuplicateByName(quickAddType.value, itemName)) {
         toast.add({ 
             severity: 'info', 
-            summary: 'Cảnh báo', 
+            summary: 'Dữ liệu đã tồn tại', 
             detail: `${config.title.replace('Thêm ', '')} "${itemName}" đã tồn tại`, 
             life: 4000 
         });
@@ -453,12 +460,7 @@ function generateQRCode(data) {
 function showProductQR(prod) {
     const qrData = JSON.stringify({
         type: 'Sản phẩm',
-        id: prod.id,
         code: prod.maSanPham,
-        name: prod.tenSanPham,
-        category: prod.category,
-        brand: prod.brand,
-        status: prod.trangThai
     });
     
     currentQRData.value = generateQRCode(qrData);
@@ -469,14 +471,7 @@ function showProductQR(prod) {
 function showDetailQR(detailData, productName) {
     const qrData = JSON.stringify({
         type: 'Chi tiết sản phẩm',
-        id: detailData.id,
         code: detailData.maChiTiet,
-        productName: productName,
-        size: detailData.size,
-        color: detailData.color,
-        quantity: detailData.soLuong,
-        price: detailData.giaBan,
-        status: detailData.trangThai
     });
     
     currentQRData.value = generateQRCode(qrData);
@@ -939,33 +934,41 @@ function editProduct(prod) {
 async function saveProduct() {
     submitted.value = true;
     
+    // Kiểm tra tất cả trường bắt buộc
+    const requiredFields = [];
+    
     if (!product.value.tenSanPham?.trim()) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Tên sản phẩm là bắt buộc', life: 3000 });
-        return;
+        requiredFields.push('Tên sản phẩm');
     }
     
     if (product.value.soLuong == null || product.value.soLuong === '' || product.value.soLuong < 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Số lượng phải là số không âm', life: 3000 });
-        return;
+        requiredFields.push('Số lượng hợp lệ');
     }
     
     if (!product.value.danhMuc) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Danh mục là bắt buộc', life: 3000 });
-        return;
+        requiredFields.push('Danh mục');
     }
     
     if (!product.value.thuongHieu) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Thương hiệu là bắt buộc', life: 3000 });
-        return;
+        requiredFields.push('Thương hiệu');
     }
     
     if (!product.value.chatLieu) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Chất liệu là bắt buộc', life: 3000 });
-        return;
+        requiredFields.push('Chất liệu');
     }
     
     if (!product.value.deGiay) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Đế giày là bắt buộc', life: 3000 });
+        requiredFields.push('Đế giày');
+    }
+    
+    // Nếu có trường nào chưa điền thì hiển thị thông báo chung
+    if (requiredFields.length > 0) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Vui lòng điền đầy đủ thông tin', 
+            detail: `Các trường bắt buộc: ${requiredFields.join(', ')}`, 
+            life: 4000 
+        });
         return;
     }
     
@@ -1317,34 +1320,41 @@ async function saveDetail() {
         detail.value.kichCos = selectedKichCo.value ? [selectedKichCo.value] : [];
     }
     
-    // Validation chung
+    // Kiểm tra tất cả trường bắt buộc cho chi tiết sản phẩm
+    const requiredFields = [];
+    
     if (!detail.value.maChiTiet?.trim()) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Mã chi tiết là bắt buộc', life: 3000 });
-        return;
+        requiredFields.push('Mã chi tiết');
     }
     
-    if (detail.value.soLuong == null || detail.value.soLuong === '' || detail.value.soLuong <= 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Số lượng phải lớn hơn 0', life: 3000 });
-        return;
-    }
-    
-    if (detail.value.giaBan == null || detail.value.giaBan === '' || detail.value.giaBan <= 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá bán phải lớn hơn 0', life: 3000 });
-        return;
+   if (detail.value.soLuong == null || detail.value.soLuong === '' || detail.value.soLuong <= 0) {
+        requiredFields.push('Số lượng phải > 0');
+    } else if (detail.value.soLuong > 10000) {
+        requiredFields.push('Số lượng tối đa = 10.000');
     }
     
     if (detail.value.giaGoc == null || detail.value.giaGoc === '' || detail.value.giaGoc <= 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá gốc phải lớn hơn 0', life: 3000 });
-        return;
+        requiredFields.push('Giá gốc phải > 0');
+    } else if (detail.value.giaGoc > 100000000) {
+        requiredFields.push('Giá gốc tối đa = 100.000.000');
     }
     
     if (!detail.value.mauSacs || detail.value.mauSacs.length === 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Phải chọn ít nhất một màu sắc', life: 3000 });
-        return;
+        requiredFields.push('Màu sắc');
     }
     
     if (!detail.value.kichCos || detail.value.kichCos.length === 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Phải chọn ít nhất một kích cỡ', life: 3000 });
+        requiredFields.push('Kích cỡ');
+    }
+    
+    // Nếu có trường nào chưa điền thì hiển thị thông báo chung
+    if (requiredFields.length > 0) {
+        toast.add({ 
+            severity: 'warn', 
+            summary: 'Vui lòng điền đầy đủ thông tin', 
+            detail: `Các trường bắt buộc: ${requiredFields.join(', ')}`, 
+            life: 4000 
+        });
         return;
     }
     
@@ -1629,10 +1639,19 @@ function getStatusLabel(status) {
 
 function getStockSeverity(product) {
     if (product.trangThai === 0) return 'danger';
-    const totalQty = getProductTotalQuantity(product.id);
-    if (totalQty > 50) return 'success';
-    if (totalQty > 10) return 'warn';
-    return 'danger';
+    // Sử dụng displayQuantity đã được tính sẵn để tránh performance issue
+    const quantity = product.displayQuantity || 0;
+    return quantity >= 10 ? 'success' : 'danger';
+}
+
+// Thêm hàm mới để xử lý màu sắc cho chi tiết sản phẩm
+function getDetailQuantitySeverity(quantity) {
+    // Logic: < 10 = đỏ, >= 10 = xanh
+    if (quantity >= 10) {
+        return 'success'; // Màu xanh
+    } else {
+        return 'danger';  // Màu đỏ
+    }
 }
 
 // Xuất file CSV
@@ -1847,7 +1866,7 @@ function collapseAll() {
                             <Column field="color" header="Màu sắc" sortable style="min-width: 8rem"></Column>
                             <Column field="soLuong" header="Số lượng" sortable style="min-width: 8rem">
                                 <template #body="detailProps">
-                                    <Badge :value="detailProps.data.soLuong" :severity="detailProps.data.soLuong > 10 ? 'success' : detailProps.data.soLuong > 0 ? 'warn' : 'danger'" />
+                                    <Badge :value="detailProps.data.soLuong" :severity="getDetailQuantitySeverity(detailProps.data.soLuong)" />
                                 </template>
                             </Column>
                             <Column field="giaGoc" header="Giá gốc" sortable style="min-width: 10rem">
@@ -2608,7 +2627,6 @@ function collapseAll() {
                 </div>
                 <div class="text-sm text-gray-600 text-center">
                     <p>Quét mã QR để xem thông tin sản phẩm</p>
-                    <small>Mã QR chứa thông tin: ID, mã sản phẩm, tên, danh mục, thương hiệu và trạng thái</small>
                 </div>
             </div>
             
@@ -2635,7 +2653,6 @@ function collapseAll() {
                 </div>
                 <div class="text-sm text-gray-600 text-center">
                     <p>Quét mã QR để xem thông tin chi tiết sản phẩm</p>
-                    <small>Mã QR chứa thông tin: ID chi tiết, mã chi tiết, tên sản phẩm, màu sắc, kích cỡ, số lượng, giá bán và trạng thái</small>
                 </div>
             </div>
             

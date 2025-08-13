@@ -64,8 +64,9 @@
                 </div>
                 <div>
                     <label for="tenKichCo" class="block font-bold mb-3">Tên Kích Cỡ</label>
-                    <InputText id="tenKichCo" v-model.trim="kichCo.tenKichCo" required="true" :invalid="submitted && !kichCo.tenKichCo" fluid />
+                    <InputText id="tenKichCo" v-model.trim="kichCo.tenKichCo" required="true" :invalid="submitted && (!kichCo.tenKichCo || isDuplicateName)" fluid />
                     <small v-if="submitted && !kichCo.tenKichCo" class="text-red-500">Tên Kích Cỡ là bắt buộc.</small>
+                    <small v-if="submitted && isDuplicateName" class="text-red-500">Tên Kích Cỡ đã tồn tại.</small>
                 </div>
                 <div>
                     <label for="trangThai" class="block font-bold mb-3">Trạng Thái</label>
@@ -109,7 +110,7 @@
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 
 const toast = useToast();
 const dt = ref();
@@ -127,6 +128,21 @@ const statuses = ref([
     { label: 'Hoạt động', value: 1 },
     { label: 'Ngừng hoạt động', value: 0 }
 ]);
+
+// Computed property to check for duplicate names
+const isDuplicateName = computed(() => {
+    if (!kichCo.value.tenKichCo) return false;
+    
+    const trimmedName = kichCo.value.tenKichCo.trim().toLowerCase();
+    
+    return ListKichCo.value.some(item => {
+        // Skip checking against itself when editing
+        if (kichCo.value.id && item.id === kichCo.value.id) {
+            return false;
+        }
+        return item.tenKichCo && item.tenKichCo.trim().toLowerCase() === trimmedName;
+    });
+});
 
 onMounted(() => {
     fetchData();
@@ -148,13 +164,13 @@ async function fetchData() {
 }
 
 function createId() {
-        let id = '';
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 8; i++) {
-            id += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return 'KC' + id;
+    let id = '';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+    return 'KC' + id;
+}
 
 function openNew() {
     kichCo.value = { 
@@ -174,7 +190,8 @@ function hideDialog() {
 async function saveKichCo() {
     submitted.value = true;
 
-    if (kichCo.value.maKichCo?.trim() && kichCo.value.tenKichCo?.trim()) {
+    // Check if required fields are filled and name is not duplicate
+    if (kichCo.value.maKichCo?.trim() && kichCo.value.tenKichCo?.trim() && !isDuplicateName.value) {
         try {
             if (kichCo.value.id) {
                 await axios.put(`http://localhost:8080/kich-co/${kichCo.value.id}`, kichCo.value);
@@ -207,12 +224,21 @@ async function saveKichCo() {
             });
         }
     } else {
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
-            life: 3000
-        });
+        if (isDuplicateName.value) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Tên Kích Cỡ đã tồn tại, vui lòng chọn tên khác',
+                life: 3000
+            });
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+                life: 3000
+            });
+        }
     }
 }
 
@@ -303,10 +329,6 @@ async function changeStatus(kc) {
 function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
 }
-
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
 
 function exportCSV() {
     try {

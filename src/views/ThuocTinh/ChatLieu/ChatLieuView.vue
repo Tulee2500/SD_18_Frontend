@@ -64,7 +64,7 @@
                 </div>
                 <div>
                     <label for="tenChatLieu" class="block font-bold mb-3">Tên Chất Liệu</label>
-                    <InputText id="tenChatLieu" v-model.trim="chatLieu.tenChatLieu" required="true" :invalid="submitted && !chatLieu.tenChatLieu" fluid />
+                    <InputText id="tenChatLieu" v-model.trim="chatLieu.tenChatLieu" required="true" :invalid="submitted && (!chatLieu.tenChatLieu || isDuplicateName)" fluid />
                     <small v-if="submitted && !chatLieu.tenChatLieu" class="text-red-500">Tên Chất Liệu là bắt buộc.</small>
                 </div>
                 <div>
@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
@@ -128,6 +128,21 @@ const statuses = ref([
     { label: 'Ngừng hoạt động', value: 0 }
 ]);
 
+// Computed property to check for duplicate names
+const isDuplicateName = computed(() => {
+    if (!chatLieu.value.tenChatLieu) return false;
+    
+    const trimmedName = chatLieu.value.tenChatLieu.trim().toLowerCase();
+    
+    return ListChatLieu.value.some(item => {
+        // Skip checking against itself when editing
+        if (chatLieu.value.id && item.id === chatLieu.value.id) {
+            return false;
+        }
+        return item.tenChatLieu && item.tenChatLieu.trim().toLowerCase() === trimmedName;
+    });
+});
+
 onMounted(() => {
     fetchData();
 });
@@ -146,16 +161,16 @@ async function fetchData() {
         });
     }
 }
-function createId() {
-        let id = '';
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 8; i++) {
-            id += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return 'CL' + id;
-    }
 
-    // Mã tự động
+function createId() {
+    let id = '';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return 'CL' + id;
+}
+
 function openNew() {
     chatLieu.value = { 
         maChatLieu: createId(),
@@ -174,7 +189,8 @@ function hideDialog() {
 async function saveChatLieu() {
     submitted.value = true;
 
-    if (chatLieu.value.maChatLieu?.trim() && chatLieu.value.tenChatLieu?.trim()) {
+    // Check if required fields are filled and name is not duplicate
+    if (chatLieu.value.maChatLieu?.trim() && chatLieu.value.tenChatLieu?.trim() && !isDuplicateName.value) {
         try {
             if (chatLieu.value.id) {
                 await axios.put(`http://localhost:8080/chat-lieu/${chatLieu.value.id}`, chatLieu.value);
@@ -207,12 +223,21 @@ async function saveChatLieu() {
             });
         }
     } else {
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
-            life: 3000
-        });
+        if (isDuplicateName.value) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Tên Chất Liệu đã tồn tại, vui lòng chọn tên khác',
+                life: 3000
+            });
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+                life: 3000
+            });
+        }
     }
 }
 
@@ -300,10 +325,6 @@ async function changeStatus(cl) {
     }
 }
 
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
-
 function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
 }
@@ -386,13 +407,12 @@ function exportCSV() {
             life: 3000
         });
     }
-    
 }
-</script>
+</script>   
 
 <style scoped>
 .card {
     border: none;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
-    </style>
+</style>
