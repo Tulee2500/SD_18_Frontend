@@ -64,7 +64,7 @@
                 </div>
                 <div>
                     <label for="tenDeGiay" class="block font-bold mb-3">Tên Đế Giày</label>
-                    <InputText id="tenDeGiay" v-model.trim="deGiay.tenDeGiay" required="true" :invalid="submitted && !deGiay.tenDeGiay" fluid />
+                    <InputText id="tenDeGiay" v-model.trim="deGiay.tenDeGiay" required="true" :invalid="submitted && (!deGiay.tenDeGiay || isDuplicateName)" fluid />
                     <small v-if="submitted && !deGiay.tenDeGiay" class="text-red-500">Tên Đế Giày là bắt buộc.</small>
                 </div>
                 <div>
@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
@@ -128,6 +128,21 @@ const statuses = ref([
     { label: 'Ngừng hoạt động', value: 0 }
 ]);
 
+// Computed property to check for duplicate names
+const isDuplicateName = computed(() => {
+    if (!deGiay.value.tenDeGiay) return false;
+    
+    const trimmedName = deGiay.value.tenDeGiay.trim().toLowerCase();
+    
+    return ListDeGiay.value.some(item => {
+        // Skip checking against itself when editing
+        if (deGiay.value.id && item.id === deGiay.value.id) {
+            return false;
+        }
+        return item.tenDeGiay && item.tenDeGiay.trim().toLowerCase() === trimmedName;
+    });
+});
+
 onMounted(() => {
     fetchData();
 });
@@ -148,13 +163,13 @@ async function fetchData() {
 }
 
 function createId() {
-        let id = '';
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 8; i++) {
-            id += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return 'DG' + id;
+    let id = '';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+    return 'DG' + id;
+}
 
 function openNew() {
     deGiay.value = { 
@@ -174,7 +189,8 @@ function hideDialog() {
 async function saveDeGiay() {
     submitted.value = true;
 
-    if (deGiay.value.maDeGiay?.trim() && deGiay.value.tenDeGiay?.trim()) {
+    // Check if required fields are filled and name is not duplicate
+    if (deGiay.value.maDeGiay?.trim() && deGiay.value.tenDeGiay?.trim() && !isDuplicateName.value) {
         try {
             if (deGiay.value.id) {
                 await axios.put(`http://localhost:8080/de-giay/${deGiay.value.id}`, deGiay.value);
@@ -207,12 +223,21 @@ async function saveDeGiay() {
             });
         }
     } else {
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
-            life: 3000
-        });
+        if (isDuplicateName.value) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Tên Đế Giày đã tồn tại, vui lòng chọn tên khác',
+                life: 3000
+            });
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+                life: 3000
+            });
+        }
     }
 }
 
@@ -304,10 +329,6 @@ function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
 }
 
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
-// Xuat theo dinh dang CSV
 function exportCSV() {
     try {
         // If no data, show warning
