@@ -55,7 +55,7 @@
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="mauSacDialog" :style="{ width: '450px' }" header="Chi tiết Màu Sắc" :modal="true">
+        <Dialog v-model:visible="mauSacDialog" :style="{ width: '450px' }" header="Chi Tiết Màu Sắc" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maMauSac" class="block font-bold mb-3">Mã Màu Sắc</label>

@@ -55,7 +55,7 @@
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="thuongHieuDialog" :style="{ width: '450px' }" header="Chi tiết Thương Hiệu" :modal="true">
+        <Dialog v-model:visible="thuongHieuDialog" :style="{ width: '450px' }" header="Chi Tiết Thương Hiệu" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maThuongHieu" class="block font-bold mb-3">Mã Thương Hiệu</label>

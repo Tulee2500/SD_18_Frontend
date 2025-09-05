@@ -55,7 +55,7 @@
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="danhMucDialog" :style="{ width: '450px' }" header="Chi tiết Danh Mục" :modal="true">
+        <Dialog v-model:visible="danhMucDialog" :style="{ width: '450px' }" header="Chi Tiết Danh Mục" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maDanhMuc" class="block font-bold mb-3">Mã Danh Mục</label>

@@ -107,7 +107,7 @@
                             severity="secondary" 
                             size="small" 
                             @click="changeStatus(slotProps.data)" 
-                            :title="slotProps.data.trangThai === 1 ? 'Vô hiệu hóa' : 'Kích hoạt'"
+                            :title="slotProps.data.trangThai === 1 ? 'Hoạt động ' : 'Không hoạt động'"
                         />
                     </div>
                 </template>
@@ -169,7 +169,7 @@
                     <InputText 
                         id="giaTri" 
                         v-model="khuyenMai.giaTri" 
-                        :min="1" 
+                        :min="0.1" 
                         :max="100" 
                         suffix="%" 
                         fluid 
@@ -178,12 +178,18 @@
                         :maxFractionDigits="2"
                         placeholder="Nhập % giảm giá..."
                         @blur="validateField('giaTri')"
+                        @input="validateField('giaTri')"
+                        mode="decimal"
+                        :useGrouping="false"
                     />
                     <small v-if="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" class="text-red-500">
                         Giá trị giảm phải lớn hơn 0.
                     </small>
                     <small v-else-if="submitted && khuyenMai.giaTri > 100" class="text-red-500">
                         Giá trị giảm không được vượt quá 100%.
+                    </small>
+                    <small v-else-if="submitted && isNaN(khuyenMai.giaTri)" class="text-red-500">
+                        Giá trị giảm phải là số hợp lệ.
                     </small>
                 </div>
 
@@ -653,12 +659,12 @@ const statusOptions = ref([
     { label: 'Chưa diễn ra', value: 'pending' },
     { label: 'Đang diễn ra', value: 'active' },
     { label: 'Đã hết hạn', value: 'expired' },
-    { label: 'Đã vô hiệu hóa', value: 'disabled' }
+    { label: 'Không hoạt động', value: 'disabled' }
 ]);
 
 const statusOptionsForForm = ref([
     { label: 'Hoạt động', value: 1 },
-    { label: 'Vô hiệu hóa', value: 0 }
+    { label: 'Không hoạt động', value: 0 }
 ]);
 
 onMounted(() => {
@@ -748,7 +754,7 @@ function getPromotionStatusText(promotion) {
         case 'expired':
             return 'Đã hết hạn';
         case 'disabled':
-            return 'Đã vô hiệu hóa';
+            return 'Không hoạt động';
         default:
             return 'Không xác định';
     }
@@ -857,7 +863,7 @@ async function openApplyProductsDialog(promotion) {
                 message = 'Khuyến mãi đã hết hạn, không thể áp dụng cho sản phẩm';
                 break;
             case 'disabled':
-                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng cho sản phẩm';
+                message = 'Khuyến mãi không hoạt động, không thể áp dụng cho sản phẩm';
                 break;
             default:
                 message = 'Khuyến mãi không khả dụng, không thể áp dụng cho sản phẩm';
@@ -966,7 +972,7 @@ async function applyPromotionToProducts() {
                 message = 'Khuyến mãi đã hết hạn, không thể áp dụng cho sản phẩm';
                 break;
             case 'disabled':
-                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng cho sản phẩm';
+                message = 'Khuyến mãi không hoạt động, không thể áp dụng cho sản phẩm';
                 break;
             default:
                 message = 'Khuyến mãi không khả dụng, không thể áp dụng cho sản phẩm';
@@ -1119,7 +1125,7 @@ function openApplyProductsFromView() {
                 message = 'Khuyến mãi đã hết hạn, không thể áp dụng thêm sản phẩm';
                 break;
             case 'disabled':
-                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng thêm sản phẩm';
+                message = 'Khuyến mãi không hoạt động, không thể áp dụng thêm sản phẩm';
                 break;
             default:
                 message = 'Khuyến mãi không khả dụng, không thể áp dụng thêm sản phẩm';
@@ -1208,10 +1214,14 @@ function validateKhuyenMaiForm() {
         errors.push('Tên khuyến mãi là bắt buộc');
     }
     
-    // Kiểm tra giá trị giảm
-    if (khuyenMai.value.giaTri == null || khuyenMai.value.giaTri <= 0) {
+    // Kiểm tra giá trị giảm - cập nhật validation
+    if (khuyenMai.value.giaTri == null || khuyenMai.value.giaTri === '') {
+        errors.push('Giá trị giảm là bắt buộc');
+    } else if (isNaN(khuyenMai.value.giaTri)) {
+        errors.push('Giá trị giảm phải là số hợp lệ');
+    } else if (Number(khuyenMai.value.giaTri) <= 0) {
         errors.push('Giá trị giảm phải lớn hơn 0');
-    } else if (khuyenMai.value.giaTri > 100) {
+    } else if (Number(khuyenMai.value.giaTri) > 100) {
         errors.push('Giá trị giảm không được vượt quá 100%');
     }
     
@@ -1258,7 +1268,7 @@ async function saveKhuyenMai() {
             
         toast.add({
             severity: 'warn',
-            summary: 'Không được để trống thông tin ',
+            summary: 'Vui lòng kiểm tra thông tin',
             detail: errorMessage,
             life: 5000
         });
@@ -1325,7 +1335,12 @@ function validateField(fieldName) {
             }
             break;
         case 'giaTri':
-            // Validation sẽ được xử lý bởi InputNumber component
+            // Validation được xử lý real-time bởi InputNumber
+            // Có thể thêm validation custom nếu cần
+            if (submitted.value) {
+                // Force re-validate khi user đang trong trạng thái đã submit
+                const errors = validateKhuyenMaiForm();
+            }
             break;
         case 'ngayBatDau':
         case 'ngayKetThuc':
@@ -1387,7 +1402,7 @@ async function changeStatus(km) {
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: `Đã ${km.trangThai === 1 ? 'vô hiệu hóa' : 'kích hoạt'} khuyến mãi`,
+            detail: `Đã ${km.trangThai === 1 ? 'kích hoạt' : 'ngừng hoạt động'} khuyến mãi`,
             life: 3000
         });
     } catch (error) {

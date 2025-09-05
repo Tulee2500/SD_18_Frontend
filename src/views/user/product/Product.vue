@@ -381,18 +381,12 @@
               </table>
             </div>
             
-            <!-- Reviews Tab -->
+            <!-- Reviews Tab - ĐÃ THAY THẾ BẰNG REVIEW SYSTEM -->
             <div v-if="activeTab === 'reviews'" class="tab-panel">
-              <h3>Đánh giá sản phẩm</h3>
-              <div class="reviews-summary">
-                <div class="rating-overview">
-                  <div class="rating-score-large">4.8</div>
-                  <div class="rating-stars-large">
-                    <span v-for="i in 5" :key="i" class="star filled">★</span>
-                  </div>
-                  <div class="rating-count">156 đánh giá</div>
-                </div>
-              </div>
+              <ReviewProducts 
+                :product-id="currentProduct?.id || productId" 
+                @review-submitted="handleReviewSubmitted"
+              />
             </div>
           </div>
         </div>
@@ -478,6 +472,9 @@
     <section id="#" class="padding-x padding-t bg-black pb-8">
       <Footer />
     </section>
+
+    <!-- ChatBot Component - ĐÃ THÊM -->
+    <ChatBot />
   </div>
 </template>
 
@@ -486,13 +483,19 @@ import Nav from '@/components/user/Nav.vue';
 import Footer from '@/views/user/Footer.vue';
 import axios from 'axios';
 import Hero from '../Hero.vue';
+// ===== ĐÃ THÊM IMPORT =====
+import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
+import ReviewProducts from '@/components/ChatBotAndReview/ReviewProducts.vue';
 
 export default {
   name: 'Product',
   components: {
     Nav,
     Footer,
-    Hero
+    Hero,
+    // ===== ĐÃ THÊM COMPONENTS =====
+    ChatBot,
+    ReviewProducts
   },
   data() {
     return {
@@ -556,6 +559,36 @@ export default {
     }
   },
   methods: {
+    // ===== ĐÃ THÊM METHOD XỬ LÝ REVIEW =====
+    handleReviewSubmitted(review) {
+      console.log('New review submitted:', review);
+      // Có thể call API để lưu review
+      // await this.saveReviewToAPI(review);
+      
+      // Hiển thị thông báo thành công
+      this.$toast?.success('Cảm ơn bạn đã đánh giá sản phẩm!') || 
+      alert('Cảm ơn bạn đã đánh giá sản phẩm!');
+    },
+
+    // Method để save review lên server (optional)
+    async saveReviewToAPI(review) {
+      try {
+        const payload = {
+          san_pham_chi_tiet_id: this.currentProduct?.id,
+          ten_khach_hang: review.name,
+          diem_danh_gia: review.rating,
+          tieu_de: review.title,
+          noi_dung: review.content
+        };
+        
+        // Uncomment when you have API endpoint
+        // const response = await axios.post('http://localhost:8080/api/danh-gia', payload);
+        // console.log('Review saved:', response.data);
+      } catch (error) {
+        console.error('Error saving review:', error);
+      }
+    },
+
     startAutoSlide() {
       if (!this.isPaused && this.productImages.length > 1) {
         this.progressWidth = 0;
@@ -1830,6 +1863,7 @@ export default {
 
 .tab-panel {
   animation: fadeIn 0.3s ease;
+  min-height: 400px;
 }
 
 .tab-panel h3 {
@@ -2197,6 +2231,29 @@ export default {
   }
 }
 
+/* ===== ĐÃ THÊM CSS CHO CHATBOT & REVIEW SYSTEM ===== */
+/* ChatBot và Review System styles */
+.chatbot-container {
+  z-index: 9999 !important;
+}
+
+.review-modal-overlay {
+  z-index: 9998 !important;
+}
+
+/* Đảm bảo tab reviews có đủ không gian */
+.tab-panel {
+  min-height: 400px;
+}
+
+/* Responsive cho review system */
+@media (max-width: 768px) {
+  .review-system {
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .product-wrapper {
@@ -2339,5 +2396,5 @@ export default {
     justify-content: flex-start;
   }
 }
-</style>
 
+</style>

@@ -216,6 +216,9 @@
       <Footer />
     </section>
     <ScrollToggler />
+    
+    <!-- ===== ĐÃ THÊM CHATBOT COMPONENT ===== -->
+    <ChatBot />
   </div>
 </template>
 
@@ -225,6 +228,8 @@ import ScrollToggler from '@/components/user/ScrollToggler.vue';
 import Footer from '@/views/user/Footer.vue';
 import axios from 'axios';
 import Hero from '../Hero.vue';
+// ===== ĐÃ THÊM CHATBOT IMPORT =====
+import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
 
 export default {
   name: 'ProductList',
@@ -233,7 +238,9 @@ export default {
     Nav,
     Footer,
     Hero,
-    ScrollToggler
+    ScrollToggler,
+    // ===== ĐÃ THÊM CHATBOT COMPONENT =====
+    ChatBot
   },
   
   data() {
@@ -1078,6 +1085,22 @@ export default {
   }
 }
 
+/* ===== ĐÃ THÊM CSS CHO CHATBOT ===== */
+/* Đảm bảo chatbot hiển thị trên cùng */
+:deep(.chatbot-container) {
+  z-index: 9999 !important;
+}
+
+/* Đảm bảo không conflict với mobile-menu-toggle */
+.mobile-menu-toggle {
+  z-index: 9997; /* Thấp hơn chatbot */
+}
+
+/* Đảm bảo ScrollToggler không conflict */
+:deep(.scroll-toggler) {
+  z-index: 9998;
+}
+
 /* Animations */
 @keyframes slideUp {
   to {
@@ -1137,6 +1160,22 @@ export default {
   .section-title {
     font-size: 2.5rem;
   }
+  
+  /* ===== RESPONSIVE CHATBOT ===== */
+  :deep(.chatbot-container) {
+    bottom: 1rem;
+    right: 1rem;
+  }
+  
+  :deep(.chat-window) {
+    width: calc(100vw - 2rem);
+    height: 70vh;
+  }
+  
+  /* Điều chỉnh mobile-menu-toggle khi có chatbot */
+  .mobile-menu-toggle {
+    bottom: 80px; /* Tránh chatbot */
+  }
 }
 
 @media (max-width: 768px) {
@@ -1189,7 +1228,7 @@ export default {
   }
   
   .mobile-menu-toggle {
-    bottom: 1rem;
+    bottom: 80px; /* Tránh chatbot */
     left: 1rem;
     padding: 0.875rem 1.25rem;
     font-size: 0.9rem;

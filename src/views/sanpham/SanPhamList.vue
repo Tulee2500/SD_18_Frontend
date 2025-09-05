@@ -1331,14 +1331,18 @@ async function saveDetail() {
         requiredFields.push('Số lượng phải > 0');
     } else if (detail.value.soLuong > 10000) {
         requiredFields.push('Số lượng tối đa = 10.000');
+    } else if (isNaN(detail.value.soLuong)) {
+        requiredFields.push('Số lượng phải là số');
     }
-    
+
     if (detail.value.giaGoc == null || detail.value.giaGoc === '' || detail.value.giaGoc <= 0) {
         requiredFields.push('Giá gốc phải > 0');
     } else if (detail.value.giaGoc > 100000000) {
         requiredFields.push('Giá gốc tối đa = 100.000.000');
+    } else if (isNaN(detail.value.giaGoc)) {
+        requiredFields.push('Giá gốc phải là số');
     }
-    
+
     if (!detail.value.mauSacs || detail.value.mauSacs.length === 0) {
         requiredFields.push('Màu sắc');
     }
@@ -1351,7 +1355,7 @@ async function saveDetail() {
     if (requiredFields.length > 0) {
         toast.add({ 
             severity: 'warn', 
-            summary: 'Vui lòng điền đầy đủ thông tin', 
+            summary: 'Vui lòng kiểm tra thông tin', 
             detail: `Các trường bắt buộc: ${requiredFields.join(', ')}`, 
             life: 4000 
         });
@@ -1856,7 +1860,7 @@ function collapseAll() {
                     <div v-else-if="productDetails[slotProps.data.id] && productDetails[slotProps.data.id].length" class="p-4">
                         <div class="flex justify-between items-center mb-4">
                             <div>
-                                <h5>Chi tiết sản phẩm: {{ slotProps.data.tenSanPham }}</h5>
+                                <h5>Thêm sản phẩm: {{ slotProps.data.tenSanPham }}</h5>
                             </div>
                             <Button label="Thêm chi tiết" icon="pi pi-plus" severity="secondary" @click="openNewDetail(slotProps.data.id)" :loading="loading" />
                         </div>
@@ -1981,7 +1985,7 @@ function collapseAll() {
         </div>
 
         <!-- Dialog thêm/sửa sản phẩm -->
-        <Dialog v-model:visible="productDialog" :style="{ width: '600px' }" header="Chi tiết Sản phẩm" :modal="true" class="p-fluid">
+        <Dialog v-model:visible="productDialog" :style="{ width: '600px' }" header="Thêm sản phẩm" :modal="true" class="p-fluid">
             <div class="flex flex-col gap-6">
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-8">
@@ -2007,7 +2011,7 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="danhMuc" class="block font-bold mb-3">Danh mục </label>
                         <div class="flex gap-2">
-                            <Select id="danhMuc" v-model="product.danhMuc" :options="danhMucs" optionLabel="tenDanhMuc" placeholder="Chọn danh mục" fluid class="flex-1" />
+                            <Select id="danhMuc" v-model="product.danhMuc" :options="danhMucs" optionLabel="tenDanhMuc" placeholder="Chọn danh mục" fluid class="flex-1" :invalid="submitted && !product.danhMuc" />
                             <Button 
                                 icon="pi pi-plus" 
                                 @click="openQuickAdd('danhMuc')" 
@@ -2022,7 +2026,7 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="thuongHieu" class="block font-bold mb-3">Thương hiệu </label>
                         <div class="flex gap-2">
-                            <Select id="thuongHieu" v-model="product.thuongHieu" :options="thuongHieus" optionLabel="tenThuongHieu" placeholder="Chọn thương hiệu" fluid class="flex-1" />
+                            <Select id="thuongHieu" v-model="product.thuongHieu" :options="thuongHieus" optionLabel="tenThuongHieu" placeholder="Chọn thương hiệu" fluid class="flex-1" :invalid="submitted && !product.thuongHieu" />
                             <Button 
                                 icon="pi pi-plus" 
                                 @click="openQuickAdd('thuongHieu')" 
@@ -2040,7 +2044,7 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="chatLieu" class="block font-bold mb-3">Chất liệu </label>
                         <div class="flex gap-2">
-                            <Select id="chatLieu" v-model="product.chatLieu" :options="chatLieus" optionLabel="tenChatLieu" placeholder="Chọn chất liệu" fluid class="flex-1" />
+                            <Select id="chatLieu" v-model="product.chatLieu" :options="chatLieus" optionLabel="tenChatLieu" placeholder="Chọn chất liệu" fluid class="flex-1" :invalid="submitted && !product.chatLieu" />
                             <Button 
                                 icon="pi pi-plus" 
                                 @click="openQuickAdd('chatLieu')" 
@@ -2055,7 +2059,7 @@ function collapseAll() {
                     <div class="col-span-6">
                         <label for="deGiay" class="block font-bold mb-3">Đế giày </label>
                         <div class="flex gap-2">
-                            <Select id="deGiay" v-model="product.deGiay" :options="deGiays" optionLabel="tenDeGiay" placeholder="Chọn đế giày" fluid class="flex-1" />
+                            <Select id="deGiay" v-model="product.deGiay" :options="deGiays" optionLabel="tenDeGiay" placeholder="Chọn đế giày" fluid class="flex-1" :invalid="submitted && !product.deGiay" />
                             <Button 
                                 icon="pi pi-plus" 
                                 @click="openQuickAdd('deGiay')" 
@@ -2097,8 +2101,9 @@ function collapseAll() {
                     </div>
                     <div class="col-span-4">
                         <label for="soLuong" class="block font-bold mb-3">Số lượng </label>
-                        <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" />
+                        <InputText id="soLuong" v-model.number="detail.soLuong" integeronly fluid placeholder="0" :min="0" :invalid="submitted && (detail.soLuong == null || detail.soLuong <= 0)" />
                         <small v-if="submitted && (detail.soLuong == null || detail.soLuong <= 0)" class="text-red-500">Số lượng phải lớn hơn 0.</small>
+                        <small v-else-if="submitted && isNaN(detail.soLuong)" class="text-red-500">Số lượng phải là số.</small>
                     </div>
                 </div>
 
@@ -2107,6 +2112,8 @@ function collapseAll() {
                         <label for="giaGoc" class="block font-bold mb-3">Giá gốc </label>
                         <InputText id="giaGoc" v-model.number="detail.giaGoc" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" />
                         <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" class="text-red-500">Giá gốc phải lớn hơn 0.</small>
+                        <small v-else-if="submitted && isNaN(detail.giaGoc)" class="text-red-500">Giá gốc phải là số.</small>
+
                     </div>
                     <!-- <div class="col-span-6">
                         <label for="giaBan" class="block font-bold mb-3">Giá bán </label>
@@ -2779,4 +2786,6 @@ function collapseAll() {
     border-radius: 10px;
     margin-bottom: 1rem;
 }
+
+
 </style>

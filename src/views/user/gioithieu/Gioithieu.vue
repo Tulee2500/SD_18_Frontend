@@ -409,6 +409,8 @@
     <section id="footer-section" class="padding-x padding-t bg-black pb-8">
       <Footer />
     </section>
+    <!-- ===== ĐÃ THÊM CHATBOT COMPONENT ===== -->
+    <ChatBot />
   </main>
 </template>
 
@@ -416,6 +418,7 @@
 import Nav from '@/components/user/Nav.vue';
 import Footer from '@/views/user/Footer.vue';
 import Hero from '../Hero.vue';
+import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
 
 export default {
   name: 'Gioithieu',
@@ -423,6 +426,7 @@ export default {
     Nav,
     Footer,
     Hero,
+    ChatBot,
   },
 };
 </script>
