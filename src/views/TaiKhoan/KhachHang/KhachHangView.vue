@@ -9,12 +9,6 @@
                 </div>
                 <div class="flex gap-2">
                     <Button
-                        label="Thêm khách hàng"
-                        icon="pi pi-plus"
-                        severity="success"
-                        @click="openCreateDialog"
-                    />
-                    <Button
                         label="Xuất Excel"
                         icon="pi pi-file-excel"
                         severity="secondary"
@@ -25,7 +19,7 @@
             </div>
         </div>
 
-        <!-- Simplified Search Section -->
+        <!-- Enhanced Search Section -->
         <div class="search-section">
             <!-- Main Global Search -->
             <div class="grid grid-cols-1 gap-4 mb-4">
@@ -36,12 +30,11 @@
                         </InputIcon>
                         <InputText
                             v-model="globalSearch"
-                            placeholder="Tìm kiếm theo tên, email, SĐT, mã KH, địa chỉ..."
+                            placeholder="Tìm kiếm tất cả thông tin khách hàng (tên, email, SĐT, mã KH, địa chỉ, tài khoản)..."
                             @input="debouncedGlobalSearch"
                             class="w-full text-lg py-3"
                         />
                     </IconField>
-                    <!-- Clear search button -->
                     <Button
                         v-if="globalSearch"
                         icon="pi pi-times"
@@ -51,6 +44,56 @@
                         size="small"
                         @click="clearGlobalSearch"
                         title="Xóa tìm kiếm"
+                    />
+                </div>
+            </div>
+
+            <!-- Advanced Filters -->
+            <div class="flex flex-wrap gap-2 items-center mb-4">
+                <Dropdown
+                    v-model="advancedFilters.trangThai"
+                    :options="statusOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Trạng thái"
+                    @change="applyAdvancedFilters"
+                    showClear
+                />
+                <Calendar
+                    v-model="advancedFilters.startDate"
+                    placeholder="Từ ngày"
+                    dateFormat="dd/mm/yy"
+                    @date-select="applyAdvancedFilters"
+                    showIcon
+                    showClear
+                />
+                <Calendar
+                    v-model="advancedFilters.endDate"
+                    placeholder="Đến ngày"
+                    dateFormat="dd/mm/yy"
+                    @date-select="applyAdvancedFilters"
+                    showIcon
+                    showClear
+                />
+                <Button
+                    label="Xóa bộ lọc"
+                    icon="pi pi-filter-slash"
+                    outlined
+                    @click="resetAdvancedFilters"
+                />
+                
+                <div class="ml-auto flex gap-2">
+                    <Badge 
+                        v-if="selectedCustomers.length > 0" 
+                        :value="`${selectedCustomers.length} đã chọn`" 
+                        severity="info" 
+                    />
+                    <Button
+                        label="Thay đổi trạng thái"
+                        icon="pi pi-refresh"
+                        severity="warning"
+                        @click="confirmBatchStatusChange"
+                        :disabled="!selectedCustomers || !selectedCustomers.length"
                     />
                 </div>
             </div>
@@ -67,63 +110,10 @@
                         </span>
                     </span>
                 </div>
-
-                <!-- Advanced Filters Toggle -->
-                <div class="flex gap-2 items-center">
-                    <Button
-                        :label="showAdvancedFilters ? 'Ẩn bộ lọc' : 'Bộ lọc nâng cao'"
-                        :icon="showAdvancedFilters ? 'pi pi-chevron-up' : 'pi pi-filter'"
-                        outlined
-                        size="small"
-                        @click="toggleAdvancedFilters"
-                    />
-                    <Button
-                        label="Xóa đã chọn"
-                        icon="pi pi-trash"
-                        severity="danger"
-                        size="small"
-                        @click="confirmDeleteSelected"
-                        :disabled="!selectedCustomers || !selectedCustomers.length"
-                    />
-                </div>
-            </div>
-
-            <!-- Advanced Filters (Collapsible) -->
-            <div v-if="showAdvancedFilters" class="bg-gray-50 p-4 rounded-lg border mb-4">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-                    <Select
-                        v-model="advancedFilters.trangThai"
-                        :options="statusOptions"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Trạng thái"
-                        @change="applyAdvancedFilters"
-                    />
-                    <DatePicker
-                        v-model="advancedFilters.startDate"
-                        placeholder="Từ ngày"
-                        dateFormat="dd/mm/yy"
-                        @date-select="applyAdvancedFilters"
-                        showIcon
-                    />
-                    <DatePicker
-                        v-model="advancedFilters.endDate"
-                        placeholder="Đến ngày"
-                        dateFormat="dd/mm/yy"
-                        @date-select="applyAdvancedFilters"
-                        showIcon
-                    />
-                    <Button
-                        label="Xóa bộ lọc"
-                        icon="pi pi-filter-slash"
-                        outlined
-                        @click="resetAdvancedFilters"
-                    />
-                </div>
             </div>
         </div>
 
-        <!-- Data Table (giữ nguyên phần này) -->
+        <!-- Data Table -->
         <DataTable
             ref="dt"
             v-model:selection="selectedCustomers"
@@ -141,7 +131,6 @@
             currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} khách hàng"
             class="responsive-table"
         >
-            <!-- Table Columns (giữ nguyên) -->
             <Column selectionMode="multiple" :exportable="false" style="width: 3rem"></Column>
             
             <Column field="id" header="ID" sortable style="width: 6rem">
@@ -152,7 +141,7 @@
 
             <Column field="maKhachHang" header="Mã KH" sortable style="width: 10rem">
                 <template #body="slotProps">
-                    <Tag :value="slotProps.data.maKhachHang" severity="info" />
+                    <Tag :value="slotProps.data.maKhachHang || 'Chưa có'" severity="info" />
                 </template>
             </Column>
 
@@ -176,6 +165,7 @@
                 </template>
             </Column>
 
+            <!-- FIXED: Địa chỉ từ API -->
             <Column header="Địa chỉ" style="min-width: 20rem">
                 <template #body="slotProps">
                     <div class="address-display">
@@ -203,7 +193,7 @@
                 </template>
             </Column>
 
-            <Column header="Tài khoản & Điểm" style="min-width: 12rem">
+            <Column header="Tài khoản & Ví điểm" style="min-width: 12rem">
                 <template #body="slotProps">
                     <div class="flex flex-col gap-1">
                         <div class="flex items-center gap-2">
@@ -240,7 +230,7 @@
                 </template>
             </Column>
 
-            <Column :exportable="false" style="width: 14rem">
+            <Column :exportable="false" style="width: 16rem">
                 <template #body="slotProps">
                     <div class="flex gap-1">
                         <Button
@@ -266,14 +256,6 @@
                             @click="changeStatus(slotProps.data)"
                             :title="slotProps.data.trangThai === 1 ? 'Vô hiệu hóa' : 'Kích hoạt'"
                         />
-                        <Button
-                            icon="pi pi-trash"
-                            size="small"
-                            outlined
-                            severity="danger"
-                            @click="confirmDeleteCustomer(slotProps.data)"
-                            title="Xóa"
-                        />
                     </div>
                 </template>
             </Column>
@@ -283,7 +265,7 @@
                     <i class="pi pi-users text-gray-400 text-6xl mb-4"></i>
                     <h5 class="text-gray-600 mb-2">Không tìm thấy khách hàng</h5>
                     <p class="text-gray-500 mb-4">
-                        {{ globalSearch ? 'Thử thay đổi từ khóa tìm kiếm hoặc tạo khách hàng mới.' : 'Thử thay đổi bộ lọc hoặc tạo khách hàng mới.' }}
+                        {{ globalSearch ? 'Thử thay đổi từ khóa tìm kiếm hoặc kiểm tra lại dữ liệu.' : 'Thử thay đổi bộ lọc hoặc kiểm tra lại dữ liệu.' }}
                     </p>
                     <div class="flex gap-2 justify-center">
                         <Button
@@ -299,39 +281,298 @@
                             outlined
                             @click="fetchData"
                         />
-                        <Button
-                            label="Thêm khách hàng"
-                            icon="pi pi-plus"
-                            @click="openCreateDialog"
-                        />
                     </div>
-                </div>
-            </template>
-
-            <template #loading>
-                <div class="flex justify-center items-center py-8">
-                    <ProgressSpinner size="50" strokeWidth="4" />
                 </div>
             </template>
         </DataTable>
 
-        <!-- Dialogs giữ nguyên như code cũ -->
         <!-- Customer View Dialog -->
         <Dialog v-model:visible="viewDialog" :style="{ width: '800px' }" :header="`Chi tiết khách hàng - ${viewingCustomer?.hoTen || 'N/A'}`" :modal="true">
-            <!-- Nội dung giữ nguyên -->
+            <div v-if="viewingCustomer" class="flex flex-col gap-4">
+                <!-- Thông tin cơ bản -->
+                                <div class="rounded-lg bg-blue-50 p-4 border border-blue-200">
+                    <h6 class="mb-3 font-semibold text-blue-700 flex items-center">
+                        <i class="pi pi-user mr-2"></i>
+                        Thông tin khách hàng
+                    </h6>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div><strong>ID:</strong> #{{ viewingCustomer.id }}</div>
+                        <div><strong>Mã KH:</strong> {{ viewingCustomer.maKhachHang || 'Chưa có' }}</div>
+                        <div><strong>Họ tên:</strong> {{ viewingCustomer.hoTen }}</div>
+                        <div><strong>Email:</strong> {{ viewingCustomer.email }}</div>
+                        <div><strong>SĐT:</strong> {{ viewingCustomer.sdt }}</div>
+                        <div>
+                            <strong>Trạng thái:</strong>
+                            <Tag 
+                                :value="getStatusLabel(viewingCustomer.trangThai)" 
+                                :severity="getStatusSeverity(viewingCustomer.trangThai)" 
+                                class="ml-2"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thông tin tài khoản -->
+                <div class="rounded-lg bg-green-50 p-4 border border-green-200">
+                    <h6 class="mb-3 font-semibold text-green-700 flex items-center">
+                        <i class="pi pi-id-card mr-2"></i>
+                        Tài khoản liên kết
+                    </h6>
+                    <div v-if="viewingCustomer.idTaiKhoan" class="text-sm">
+                        <div><strong>ID Tài khoản:</strong> #{{ viewingCustomer.idTaiKhoan }}</div>
+                        <div><strong>Email đăng nhập:</strong> {{ viewingCustomer.email }}</div>
+                    </div>
+                    <div v-else class="text-orange-600">
+                        Chưa liên kết với tài khoản nào
+                    </div>
+                </div>
+
+                <!-- FIXED: Địa chỉ từ API -->
+                <div v-if="viewingCustomer.danhSachDiaChi && viewingCustomer.danhSachDiaChi.length > 0" class="rounded-lg bg-indigo-50 p-4 border border-indigo-200">
+                    <h6 class="mb-3 font-semibold text-indigo-700 flex items-center">
+                        <i class="pi pi-map-marker mr-2"></i>
+                        Địa chỉ ({{ viewingCustomer.danhSachDiaChi.length }})
+                    </h6>
+                    <div class="space-y-2">
+                        <div v-for="(diaChi, index) in viewingCustomer.danhSachDiaChi" 
+                             :key="index" 
+                             class="border rounded p-3 bg-white" 
+                             :class="{ 'border-green-500 bg-green-50': diaChi.isDefault }">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-semibold">{{ diaChi.diaChiDayDu || formatAddressFromInfo(diaChi) }}</p>
+                                    <div class="text-xs text-gray-600 mt-1">
+                                        <span>Tỉnh: {{ diaChi.tenTinh || 'N/A' }}</span> | 
+                                        <span>Phường/Xã: {{ diaChi.tenPhuong || 'N/A' }}</span>
+                                    </div>
+                                </div>
+                                <Tag v-if="diaChi.isDefault" value="Mặc định" severity="success" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Đóng" icon="pi pi-times" text @click="viewDialog = false" />
+                <Button label="Chỉnh sửa" icon="pi pi-pencil" @click="editFromView" />
+            </template>
         </Dialog>
 
         <!-- Customer Edit Dialog -->
-        <Dialog v-model:visible="customerDialog" :style="{ width: '900px' }" :header="`${customer.id ? 'Cập nhật' : 'Thêm'} khách hàng`" :modal="true">
-            <!-- Nội dung giữ nguyên -->
+        <Dialog v-model:visible="customerDialog" :style="{ width: '1000px' }" header="Chỉnh sửa thông tin khách hàng" :modal="true">
+            <div v-if="customer.id" class="flex flex-col gap-6">
+                <!-- Thông tin cơ bản -->
+                <div class="border-bottom pb-4">
+                    <h6 class="mb-3 font-semibold flex items-center gap-2">
+                        <i class="pi pi-user"></i>
+                        Thông tin cơ bản
+                    </h6>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="editHoTen" class="mb-3 block font-bold text-red-600">Họ Tên *</label>
+                            <InputText 
+                                id="editHoTen" 
+                                v-model.trim="customer.hoTen" 
+                                required="true" 
+                                :invalid="submitted && !customer.hoTen" 
+                                fluid 
+                            />
+                            <small v-if="submitted && !customer.hoTen" class="text-red-500">
+                                Họ tên là bắt buộc
+                            </small>
+                        </div>
+                        <div>
+                            <label for="editSdt" class="mb-3 block font-bold text-red-600">Số điện thoại *</label>
+                            <InputText 
+                                id="editSdt" 
+                                v-model="customer.sdt" 
+                                required="true" 
+                                :invalid="submitted && (!customer.sdt || !isValidPhone(customer.sdt))" 
+                                fluid 
+                            />
+                            <small v-if="submitted && !customer.sdt" class="text-red-500">
+                                Số điện thoại là bắt buộc
+                            </small>
+                            <small v-if="submitted && customer.sdt && !isValidPhone(customer.sdt)" class="text-red-500">
+                                Số điện thoại không hợp lệ
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <div>
+                            <label for="editTrangThai" class="mb-3 block font-bold text-red-600">Trạng thái *</label>
+                            <Dropdown 
+                                id="editTrangThai" 
+                                v-model="customer.trangThai" 
+                                :options="statusOptionsForForm" 
+                                optionLabel="label" 
+                                optionValue="value" 
+                                placeholder="Chọn trạng thái" 
+                                :invalid="submitted && customer.trangThai === undefined" 
+                                fluid 
+                            />
+                            <small v-if="submitted && customer.trangThai === undefined" class="text-red-500">
+                                Trạng thái là bắt buộc
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FIXED: Quản lý địa chỉ với API Việt Nam -->
+                <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <h6 class="font-semibold text-indigo-700 flex items-center gap-2">
+                            <i class="pi pi-map-marker"></i>
+                            Quản lý địa chỉ (API Việt Nam)
+                        </h6>
+                        <Button
+                            label="Thêm địa chỉ"
+                            icon="pi pi-plus"
+                            size="small"
+                            @click="addNewAddress"
+                            class="p-button-sm"
+                        />
+                    </div>
+
+                    <div v-if="customer.danhSachDiaChi && customer.danhSachDiaChi.length > 0" class="space-y-3">
+                        <div v-for="(diaChi, index) in customer.danhSachDiaChi" 
+                             :key="index" 
+                             class="border rounded-lg p-4 bg-white" 
+                             :class="{ 'border-green-500 bg-green-50': diaChi.isDefault }">
+                            
+                            <div class="flex justify-between items-start mb-3">
+                                <h6 class="font-semibold flex items-center gap-2">
+                                    <i class="pi pi-home"></i>
+                                    Địa chỉ {{ index + 1 }}
+                                </h6>
+                                <div class="flex gap-2">
+                                    <Button
+                                        v-if="!diaChi.isDefault"
+                                        label="Đặt mặc định"
+                                        icon="pi pi-star"
+                                        size="small"
+                                        outlined
+                                        @click="setDefaultAddress(index)"
+                                    />
+                                    <Tag v-else value="Mặc định" severity="success" />
+                                    <Button
+                                        icon="pi pi-trash"
+                                        size="small"
+                                        severity="danger"
+                                        outlined
+                                        @click="removeAddress(index)"
+                                        :disabled="customer.danhSachDiaChi.length === 1"
+                                        title="Xóa địa chỉ"
+                                    />
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Tỉnh/Thành phố</label>
+                                    <Dropdown
+                                        :model-value="diaChi.maTinh"
+                                        :options="provinces"
+                                        optionLabel="name"
+                                        optionValue="code"
+                                        placeholder="Chọn tỉnh/thành phố"
+                                        fluid
+                                        :loading="loadingProvinces"
+                                        @change="(event) => onAddressProvinceChange(event.value, index)"
+                                        showClear
+                                    />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Phường/Xã</label>
+                                    <Dropdown
+                                        :model-value="diaChi.maPhuong"
+                                        :options="diaChi.availableWards || []"
+                                        optionLabel="name"
+                                        optionValue="code"
+                                        placeholder="Chọn phường/xã"
+                                        fluid
+                                        :loading="loadingWards"
+                                        :disabled="!diaChi.maTinh"
+                                        @change="(event) => onAddressWardChange(event.value, index)"
+                                        showClear
+                                    />
+                                    <small v-if="!diaChi.maTinh" class="text-gray-500">
+                                        Vui lòng chọn tỉnh/thành phố trước
+                                    </small>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">Địa chỉ chi tiết</label>
+                                    <InputText
+                                        v-model="diaChi.diaChiChiTiet"
+                                        placeholder="Số nhà, tên đường..."
+                                        fluid
+                                        @input="updateAddressFullText(index)"
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- Địa chỉ đầy đủ preview -->
+                            <div class="mt-3 p-2 bg-gray-50 rounded">
+                                <small class="text-gray-600">Địa chỉ đầy đủ:</small>
+                                <p class="font-medium text-gray-800 mt-1">
+                                    {{ formatFullAddressEdit(diaChi) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-else class="text-center text-indigo-600 py-6">
+                        <i class="pi pi-map-marker text-3xl mb-2"></i>
+                        <p class="font-medium">Chưa có địa chỉ</p>
+                        <p class="text-sm">Nhấn "Thêm địa chỉ" để thêm địa chỉ mới</p>
+                    </div>
+                </div>
+            </div>
+
+            <template #footer>
+                <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" :disabled="saving" />
+                <Button 
+                    label="Lưu thay đổi" 
+                    icon="pi pi-check" 
+                    @click="saveCustomer" 
+                    :loading="saving" 
+                />
+            </template>
         </Dialog>
 
         <!-- Address List Dialog -->
         <Dialog v-model:visible="addressListDialog" :style="{ width: '700px' }" header="Danh sách địa chỉ" :modal="true">
-            <!-- Nội dung giữ nguyên -->
+            <div v-if="selectedCustomerAddresses">
+                <div v-if="selectedCustomerAddresses.danhSachDiaChi && selectedCustomerAddresses.danhSachDiaChi.length > 0" class="space-y-3">
+                    <div v-for="(diaChi, index) in selectedCustomerAddresses.danhSachDiaChi" 
+                         :key="index" 
+                         class="border rounded p-4" 
+                         :class="{ 'border-green-500 bg-green-50': diaChi.isDefault }">
+                        <div class="flex justify-between items-start mb-3">
+                            <h6 class="font-semibold">Địa chỉ {{ index + 1 }}</h6>
+                            <Tag v-if="diaChi.isDefault" value="Mặc định" severity="success" />
+                        </div>
+                        <div class="text-sm space-y-1">
+                            <p class="font-medium">{{ diaChi.diaChiDayDu || formatAddressFromInfo(diaChi) }}</p>
+                            <div class="text-gray-600">
+                                <div v-if="diaChi.diaChiChiTiet">Chi tiết: {{ diaChi.diaChiChiTiet }}</div>
+                                <div>Phường/Xã: {{ diaChi.tenPhuong || 'N/A' }}</div>
+                                <div>Tỉnh/TP: {{ diaChi.tenTinh || 'N/A' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center text-muted py-8">
+                    <i class="pi pi-map-marker text-4xl mb-3"></i>
+                    <h6>Chưa có địa chỉ</h6>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Đóng" icon="pi pi-times" @click="addressListDialog = false" />
+            </template>
         </Dialog>
 
-        <!-- Delete Confirmation Dialogs -->
         <ConfirmDialog />
         <Toast />
     </div>
@@ -341,7 +582,7 @@
 import axios from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 // Composables
@@ -369,13 +610,16 @@ const customer = ref({})
 const viewingCustomer = ref(null)
 const selectedCustomerAddresses = ref(null)
 
-// Search States - SIMPLIFIED
-const globalSearch = ref('')
-const showAdvancedFilters = ref(false)
+// Address Data - FIXED TO USE API
+const provinces = ref([])
+const wards = ref([])
+const loadingProvinces = ref(false)
+const loadingWards = ref(false)
 
-// Advanced Filters (Optional)
+// Search States
+const globalSearch = ref('')
 const advancedFilters = ref({
-    trangThai: '',
+    trangThai: null,
     startDate: null,
     endDate: null
 })
@@ -391,7 +635,7 @@ const pagination = ref({
 
 // Options
 const statusOptions = ref([
-    { label: 'Tất cả trạng thái', value: '' },
+    { label: 'Tất cả trạng thái', value: null },
     { label: 'Hoạt động', value: 1 },
     { label: 'Tạm khóa', value: 0 }
 ])
@@ -401,12 +645,7 @@ const statusOptionsForForm = ref([
     { label: 'Tạm khóa', value: 0 }
 ])
 
-// Computed
-const hasSelectedCustomers = computed(() => 
-    selectedCustomers.value && selectedCustomers.value.length > 0
-)
-
-// Utility Functions (giữ nguyên tất cả các function utility cũ)
+// ===== UTILITY FUNCTIONS =====
 const formatDate = (date) => {
     if (!date) return ''
     return new Date(date).toLocaleDateString('vi-VN', {
@@ -459,7 +698,6 @@ const formatAddressFromInfo = (address) => {
     const parts = [
         address.diaChiChiTiet,
         address.tenPhuong,
-        address.tenHuyen,
         address.tenTinh
     ].filter(part => part && part.trim() !== '')
     
@@ -471,23 +709,30 @@ const truncateAddress = (address) => {
     return address.length > 50 ? address.substring(0, 50) + '...' : address
 }
 
-const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-const isValidPhone = (phone) => /^[0-9]{10}$/.test(phone)
+const formatFullAddressEdit = (address) => {
+    if (!address) return 'Chưa có địa chỉ'
+    
+    const parts = [
+        address.diaChiChiTiet,
+        address.tenPhuong,
+        address.tenTinh
+    ].filter(part => part && part.trim() !== '')
+    
+    return parts.length > 0 ? parts.join(', ') : 'Chưa có địa chỉ'
+}
 
-// OPTIMIZED SEARCH FUNCTIONS
+const isValidPhone = (phone) => /^0\d{9,10}$/.test(phone)
+
+// ===== SEARCH FUNCTIONS =====
 const clearGlobalSearch = () => {
     globalSearch.value = ''
     pagination.value.page = 0
     fetchData()
 }
 
-const toggleAdvancedFilters = () => {
-    showAdvancedFilters.value = !showAdvancedFilters.value
-}
-
 const resetAdvancedFilters = () => {
     advancedFilters.value = {
-        trangThai: '',
+        trangThai: null,
         startDate: null,
         endDate: null
     }
@@ -517,7 +762,192 @@ const debouncedGlobalSearch = debounce(() => {
     fetchData()
 }, 500)
 
-// ENHANCED API FUNCTION
+// ===== ADDRESS MANAGEMENT - FIXED TO USE API =====
+const fetchProvinces = async () => {
+    if (provinces.value.length > 0) return
+    
+    loadingProvinces.value = true
+    try {
+        console.log('🌍 Fetching provinces from Vietnam API...')
+        const response = await axios.get('http://localhost:8080/api/vietnam-address/provinces')
+        
+        if (response.data && response.data.success && response.data.data) {
+            provinces.value = response.data.data.map(item => ({
+                code: item.code.toString(),
+                name: item.name,
+                codename: item.codename
+            }))
+            console.log('✅ Loaded provinces from API:', provinces.value.length)
+        } else {
+            provinces.value = [
+                { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
+                { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
+                { code: '48', name: 'Đà Nẵng', codename: 'da_nang' }
+            ]
+        }
+    } catch (error) {
+        console.error('Error loading provinces:', error)
+        provinces.value = [
+            { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
+            { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
+            { code: '48', name: 'Đà Nẵng', codename: 'da_nang' }
+        ]
+    } finally {
+        loadingProvinces.value = false
+    }
+}
+
+const fetchWards = async (provinceCode) => {
+    if (!provinceCode) {
+        wards.value = []
+        return
+    }
+    
+    loadingWards.value = true
+    try {
+        console.log('🏘️ Fetching wards for province:', provinceCode)
+        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
+        
+        if (response.data && response.data.success && response.data.data) {
+            wards.value = response.data.data.map(item => ({
+                code: item.code.toString(),
+                name: item.name,
+                codename: item.codename
+            }))
+            console.log('✅ Loaded wards from API:', wards.value.length)
+        } else {
+            wards.value = [
+                { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
+                { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' },
+                { code: '3', name: 'Phường/Xã 3', codename: 'phuong_xa_3' }
+            ]
+        }
+    } catch (error) {
+        console.error('Error loading wards:', error)
+        wards.value = [
+            { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
+            { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' }
+        ]
+    } finally {
+        loadingWards.value = false
+    }
+}
+
+// For editing addresses with API data
+const onAddressProvinceChange = async (provinceCode, addressIndex) => {
+    if (!customer.value.danhSachDiaChi[addressIndex]) return
+    
+    // Clear ward selection
+    customer.value.danhSachDiaChi[addressIndex].maPhuong = ''
+    customer.value.danhSachDiaChi[addressIndex].tenPhuong = ''
+    
+    // Set province info
+    const selectedProvince = provinces.value.find(p => p.code === provinceCode)
+    if (selectedProvince) {
+        customer.value.danhSachDiaChi[addressIndex].tenTinh = selectedProvince.name
+        customer.value.danhSachDiaChi[addressIndex].maTinh = provinceCode
+    }
+    
+    // Load wards for this province
+    await fetchWardsForAddress(provinceCode, addressIndex)
+    updateAddressFullText(addressIndex)
+}
+
+const onAddressWardChange = (wardCode, addressIndex) => {
+    if (!customer.value.danhSachDiaChi[addressIndex]) return
+    
+    const availableWards = customer.value.danhSachDiaChi[addressIndex].availableWards || []
+    const selectedWard = availableWards.find(w => w.code === wardCode)
+    if (selectedWard) {
+        customer.value.danhSachDiaChi[addressIndex].tenPhuong = selectedWard.name
+        customer.value.danhSachDiaChi[addressIndex].maPhuong = wardCode
+    }
+    updateAddressFullText(addressIndex)
+}
+
+const fetchWardsForAddress = async (provinceCode, addressIndex) => {
+    if (!provinceCode || !customer.value.danhSachDiaChi || !customer.value.danhSachDiaChi[addressIndex]) return
+    
+    try {
+        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
+        
+        let wardsData = []
+        if (response.data && response.data.success && response.data.data) {
+            wardsData = response.data.data.map(item => ({
+                code: item.code.toString(),
+                name: item.name,
+                codename: item.codename
+            }))
+        } else {
+            wardsData = [
+                { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
+                { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' }
+            ]
+        }
+        
+        customer.value.danhSachDiaChi[addressIndex].availableWards = wardsData
+    } catch (error) {
+        console.error('❌ Error fetching wards for address:', error)
+        customer.value.danhSachDiaChi[addressIndex].availableWards = [
+            { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' }
+        ]
+    }
+}
+
+const updateAddressFullText = (index) => {
+    if (!customer.value.danhSachDiaChi || !customer.value.danhSachDiaChi[index]) return
+    
+    const address = customer.value.danhSachDiaChi[index]
+    const parts = [
+        address.diaChiChiTiet,
+        address.tenPhuong,
+        address.tenTinh
+    ].filter(part => part && part.trim() !== '')
+    
+    address.diaChiDayDu = parts.join(', ')
+}
+
+// Address management functions
+const addNewAddress = () => {
+    if (!customer.value.danhSachDiaChi) {
+        customer.value.danhSachDiaChi = []
+    }
+    
+    const newAddress = {
+        diaChiChiTiet: '',
+        tenPhuong: '',
+        tenTinh: '',
+        maPhuong: '',
+        maTinh: '',
+        diaChiDayDu: '',
+        availableWards: [],
+        isDefault: customer.value.danhSachDiaChi.length === 0
+    }
+    
+    customer.value.danhSachDiaChi.push(newAddress)
+}
+
+const removeAddress = (index) => {
+    if (!customer.value.danhSachDiaChi || customer.value.danhSachDiaChi.length <= 1) {
+        return
+    }
+    
+    const isRemovedDefault = customer.value.danhSachDiaChi[index].isDefault
+    customer.value.danhSachDiaChi.splice(index, 1)
+    
+    if (isRemovedDefault && customer.value.danhSachDiaChi.length > 0) {
+        customer.value.danhSachDiaChi[0].isDefault = true
+    }
+}
+
+const setDefaultAddress = (index) => {
+    if (!customer.value.danhSachDiaChi) return
+    
+    customer.value.danhSachDiaChi.forEach(addr => addr.isDefault = false)
+    customer.value.danhSachDiaChi[index].isDefault = true
+}
+
+// ===== MAIN API FUNCTION =====
 const fetchData = async () => {
     isLoading.value = true
     try {
@@ -528,13 +958,15 @@ const fetchData = async () => {
             sortDir: pagination.value.sortOrder === 1 ? 'asc' : 'desc'
         }
 
-        // Global search - tìm kiếm tất cả các trường
+        let endpoint = 'http://localhost:8080/api/khach-hang'
+        
+        // Add search parameter if exists
         if (globalSearch.value && globalSearch.value.trim()) {
-            params.globalSearch = globalSearch.value.trim()
+            params.search = globalSearch.value.trim()
         }
 
         // Advanced filters
-        if (advancedFilters.value.trangThai !== '') {
+        if (advancedFilters.value.trangThai !== null && advancedFilters.value.trangThai !== undefined) {
             params.trangThai = advancedFilters.value.trangThai
         }
         if (advancedFilters.value.startDate) {
@@ -544,10 +976,7 @@ const fetchData = async () => {
             params.endDate = advancedFilters.value.endDate.toISOString().split('T')[0]
         }
 
-        console.log('🔍 Fetching customers with params:', params)
-
-        // Sử dụng endpoint tìm kiếm tối ưu
-        const response = await axios.get('/api/khach-hang/search', { params })
+        const response = await axios.get(endpoint, { params })
 
         if (response.data) {
             if (response.data.content && Array.isArray(response.data.content)) {
@@ -555,112 +984,112 @@ const fetchData = async () => {
                 pagination.value.totalElements = response.data.totalElements || 0
                 pagination.value.totalPages = response.data.totalPages || 0
                 totalRecords.value = response.data.totalElements || 0
-                console.log(`✅ Loaded ${response.data.content.length} customers (${response.data.totalElements} total)`)
             } else if (Array.isArray(response.data)) {
                 customers.value = response.data
                 pagination.value.totalElements = response.data.length
                 totalRecords.value = response.data.length
+            } else {
+                customers.value = []
+                pagination.value.totalElements = 0
+                totalRecords.value = 0
             }
         }
     } catch (error) {
-        console.error('❌ Error fetching customers:', error)
+        console.error('Error fetching customers:', error)
         handleApiError(error, 'Không thể tải danh sách khách hàng')
         customers.value = []
-        
-        // Fallback nếu cần
-        try {
-            console.log('🔄 Trying basic API as fallback...')
-            const basicResponse = await axios.get('/api/khach-hang')
-            if (basicResponse.data && Array.isArray(basicResponse.data)) {
-                customers.value = basicResponse.data
-                pagination.value.totalElements = basicResponse.data.length
-                totalRecords.value = basicResponse.data.length
-                console.log('✅ Fallback successful')
-            }
-        } catch (fallbackError) {
-            console.error('❌ Fallback also failed:', fallbackError)
-        }
+        totalRecords.value = 0
     } finally {
         isLoading.value = false
     }
 }
 
-// Giữ nguyên tất cả các function khác từ code cũ
-// (saveCustomer, changeStatus, deleteCustomer, etc...)
-
+// ===== CRUD OPERATIONS =====
 const saveCustomer = async () => {
     submitted.value = true
+    saving.value = true
     
-    if (!customer.value.hoTen?.trim() || 
-        !customer.value.email?.trim() || 
-        !isValidEmail(customer.value.email) || 
-        !customer.value.sdt?.trim() || 
-        !isValidPhone(customer.value.sdt) || 
-        customer.value.trangThai === undefined) {
+    try {
+        if (!customer.value.id) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Cảnh báo',
+                detail: 'Không thể lưu khách hàng không tồn tại.',
+                life: 3000
+            })
+            return
+        }
+
+        if (!customer.value.hoTen?.trim() || 
+            !customer.value.sdt?.trim() || 
+            !isValidPhone(customer.value.sdt) || 
+            customer.value.trangThai === undefined) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Cảnh báo',
+                detail: 'Vui lòng điền đầy đủ và đúng định dạng thông tin bắt buộc',
+                life: 3000
+            })
+            return
+        }
+
+        // Process addresses - FIXED TO USE API DATA
+        const processedAddresses = customer.value.danhSachDiaChi?.map(addr => ({
+            diaChiChiTiet: addr.diaChiChiTiet?.trim(),
+            tenPhuong: addr.tenPhuong?.trim(),
+            tenTinh: addr.tenTinh?.trim(),
+            diaChiDayDu: formatFullAddressEdit(addr),
+            isDefault: addr.isDefault || false,
+            maPhuong: addr.maPhuong || null,
+            maTinh: addr.maTinh || null
+        })).filter(addr => addr.diaChiChiTiet && addr.tenPhuong && addr.tenTinh) || []
+
+        // Ensure we have at least one default address if any addresses exist
+        if (processedAddresses.length > 0) {
+            const hasDefault = processedAddresses.some(addr => addr.isDefault)
+            if (!hasDefault) {
+                processedAddresses[0].isDefault = true
+            }
+        }
+
+        const customerData = {
+            hoTen: customer.value.hoTen.trim(),
+            sdt: customer.value.sdt.trim(),
+            trangThai: customer.value.trangThai,
+            danhSachDiaChi: processedAddresses
+        }
+
+        const response = await axios.put(`http://localhost:8080/api/khach-hang/${customer.value.id}`, customerData)
+        
         toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Vui lòng điền đầy đủ và đúng định dạng thông tin bắt buộc',
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Cập nhật thông tin khách hàng thành công',
             life: 3000
         })
-        return
-    }
-
-    saving.value = true
-    try {
-        const customerData = {
-            hoTen: customer.value.hoTen,
-            email: customer.value.email,
-            sdt: customer.value.sdt,
-            trangThai: customer.value.trangThai
-        }
-
-        if (customer.value.maKhachHang) {
-            customerData.maKhachHang = customer.value.maKhachHang
-        }
-
-        if (customer.value.id) {
-            customerData.id = customer.value.id
-            await axios.put(`/api/khach-hang/${customer.value.id}`, customerData)
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: 'Cập nhật khách hàng thành công',
-                life: 3000
-            })
-        } else {
-            await axios.post('/api/khach-hang', customerData)
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: 'Thêm khách hàng thành công',
-                life: 3000
-            })
-        }
 
         await fetchData()
         hideDialog()
     } catch (error) {
         console.error('Error saving customer:', error)
-        handleApiError(error, 'Không thể lưu thông tin khách hàng')
+        handleApiError(error, 'Không thể cập nhật thông tin khách hàng')
     } finally {
         saving.value = false
     }
 }
 
-// ... Tất cả các function khác giữ nguyên từ code cũ
-
 const changeStatus = async (customerData) => {
     try {
         const newStatus = customerData.trangThai === 1 ? 0 : 1
-        await axios.patch(`/api/khach-hang/${customerData.id}/status`, { 
+        
+        const response = await axios.patch(`http://localhost:8080/api/khach-hang/${customerData.id}/status`, { 
             trangThai: newStatus 
         })
 
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: `Đã ${newStatus === 1 ? 'kích hoạt' : 'tạm khóa'} khách hàng`,
+            detail: `Đã ${newStatus === 1 ? 'kích hoạt' : 'tạm khóa'} khách hàng ${customerData.hoTen}`,
             life: 3000
         })
 
@@ -671,42 +1100,46 @@ const changeStatus = async (customerData) => {
     }
 }
 
-const deleteCustomer = async (customerId) => {
-    try {
-        await axios.delete(`/api/khach-hang/${customerId}`)
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Xóa khách hàng thành công',
-            life: 3000
-        })
-        await fetchData()
-    } catch (error) {
-        console.error('Error deleting customer:', error)
-        handleApiError(error, 'Không thể xóa khách hàng')
-    }
+const confirmBatchStatusChange = () => {
+    if (!selectedCustomers.value || !selectedCustomers.value.length) return
+
+    confirm.require({
+        message: `Bạn có muốn thay đổi trạng thái của ${selectedCustomers.value.length} khách hàng đã chọn?`,
+        header: 'Xác nhận thay đổi trạng thái',
+        icon: 'pi pi-question-circle',
+        rejectClass: 'p-button-secondary p-button-outlined',
+        rejectLabel: 'Hủy',
+        acceptLabel: 'Thực hiện',
+        accept: () => batchChangeStatus()
+    })
 }
 
-const deleteSelectedCustomers = async () => {
+const batchChangeStatus = async () => {
     try {
-        const ids = selectedCustomers.value.map(customer => customer.id)
-        await axios.delete('/api/khach-hang/batch', { data: ids })
+        const promises = selectedCustomers.value.map(customer => 
+            axios.patch(`http://localhost:8080/api/khach-hang/${customer.id}/status`, { 
+                trangThai: customer.trangThai === 1 ? 0 : 1 
+            })
+        )
+        
+        await Promise.all(promises)
         
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: 'Xóa các khách hàng đã chọn thành công',
+            detail: `Đã thay đổi trạng thái ${selectedCustomers.value.length} khách hàng`,
             life: 3000
         })
         
         selectedCustomers.value = []
         await fetchData()
     } catch (error) {
-        console.error('Error deleting customers:', error)
-        handleApiError(error, 'Không thể xóa khách hàng')
+        console.error('Error batch changing status:', error)
+        handleApiError(error, 'Không thể thay đổi trạng thái hàng loạt')
     }
 }
 
+// ===== PAGINATION HANDLERS =====
 const onPageChange = (event) => {
     pagination.value.page = event.page
     pagination.value.size = event.rows
@@ -719,31 +1152,50 @@ const onSort = (event) => {
     fetchData()
 }
 
-// Dialog Functions
-const openCreateDialog = () => {
-    customer.value = {
-        trangThai: 1
-    }
-    submitted.value = false
-    customerDialog.value = true
-}
-
+// ===== DIALOG FUNCTIONS =====
 const viewCustomer = (customerData) => {
     viewingCustomer.value = { ...customerData }
     viewDialog.value = true
 }
 
 const editCustomer = (customerData) => {
-    customer.value = { ...customerData }
+    customer.value = { 
+        ...customerData,
+        danhSachDiaChi: customerData.danhSachDiaChi ? 
+            customerData.danhSachDiaChi.map(addr => ({
+                ...addr,
+                availableWards: []
+            })) : []
+    }
+    
+    // Initialize address data if needed
+    if (!customer.value.danhSachDiaChi || customer.value.danhSachDiaChi.length === 0) {
+        customer.value.danhSachDiaChi = [{
+            diaChiChiTiet: '',
+            tenPhuong: '',
+            tenTinh: '',
+            maPhuong: null,
+            maTinh: null,
+            availableWards: [],
+            isDefault: true
+        }]
+    } else {
+        // Load wards for existing addresses
+        customer.value.danhSachDiaChi.forEach((addr, index) => {
+            if (addr.maTinh) {
+                fetchWardsForAddress(addr.maTinh, index)
+            }
+        })
+    }
+    
     submitted.value = false
     customerDialog.value = true
+    fetchProvinces()
 }
 
 const editFromView = () => {
-    customer.value = { ...viewingCustomer.value }
+    editCustomer(viewingCustomer.value)
     viewDialog.value = false
-    customerDialog.value = true
-    submitted.value = false
 }
 
 const hideDialog = () => {
@@ -757,41 +1209,13 @@ const viewAllAddresses = (customerData) => {
     addressListDialog.value = true
 }
 
-// Confirmation Functions
-const confirmDeleteCustomer = (customerData) => {
-    confirm.require({
-        message: `Bạn có chắc chắn muốn xóa khách hàng "${customerData.hoTen}"?`,
-        header: 'Xác nhận xóa',
-        icon: 'pi pi-exclamation-triangle',
-        rejectClass: 'p-button-secondary p-button-outlined',
-        rejectLabel: 'Hủy',
-        acceptLabel: 'Xóa',
-        accept: () => deleteCustomer(customerData.id)
-    })
-}
-
-const confirmDeleteSelected = () => {
-    if (!hasSelectedCustomers.value) return
-
-    confirm.require({
-        message: `Bạn có chắc chắn muốn xóa ${selectedCustomers.value.length} khách hàng đã chọn?`,
-        header: 'Xác nhận xóa',
-        icon: 'pi pi-exclamation-triangle',
-        rejectClass: 'p-button-secondary p-button-outlined',
-        rejectLabel: 'Hủy',
-        acceptLabel: 'Xóa',
-        accept: () => deleteSelectedCustomers()
-    })
-}
-
-// Export Functions - giữ nguyên
-
+// ===== EXPORT FUNCTIONS =====
 const exportToExcel = async () => {
     exporting.value = true
     try {
         const headers = [
             'ID', 'Mã Khách Hàng', 'Họ Tên', 'Email', 'SĐT', 
-            'Địa Chỉ', 'Trạng Thái', 'Ngày Tạo'
+            'Địa Chỉ', 'Trạng Thái', 'ID Tài Khoản', 'Ngày Tạo'
         ]
 
         const data = customers.value.map(customer => [
@@ -802,6 +1226,7 @@ const exportToExcel = async () => {
             customer.sdt || '',
             getDefaultAddress(customer) || 'Chưa có địa chỉ',
             getStatusLabel(customer.trangThai),
+            customer.idTaiKhoan || 'Chưa liên kết',
             formatDate(customer.ngayTao)
         ])
 
@@ -843,6 +1268,7 @@ const downloadExcel = (headers, data, filename) => {
     document.body.removeChild(link)
 }
 
+// ===== ERROR HANDLING =====
 const handleApiError = (error, defaultMessage) => {
     let errorMessage = defaultMessage
     
@@ -859,6 +1285,9 @@ const handleApiError = (error, defaultMessage) => {
                 break
             case 404:
                 errorMessage = 'Không tìm thấy dữ liệu'
+                break
+            case 409:
+                errorMessage = data.message || 'Email đã tồn tại trong hệ thống'
                 break
             case 500:
                 errorMessage = 'Lỗi server nội bộ'
@@ -878,12 +1307,12 @@ const handleApiError = (error, defaultMessage) => {
     })
 }
 
-// Lifecycle
+// ===== LIFECYCLE =====
 onMounted(() => {
     fetchData()
 })
 
-// Watchers
+// ===== WATCHERS =====
 watch(() => pagination.value.size, () => {
     pagination.value.page = 0
     fetchData()
