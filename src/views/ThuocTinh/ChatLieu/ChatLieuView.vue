@@ -55,7 +55,7 @@
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="chatLieuDialog" :style="{ width: '450px' }" header="Chi tiết Chất Liệu" :modal="true">
+        <Dialog v-model:visible="chatLieuDialog" :style="{ width: '450px' }" header="Chi Tiết Chất Liệu" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maChatLieu" class="block font-bold mb-3">Mã Chất Liệu</label>

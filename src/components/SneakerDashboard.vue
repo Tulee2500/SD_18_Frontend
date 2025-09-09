@@ -30,7 +30,7 @@
         <KPICards :stats="dashboardData.totalStats" />
 
         <!-- Secondary Stats -->
-        <SecondaryStats :stats="dashboardData.totalStats" />
+        <!-- <SecondaryStats :stats="dashboardData.totalStats" /> -->
 
         <!-- Charts Row 1 -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -69,7 +69,7 @@ import ErrorAlert from '@/components/common/ErrorAlert.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import ApiWarning from '@/components/common/ApiWarning.vue'
 import KPICards from '@/components/dashboard/KPICards.vue'
-import SecondaryStats from '@/components/dashboard/SecondaryStats.vue'
+// import SecondaryStats from '@/components/dashboard/SecondaryStats.vue'
 import RevenueChart from '@/components/dashboard/RevenueChart.vue'
 import BrandChart from '@/components/dashboard/BrandChart.vue'
 import TopProductsList from '@/components/dashboard/TopProductsList.vue'

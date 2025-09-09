@@ -55,7 +55,7 @@
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="deGiayDialog" :style="{ width: '450px' }" header="Chi tiết Đế Giày" :modal="true">
+        <Dialog v-model:visible="deGiayDialog" :style="{ width: '450px' }" header="Thêm Đế Giày" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maDeGiay" class="block font-bold mb-3">Mã Đế Giày</label>
