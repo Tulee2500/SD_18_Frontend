@@ -248,16 +248,40 @@ onMounted(() => {
 async function fetchData() {
     isLoading.value = true;
     try {
-        const res = await axios.get('http://localhost:8080/nhan-vien');
-        employees.value = res.data || [];
-    } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Có lỗi xảy ra khi tải dữ liệu nhân viên',
-            life: 3000
+        const res = await axios.get('http://localhost:8080/api/nhan-vien', {
+            params: {
+                page: 0,
+                size: 100,
+                sortBy: 'id',
+                sortDir: 'desc'
+            }
         });
+
+        if (res.data && res.data.content) {
+            employees.value = res.data.content; // ✅ ĐÚNG: sử dụng employees
+            console.log(`✅ Loaded ${res.data.content.length} employees`);
+        } else {
+            employees.value = []; // ✅ ĐÚNG: sử dụng employees
+        }
+    } catch (error) {
+        console.error('❌ Error fetching employees:', error);
+        
+        if (error.response?.status === 404) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'API endpoint không tồn tại',
+                life: 3000
+            });
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Không thể tải danh sách nhân viên', // ✅ SỬA: nhân viên thay vì khách hàng
+                life: 3000
+            });
+        }
+        employees.value = []; // ✅ ĐÚNG: sử dụng employees
     } finally {
         isLoading.value = false;
     }
@@ -339,7 +363,7 @@ async function saveEmployee() {
             idDiaChi: employee.value.diaChi
         };
 
-        await axios.put(`http://localhost:8080/nhan-vien/${employee.value.id}`, employeeData);
+        await axios.put(`http://localhost:8080/api/nhan-vien/${employee.value.id}`, employeeData);
 
         toast.add({
             severity: 'success',
@@ -380,7 +404,7 @@ function confirmDeleteEmployee(emp) {
 async function deleteEmployee() {
     deleting.value = true;
     try {
-        await axios.delete(`http://localhost:8080/nhan-vien/${employee.value.id}`);
+        await axios.delete(`http://localhost:8080/api/nhan-vien/${employee.value.id}`);
         await fetchData();
         deleteEmployeeDialog.value = false;
         employee.value = {};
@@ -417,7 +441,7 @@ async function changeStatus(emp) {
             idDiaChi: emp.diaChi
         };
 
-        await axios.put(`http://localhost:8080/nhan-vien/${emp.id}`, updateData);
+        await axios.put(`http://localhost:8080/api/nhan-vien/${emp.id}`, updateData);
         await fetchData();
         toast.add({
             severity: 'success',
@@ -444,7 +468,7 @@ async function deleteSelectedEmployees() {
     deleting.value = true;
     try {
         for (const emp of selectedEmployees.value) {
-            await axios.delete(`http://localhost:8080/nhan-vien/${emp.id}`);
+            await axios.delete(`http://localhost:8080/api/nhan-vien/${emp.id}`);
         }
         await fetchData();
         deleteEmployeesDialog.value = false;

@@ -78,16 +78,47 @@
                     </div>
                 </template>
             </Column>
-            <Column header="Địa chỉ" style="min-width: 12rem">
-                <template #body="slotProps">
-                    <div class="flex flex-col">
-                        <span class="text-muted text-sm">
-                            <i class="pi pi-map-marker text-muted mr-1"></i>
-                            ID Địa chỉ: {{ slotProps.data.idDiaChi || 'Chưa có địa chỉ' }}
-                        </span>
-                    </div>
-                </template>
-            </Column>
+            <!-- Cột địa chỉ hiển thị từ KhachHangDto -->
+<Column header="Địa chỉ" style="min-width: 18rem">
+    <template #body="slotProps">
+        <div class="flex flex-col">
+            <!-- Địa chỉ mặc định -->
+            <div v-if="slotProps.data.diaChiMacDinh" class="mb-2">
+                <div class="flex items-center mb-1">
+                    <i class="pi pi-home text-primary mr-1"></i>
+                    <span class="font-semibold text-primary text-sm">Địa chỉ mặc định</span>
+                    <Tag value="Mặc định" severity="success" class="ml-2 text-xs" />
+                </div>
+                <span class="text-sm text-muted">
+                    <i class="pi pi-map-marker text-muted mr-1"></i>
+                    {{ slotProps.data.diaChiMacDinh.diaChiDayDu || formatAddressFromInfo(slotProps.data.diaChiMacDinh) }}
+                </span>
+            </div>
+            
+            <!-- Tổng số địa chỉ -->
+            <div v-if="slotProps.data.danhSachDiaChi && slotProps.data.danhSachDiaChi.length > 1" class="flex items-center">
+                <i class="pi pi-list text-muted mr-1"></i>
+                <span class="text-xs text-muted">
+                    {{ slotProps.data.danhSachDiaChi.length }} địa chỉ
+                </span>
+                <Button 
+                    icon="pi pi-eye" 
+                    text 
+                    size="small" 
+                    class="ml-2 p-1" 
+                    @click="viewAllAddresses(slotProps.data)"
+                    title="Xem tất cả địa chỉ"
+                />
+            </div>
+            
+            <!-- Trường hợp chưa có địa chỉ -->
+            <div v-if="!slotProps.data.diaChiMacDinh && (!slotProps.data.danhSachDiaChi || slotProps.data.danhSachDiaChi.length === 0)" class="text-center py-2">
+                <i class="pi pi-map-marker text-muted"></i>
+                <span class="text-sm text-muted ml-1">Chưa có địa chỉ</span>
+            </div>
+        </div>
+    </template>
+</Column>
             <Column header="Điểm tích lũy" style="width: 10rem">
                 <template #body="slotProps">
                     <div class="flex items-center">
@@ -253,6 +284,74 @@
 
         <Toast />
     </div>
+    <!-- Dialog xem tất cả địa chỉ -->
+<Dialog 
+    v-model:visible="addressListDialog" 
+    :style="{ width: '800px' }" 
+    :header="`Danh sách địa chỉ - ${selectedCustomerAddresses?.hoTen || 'Khách hàng'}`" 
+    :modal="true"
+>
+    <div v-if="selectedCustomerAddresses && selectedCustomerAddresses.danhSachDiaChi" class="flex flex-col gap-3">
+        <div 
+            v-for="(address, index) in selectedCustomerAddresses.danhSachDiaChi" 
+            :key="address.id || index"
+            class="border rounded-lg p-4"
+            :class="address.isDefault ? 'border-primary bg-primary-50' : 'border-muted'"
+        >
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="font-semibold">Địa chỉ #{{ index + 1 }}</span>
+                    <Tag v-if="address.isDefault" value="Mặc định" severity="success" />
+                    <Tag 
+                        :value="address.trangThai === 1 ? 'Hoạt động' : 'Ngưng'" 
+                        :severity="address.trangThai === 1 ? 'success' : 'danger'" 
+                    />
+                </div>
+                <div class="flex gap-1">
+                    <Button 
+                        icon="pi pi-pencil" 
+                        outlined 
+                        size="small" 
+                        @click="editAddress(address, selectedCustomerAddresses)" 
+                        title="Sửa địa chỉ" 
+                    />
+                    <Button 
+                        icon="pi pi-trash" 
+                        outlined 
+                        severity="danger" 
+                        size="small" 
+                        @click="deleteAddress(address)" 
+                        title="Xóa địa chỉ" 
+                    />
+                </div>
+            </div>
+            
+            <div class="text-sm text-muted">
+                <i class="pi pi-map-marker mr-2"></i>
+                {{ address.diaChiDayDu || formatAddressFromInfo(address) }}
+            </div>
+            
+            <!-- Chi tiết địa chỉ -->
+            <div class="grid grid-cols-2 gap-2 mt-3 text-xs text-muted">
+                <div v-if="address.tenTinh"><strong>Tỉnh/TP:</strong> {{ address.tenTinh }}</div>
+                <div v-if="address.tenHuyen"><strong>Quận/Huyện:</strong> {{ address.tenHuyen }}</div>
+                <div v-if="address.tenPhuong"><strong>Phường/Xã:</strong> {{ address.tenPhuong }}</div>
+                <div v-if="address.diaChiChiTiet"><strong>Chi tiết:</strong> {{ address.diaChiChiTiet }}</div>
+            </div>
+        </div>
+        
+        <!-- Trường hợp không có địa chỉ -->
+        <div v-if="selectedCustomerAddresses.danhSachDiaChi.length === 0" class="text-center py-4">
+            <i class="pi pi-map-marker text-muted text-3xl mb-2"></i>
+            <p class="text-muted">Khách hàng chưa có địa chỉ nào</p>
+        </div>
+    </div>
+    
+    <template #footer>
+        <Button label="Đóng" icon="pi pi-times" text @click="addressListDialog = false" />
+        <Button label="Thêm địa chỉ mới" icon="pi pi-plus" @click="addNewAddress" />
+    </template>
+</Dialog>
 </template>
 
 <script setup>
@@ -304,11 +403,11 @@ onMounted(() => {
 
 async function fetchData() {
     isLoading.value = true;
-    console.log('🔄 Bắt đầu fetch data từ:', 'http://localhost:8080/khach-hang');
+    console.log('🔄 Bắt đầu fetch data từ:', 'http://localhost:8080/api/khach-hang');
 
     try {
         console.log('📡 Đang gọi API...');
-        const res = await axios.get('http://localhost:8080/khach-hang', { timeout: 10000 });
+        const res = await axios.get('http://localhost:8080/api/khach-hang', { timeout: 10000 });
 
         console.log('✅ Response status:', res.status);
         console.log('📦 Response headers:', res.headers);
@@ -512,11 +611,11 @@ async function saveCustomer() {
 
         if (customer.value.id) {
             // Cập nhật khách hàng
-            await axios.put(`http://localhost:8080/khach-hang/${customer.value.id}`, customerDto, { timeout: 5000 });
+            await axios.put(`http://localhost:8080/api/khach-hang/${customer.value.id}`, customerDto, { timeout: 5000 });
             toast.add({ severity: 'success', summary: 'Thành công', detail: 'Cập nhật khách hàng thành công', life: 3000 });
         } else {
             // Thêm khách hàng mới
-            await axios.post('http://localhost:8080/khach-hang', customerDto, { timeout: 5000 });
+            await axios.post('http://localhost:8080/api/khach-hang', customerDto, { timeout: 5000 });
             toast.add({ severity: 'success', summary: 'Thành công', detail: 'Thêm khách hàng thành công', life: 3000 });
         }
 
@@ -544,7 +643,7 @@ function confirmDeleteCustomer(cust) {
 async function deleteCustomer() {
     deleting.value = true;
     try {
-        await axios.delete(`http://localhost:8080/khach-hang/${customer.value.id}`, { timeout: 5000 });
+        await axios.delete(`http://localhost:8080/api/khach-hang/${customer.value.id}`, { timeout: 5000 });
         await fetchData();
         deleteCustomerDialog.value = false;
         customer.value = {};
@@ -578,7 +677,7 @@ async function changeStatus(cust) {
             idDiaChi: cust.idDiaChi
         };
 
-        await axios.put(`http://localhost:8080/khach-hang/${cust.id}`, updateData, { timeout: 5000 });
+        await axios.put(`http://localhost:8080/api/khach-hang/${cust.id}`, updateData, { timeout: 5000 });
         await fetchData();
         toast.add({
             severity: 'success',
@@ -600,7 +699,7 @@ async function deleteSelectedCustomers() {
     deleting.value = true;
     try {
         for (const cust of selectedCustomers.value) {
-            await axios.delete(`http://localhost:8080/khach-hang/${cust.id}`, { timeout: 5000 });
+            await axios.delete(`http://localhost:8080/api/khach-hang/${cust.id}`, { timeout: 5000 });
         }
         await fetchData();
         deleteCustomersDialog.value = false;
@@ -674,6 +773,80 @@ function getInitials(name) {
               .toUpperCase()
               .slice(0, 2)
         : '';
+}
+// Thêm các hàm này vào script setup
+
+// Format địa chỉ từ DiaChiInfo object
+function formatAddressFromInfo(diaChiInfo) {
+    if (!diaChiInfo) return 'Chưa có địa chỉ';
+    
+    const parts = [];
+    
+    // Địa chỉ chi tiết
+    if (diaChiInfo.diaChiChiTiet) {
+        parts.push(diaChiInfo.diaChiChiTiet);
+    }
+    
+    // Phường/Xã
+    if (diaChiInfo.tenPhuong) {
+        parts.push(diaChiInfo.tenPhuong);
+    }
+    
+    // Quận/Huyện  
+    if (diaChiInfo.tenHuyen) {
+        parts.push(diaChiInfo.tenHuyen);
+    }
+    
+    // Tỉnh/Thành phố
+    if (diaChiInfo.tenTinh) {
+        parts.push(diaChiInfo.tenTinh);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : 'Chưa có địa chỉ';
+}
+
+// Dialog để xem tất cả địa chỉ
+const addressListDialog = ref(false);
+const selectedCustomerAddresses = ref(null);
+
+function viewAllAddresses(customer) {
+    selectedCustomerAddresses.value = customer;
+    addressListDialog.value = true;
+}
+function editAddress(address, customer) {
+    // Logic để mở form sửa địa chỉ
+    console.log('Edit address:', address, 'for customer:', customer);
+    toast.add({
+        severity: 'info',
+        summary: 'Thông báo',
+        detail: 'Chức năng sửa địa chỉ sẽ được triển khai',
+        life: 3000
+    });
+}
+
+// Xóa địa chỉ
+function deleteAddress(address) {
+    // Logic để xóa địa chỉ
+    console.log('Delete address:', address);
+    toast.add({
+        severity: 'info',
+        summary: 'Thông báo', 
+        detail: 'Chức năng xóa địa chỉ sẽ được triển khai',
+        life: 3000
+    });
+}
+
+// Thêm địa chỉ mới
+function addNewAddress() {
+    if (!selectedCustomerAddresses.value) return;
+    
+    console.log('Add new address for customer:', selectedCustomerAddresses.value);
+    toast.add({
+        severity: 'info',
+        summary: 'Thông báo',
+        detail: 'Chức năng thêm địa chỉ mới sẽ được triển khai', 
+        life: 3000
+    });
 }
 </script>
 

@@ -9,6 +9,18 @@ const isLoadingCart = ref(false);
 // API Configuration
 const API_BASE_URL = 'http://localhost:8080';
 
+// Confirmation Modal State
+const confirmModal = ref({
+  show: false,
+  title: '',
+  message: '',
+  confirmText: 'Xác nhận',
+  cancelText: 'Hủy',
+  type: 'danger', // 'danger', 'warning', 'info'
+  onConfirm: null,
+  loading: false
+});
+
 // Auth helper
 const getAuthToken = () => {
   return localStorage.getItem('auth_token');
@@ -51,8 +63,40 @@ const buildImageUrl = (imagePath) => {
   return `${API_BASE_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
 };
 
+// Confirmation Modal Functions
+const showConfirmModal = (title, message, onConfirm, options = {}) => {
+  confirmModal.value = {
+    show: true,
+    title,
+    message,
+    confirmText: options.confirmText || 'Xác nhận',
+    cancelText: options.cancelText || 'Hủy',
+    type: options.type || 'danger',
+    onConfirm,
+    loading: false
+  };
+};
+
+const hideConfirmModal = () => {
+  confirmModal.value.show = false;
+  confirmModal.value.loading = false;
+  confirmModal.value.onConfirm = null;
+};
+
+const handleConfirm = async () => {
+  if (confirmModal.value.onConfirm) {
+    confirmModal.value.loading = true;
+    try {
+      await confirmModal.value.onConfirm();
+      hideConfirmModal();
+    } catch (error) {
+      confirmModal.value.loading = false;
+      console.error('Error in confirmation action:', error);
+    }
+  }
+};
+
 // 🛒 Load cart from backend
-// 🛒 Load cart from backend - CLEAN VERSION (CHỈ DÙNG JWT)
 const loadCartFromBackend = async () => {
   if (isLoadingCart.value) return;
 
@@ -107,7 +151,7 @@ const loadCartFromBackend = async () => {
   }
 };
 
-// ✏️ Update quantity - CLEAN VERSION
+// ✏️ Update quantity
 const updateQuantity = async (cartItemId, newQuantity) => {
   if (newQuantity < 1) return;
 
@@ -154,61 +198,81 @@ const updateQuantity = async (cartItemId, newQuantity) => {
   }
 };
 
-// 🗑️ Remove item - CLEAN VERSION
-const removeItem = async (cartItemId) => {
+// 🗑️ Remove item with custom modal
+const removeItem = (cartItemId) => {
   const item = cartItems.value.find(item => item.id === cartItemId);
-  if (!confirm(`Bạn có chắc chắn muốn xóa "${item?.name || 'sản phẩm này'}"?`)) return;
 
-  try {
-    console.log(`🔄 Removing item ${cartItemId}`);
+  showConfirmModal(
+    '🗑️ Xóa sản phẩm',
+    `Bạn có chắc chắn muốn xóa "<strong>${item?.name || 'sản phẩm này'}</strong>" khỏi giỏ hàng không?`,
+    async () => {
+      try {
+        console.log(`🔄 Removing item ${cartItemId}`);
 
-    await axios.delete(`${API_BASE_URL}/api/gio-hang/remove/${cartItemId}`, {
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
-        'Content-Type': 'application/json'
+        await axios.delete(`${API_BASE_URL}/api/gio-hang/remove/${cartItemId}`, {
+          headers: {
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('✅ Item removed from backend');
+
+        // Update local state
+        cartItems.value = cartItems.value.filter(item => item.id !== cartItemId);
+
+        showNotification('success', 'Đã xóa sản phẩm', `"${item?.name}" đã được xóa khỏi giỏ hàng`);
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+
+      } catch (error) {
+        console.error('❌ Error removing item:', error);
+        showNotification('error', 'Lỗi', 'Không thể xóa sản phẩm');
       }
-    });
-
-    console.log('✅ Item removed from backend');
-
-    // Update local state
-    cartItems.value = cartItems.value.filter(item => item.id !== cartItemId);
-
-    showNotification('success', 'Đã xóa sản phẩm', `"${item?.name}" đã được xóa khỏi giỏ hàng`);
-    window.dispatchEvent(new CustomEvent('cartUpdated'));
-
-  } catch (error) {
-    console.error('❌ Error removing item:', error);
-    showNotification('error', 'Lỗi', 'Không thể xóa sản phẩm');
-  }
+    },
+    {
+      confirmText: 'Xóa ngay',
+      cancelText: 'Hủy bỏ',
+      type: 'danger'
+    }
+  );
 };
 
-// 🧹 Clear cart - CLEAN VERSION
-const clearCart = async () => {
-  if (!confirm('Bạn có chắc chắn muốn xóa tất cả sản phẩm trong giỏ hàng?')) return;
+// 🧹 Clear cart with custom modal
+const clearCart = () => {
+  const itemCount = cartItems.value.length;
 
-  try {
-    console.log('🔄 Clearing cart...');
+  showConfirmModal(
+    '🧹 Xóa toàn bộ giỏ hàng',
+    `Bạn có chắc chắn muốn xóa <strong>tất cả ${itemCount} sản phẩm</strong> trong giỏ hàng không?<br><br><span class="text-amber-600">⚠️ Hành động này không thể hoàn tác!</span>`,
+    async () => {
+      try {
+        console.log('🔄 Clearing cart...');
 
-    await axios.delete(`${API_BASE_URL}/api/gio-hang/clear`, {
-      headers: {
-        'Authorization': `Bearer ${getAuthToken()}`,
-        'Content-Type': 'application/json'
+        await axios.delete(`${API_BASE_URL}/api/gio-hang/clear`, {
+          headers: {
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('✅ Cart cleared from backend');
+
+        cartItems.value = [];
+
+        showNotification('success', 'Đã xóa giỏ hàng', `Đã xóa ${itemCount} sản phẩm khỏi giỏ hàng`);
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+
+      } catch (error) {
+        console.error('❌ Error clearing cart:', error);
+        showNotification('error', 'Lỗi', 'Không thể xóa giỏ hàng');
       }
-    });
-
-    console.log('✅ Cart cleared from backend');
-
-    const itemCount = cartItems.value.length;
-    cartItems.value = [];
-
-    showNotification('success', 'Đã xóa giỏ hàng', `Đã xóa ${itemCount} sản phẩm khỏi giỏ hàng`);
-    window.dispatchEvent(new CustomEvent('cartUpdated'));
-
-  } catch (error) {
-    console.error('❌ Error clearing cart:', error);
-    showNotification('error', 'Lỗi', 'Không thể xóa giỏ hàng');
-  }
+    },
+    {
+      confirmText: 'Xóa tất cả',
+      cancelText: 'Giữ lại',
+      type: 'danger'
+    }
+  );
 };
 
 // Notification system
@@ -332,6 +396,78 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Custom Confirmation Modal -->
+  <Transition name="modal">
+    <div v-if="confirmModal.show" class="fixed inset-0 z-50 overflow-y-auto">
+      <!-- Backdrop -->
+      <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="hideConfirmModal">
+          <div class="absolute inset-0 bg-gray-900 opacity-75"></div>
+        </div>
+
+        <!-- Modal -->
+        <div class="inline-block align-bottom bg-white rounded-2xl px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+          <!-- Icon -->
+          <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-4"
+               :class="{
+                 'bg-red-100': confirmModal.type === 'danger',
+                 'bg-yellow-100': confirmModal.type === 'warning',
+                 'bg-blue-100': confirmModal.type === 'info'
+               }">
+            <svg v-if="confirmModal.type === 'danger'" class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <svg v-else-if="confirmModal.type === 'warning'" class="h-8 w-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 15.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <svg v-else class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+
+          <!-- Content -->
+          <div class="text-center">
+            <h3 class="text-lg leading-6 font-bold text-gray-900 mb-2">
+              {{ confirmModal.title }}
+            </h3>
+            <div class="mt-2">
+              <p class="text-sm text-gray-600" v-html="confirmModal.message"></p>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-center gap-3">
+            <button
+              type="button"
+              class="w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 sm:w-auto sm:text-sm transition-all"
+              @click="hideConfirmModal"
+              :disabled="confirmModal.loading"
+            >
+              {{ confirmModal.cancelText }}
+            </button>
+            <button
+              type="button"
+              class="w-full inline-flex justify-center items-center rounded-xl border border-transparent shadow-sm px-4 py-3 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:w-auto sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="{
+                'bg-red-600 hover:bg-red-700 focus:ring-red-500': confirmModal.type === 'danger',
+                'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500': confirmModal.type === 'warning',
+                'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500': confirmModal.type === 'info'
+              }"
+              @click="handleConfirm"
+              :disabled="confirmModal.loading"
+            >
+              <svg v-if="confirmModal.loading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {{ confirmModal.loading ? 'Đang xử lý...' : confirmModal.confirmText }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
   <!-- Notification -->
   <Transition name="slide-fade">
     <div v-if="notification.show"
@@ -487,30 +623,17 @@ onUnmounted(() => {
 
                 <!-- Unit Price -->
                 <div class="col-span-2">
-                  <div class="font-medium text-gray-800 text-sm">
                     {{ formatCurrency(item.price) }}đ
-                  </div>
-                  <div class="text-xs text-gray-500">đơn giá</div>
                 </div>
 
                 <!-- Total Price -->
                 <div class="col-span-2">
-                  <div class="font-bold text-orange-600 text-base">
                     {{ formatCurrency(item.price * item.quantity) }}đ
-                  </div>
-                  <div class="text-xs text-gray-500">{{ item.quantity }} x {{ formatCurrency(item.price) }}đ</div>
                 </div>
 
                 <!-- Actions -->
                 <div class="col-span-1">
                   <div class="flex flex-col gap-2 items-center">
-                    <button
-                      @click="refreshItem(item.id)"
-                      class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
-                      title="Reset về 1"
-                    >
-                      Reset
-                    </button>
                     <button
                       @click="removeItem(item.id)"
                       class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
@@ -556,13 +679,6 @@ onUnmounted(() => {
 
                   <!-- Actions -->
                   <div class="flex flex-col gap-1">
-                    <button
-                      @click="refreshItem(item.id)"
-                      class="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs"
-                      title="Reset về 1"
-                    >
-                      Reset
-                    </button>
                     <button
                       @click="removeItem(item.id)"
                       class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs"
@@ -698,6 +814,26 @@ onUnmounted(() => {
 .slide-fade-leave-to {
   transform: translateX(20px);
   opacity: 0;
+}
+
+/* Modal animations */
+.modal-enter-active, .modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-active .modal-container,
+.modal-leave-active .modal-container {
+  transition: all 0.3s ease;
+}
+
+.modal-enter-from, .modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-from .modal-container,
+.modal-leave-to .modal-container {
+  opacity: 0;
+  transform: scale(0.9) translateY(-20px);
 }
 
 @keyframes slideIn {
