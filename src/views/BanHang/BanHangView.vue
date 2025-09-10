@@ -1,1101 +1,36 @@
-<template>
-    <div class="pos-container">
-        <!-- Toast Notifications -->
-        <div class="toast-container position-fixed end-0 top-0 p-3" style="z-index: 1100">
-            <div v-if="showToast" class="toast show" :class="{ 'text-bg-success': toastType === 'success', 'text-bg-danger': toastType === 'error' }">
-                <div class="toast-body">
-                    {{ toastMessage }}
-                </div>
-            </div>
-        </div>
-
-        <div class="pos-layout d-flex">
-            <!-- Left Panel - Products -->
-            <div class="left-panel col-lg-8 border-end bg-light">
-                <!-- Header -->
-                <div class="bg-primary p-3 text-white">
-                    <div class="row align-items-center g-3">
-                        <div class="col-auto">
-                            <h4 class="mb-0">
-                                <i class="bi bi-shop me-2"></i>
-                                Bán Hàng Tại Quầy
-                            </h4>
-                        </div>
-
-                        <div class="col">
-                            <div class="input-group">
-                                <input ref="searchInput" v-model="searchKeyword" @input="debounceSearch" type="text" placeholder="Tìm sản phẩm hoặc quét mã QR..." class="form-control" />
-                                <button @click="showQrScanner = true" class="btn btn-outline-light">
-                                    <i class="bi bi-qr-code-scan"></i>
-                                </button>
-                                <button @click="timKiemSanPham(0)" class="btn btn-light">
-                                    <i class="bi bi-search"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="col-auto">
-                            <div class="text-center">
-                                <small class="d-block opacity-75">Tìm thấy</small>
-                                <strong>{{ tongSoPhanTu }} sản phẩm</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Filters -->
-                <div class="bg-info p-3 text-white">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">Danh mục</label>
-                            <select v-model="filters.danhMucId" @change="applyFilters" class="form-select form-select-sm">
-                                <option value="">Tất cả danh mục</option>
-                                <option v-for="dm in danhSachDanhMuc" :key="dm.id" :value="dm.id">
-                                    {{ dm.tenDanhMuc }}
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">Thương hiệu</label>
-                            <select v-model="filters.thuongHieuId" @change="applyFilters" class="form-select form-select-sm">
-                                <option value="">Tất cả thương hiệu</option>
-                                <option v-for="th in danhSachThuongHieu" :key="th.id" :value="th.id">
-                                    {{ th.tenThuongHieu }}
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label small mb-1">Khoảng giá</label>
-                            <div class="input-group input-group-sm">
-                                <input v-model="filters.minPrice" @input="debouncePriceFilter" type="number" placeholder="Từ" class="form-control" />
-                                <span class="input-group-text">-</span>
-                                <input v-model="filters.maxPrice" @input="debouncePriceFilter" type="number" placeholder="Đến" class="form-control" />
-                            </div>
-                        </div>
-
-                        <div class="col-md-2">
-                            <button @click="resetFilters" class="btn btn-light btn-sm w-100"><i class="bi bi-arrow-clockwise me-1"></i>Reset</button>
-                        </div>
-                    </div>
-
-                    <!-- Employee Info -->
-                    <div class="row mt-3">
-                        <div class="col">
-                            <div class="card border-0 bg-white bg-opacity-25">
-                                <div class="card-body p-2">
-                                    <div class="row text-center">
-                                        <div class="col">
-                                            <small class="d-block opacity-75">Nhân viên</small>
-                                            <strong class="small">{{ nhanVienInfo.tenNhanVien || 'Nhân viên' }}</strong>
-                                        </div>
-                                        <div class="col">
-                                            <small class="d-block opacity-75">Mã NV</small>
-                                            <strong class="small">{{ nhanVienInfo.maNhanVien || '001' }}</strong>
-                                        </div>
-                                        <div class="col">
-                                            <small class="d-block opacity-75">Sản phẩm</small>
-                                            <strong class="small">{{ danhSachSanPham.length }}/{{ tongSoPhanTu }}</strong>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Products Section -->
-                <div class="flex-grow-1 p-3" style="height: calc(100vh - 200px); overflow-y: auto">
-                    <!-- Loading -->
-                    <div v-if="loading" class="py-5 text-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Đang tải...</span>
-                        </div>
-                        <p class="text-muted mt-3">Đang tải sản phẩm...</p>
-                    </div>
-
-                    <!-- Error -->
-                    <div v-if="error" class="alert alert-danger text-center">
-                        <i class="bi bi-exclamation-triangle me-2"></i>
-                        {{ error }}
-                        <button @click="timKiemSanPham(0)" class="btn btn-outline-danger btn-sm mt-2"><i class="bi bi-arrow-clockwise me-1"></i>Thử lại</button>
-                    </div>
-
-                    <!-- Products -->
-                    <div v-if="!loading && !error">
-                        <!-- Empty State -->
-                        <div v-if="danhSachSanPham.length === 0" class="py-5 text-center">
-                            <i class="bi bi-search display-1 text-muted"></i>
-                            <h5 class="mt-3">Không tìm thấy sản phẩm</h5>
-                            <p class="text-muted">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc</p>
-                        </div>
-
-                        <!-- Products Grid -->
-                        <div v-else class="row g-3">
-                            <div v-for="product in danhSachSanPham" :key="product.id" class="col-md-6">
-                                <div class="card product-card h-100" @click="xemChiTietSanPham(product)" style="cursor: pointer">
-                                    <div class="position-relative" style="height: 220px; overflow: hidden">
-                                        <img :src="getProductImage(product)" :alt="product.tenSanPham" @error="handleImageError" class="card-img-top w-100 h-100" style="object-fit: cover" />
-
-                                        <!-- Discount Badge - Top Left -->
-                                        <div v-if="product.giaGoc && product.giaGoc > product.giaBan" class="position-absolute start-0 top-0 m-2">
-                                            <span class="badge bg-success">-{{ Math.round((1 - product.giaBan / product.giaGoc) * 100) }}%</span>
-                                        </div>
-
-                                        <!-- Stock Badge - Top Right -->
-                                        <div class="position-absolute end-0 top-0 m-2">
-                                            <span v-if="product.soLuong <= 0" class="badge bg-danger">Hết hàng</span>
-                                            <span v-else-if="product.soLuong <= 5" class="badge bg-warning text-dark">Còn {{ product.soLuong }}</span>
-                                        </div>
-                                    </div>
-
-                                    <div class="card-body p-3">
-                                        <h6 class="card-title mb-3" :title="product.tenSanPham" style="height: 2.8rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 1rem; font-weight: 600">
-                                            {{ product.tenSanPham }}
-                                        </h6>
-
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <div class="d-flex align-items-center">
-                                                <span class="rounded-circle me-2" :style="{ backgroundColor: getMauHex(product.mauSac?.tenMau), width: '18px', height: '18px', border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }"></span>
-                                                <small class="text-muted">{{ product.mauSac?.tenMau || 'N/A' }}</small>
-                                            </div>
-                                            <span class="badge bg-light text-dark">Size: {{ product.kichCo?.tenKichCo || 'N/A' }}</span>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <div class="d-flex align-items-baseline gap-2">
-                                                <span class="h5 text-danger fw-bold mb-0">{{ formatPrice(product.giaBan) }}</span>
-                                                <small v-if="product.giaGoc && product.giaGoc > product.giaBan" class="text-muted text-decoration-line-through">
-                                                    {{ formatPrice(product.giaGoc) }}
-                                                </small>
-                                            </div>
-                                        </div>
-
-                                        <button @click.stop="themVaoHoaDon(product)" :disabled="product.soLuong <= 0" class="btn btn-sm w-100" :class="product.soLuong <= 0 ? 'btn-secondary' : 'btn-primary'">
-                                            <i class="bi bi-cart-plus me-1"></i>
-                                            {{ product.soLuong <= 0 ? 'Hết hàng' : 'Thêm vào hóa đơn' }}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Pagination -->
-                        <nav v-if="tongSoTrang > 1" class="mt-4">
-                            <ul class="pagination justify-content-center">
-                                <li class="page-item" :class="{ disabled: trangHienTai === 0 }">
-                                    <a class="page-link" @click="chuyenTrang(trangHienTai - 1)" href="#" @click.prevent>
-                                        <i class="bi bi-chevron-left"></i>
-                                    </a>
-                                    q
-                                </li>
-                                <li class="page-item active">
-                                    <span class="page-link">{{ trangHienTai + 1 }} / {{ tongSoTrang }}</span>
-                                </li>
-                                <li class="page-item" :class="{ disabled: trangHienTai >= tongSoTrang - 1 }">
-                                    <a class="page-link" @click="chuyenTrang(trangHienTai + 1)" href="#" @click.prevent>
-                                        <i class="bi bi-chevron-right"></i>
-                                    </a>
-                                </li>
-                            </ul>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Panel - Invoice -->
-            <div class="right-panel col-lg-4 bg-white">
-                <!-- Invoice Tabs -->
-                <div class="bg-primary p-2 text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex flex-grow-1 gap-1 overflow-auto">
-                            <button
-                                v-for="(hoaDon, index) in hoaDonCho"
-                                :key="hoaDon.id"
-                                class="btn btn-sm position-relative flex-shrink-0"
-                                :class="hoaDonDangChon?.id === hoaDon.id ? 'btn-light text-dark' : 'btn-outline-light'"
-                                @click="chonHoaDon(hoaDon)"
-                            >
-                                <i class="bi bi-file-text me-1"></i>
-                                HĐ{{ index + 1 }}
-                                <button
-                                    v-if="hoaDonCho.length > 1"
-                                    @click.stop="xoaHoaDon(hoaDon.id)"
-                                    class="btn-close btn-close-white position-absolute"
-                                    style="top: -5px; right: -5px; font-size: 0.6rem; padding: 0.1rem"
-                                    :class="hoaDonDangChon?.id === hoaDon.id ? 'btn-close-dark' : 'btn-close-white'"
-                                ></button>
-                            </button>
-                        </div>
-                        <button @click="taoHoaDonMoi" class="btn btn-success btn-sm ms-2 flex-shrink-0"><i class="bi bi-plus-lg me-1"></i>Tạo HĐ</button>
-                    </div>
-                </div>
-
-                <!-- Invoice Content -->
-                <div v-if="hoaDonDangChon" class="p-3" style="height: calc(100vh - 60px); overflow-y: auto">
-                    <!-- Customer Section -->
-                    <div class="card mb-3">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-person me-2"></i>Khách hàng</h6>
-                            <button @click="showCustomerModal = true" class="btn btn-outline-primary btn-sm"><i class="bi bi-search me-1"></i>Chọn</button>
-                        </div>
-                        <div class="card-body">
-                            <div v-if="khachHang" class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <!-- ✅ SỬA: Hiển thị đầy đủ thông tin -->
-                                    <div class="fw-bold">{{ khachHang.hoTen || 'Chưa có tên' }}</div>
-                                    <small class="text-muted d-block">📞 {{ khachHang.sdt || 'Chưa có SĐT' }}</small>
-                                    <small class="text-muted d-block" v-if="khachHang.email"> ✉️ {{ khachHang.email }} </small>
-                                    <div class="small mt-1 text-primary">💎 Điểm tích lũy: {{ khachHang.diemTichLuy || 0 }} điểm</div>
-                                </div>
-                                <button @click="boKhachHang" class="btn btn-outline-danger btn-sm" title="Bỏ khách hàng">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </div>
-                            <div v-else class="text-muted py-2 text-center">
-                                <i class="bi bi-person me-2"></i>Khách lẻ
-                                <div class="small mt-1">Chưa chọn khách hàng</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Voucher Section -->
-                    <div class="card mb-3">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-ticket me-2"></i>Voucher</h6>
-                            <button @click="showVoucherModal = true" class="btn btn-outline-success btn-sm"><i class="bi bi-search me-1"></i>Áp dụng</button>
-                        </div>
-                        <div class="card-body">
-                            <div v-if="voucher" class="d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center flex-grow-1">
-                                    <!-- ✅ THÊM: Hình ảnh voucher đã chọn -->
-                                    <div class="position-relative me-3" style="width: 48px; height: 48px; flex-shrink: 0">
-                                        <img :src="getVoucherImage(voucher)" :alt="voucher.tenVoucher" @error="handleVoucherImageError" class="w-100 h-100 rounded-3 object-fit-cover border-success border" style="border-width: 2px !important" />
-                                        <!-- Badge success indicator -->
-                                        <span class="position-absolute badge bg-success rounded-circle start-0 top-0" style="width: 16px; height: 16px; transform: translate(-50%, -50%); font-size: 0.6rem">
-                                            <i class="bi bi-check"></i>
-                                        </span>
-                                    </div>
-
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-truncate" style="max-width: 200px">{{ voucher.tenVoucher }}</div>
-                                        <div class="text-success small">
-                                            <i class="bi bi-tag-fill me-1"></i>
-                                            <span v-if="voucher.loaiGiamGia === 'PHAN_TRAM'"> Giảm {{ voucher.giaTriGiam }}% </span>
-                                            <span v-else> Giảm {{ formatPrice(voucher.giaTriGiam) }} </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button @click="boVoucher" class="btn btn-outline-danger btn-sm ms-2" title="Bỏ voucher">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </div>
-
-                            <div v-else class="text-muted py-2 text-center">
-                                <div class="mb-2">
-                                    <i class="bi bi-ticket display-6 text-muted"></i>
-                                </div>
-                                <div>Chưa có voucher</div>
-                                <small class="text-muted">Nhấn "Áp dụng" để chọn voucher</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Cart Items -->
-                    <div class="card mb-3">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0"><i class="bi bi-cart me-2"></i>Sản phẩm</h6>
-                            <span class="badge bg-primary">{{ tongQuan.soLuongSanPham }} loại - {{ tongQuan.tongSoLuong }} sp</span>
-                        </div>
-                        <div class="card-body p-0">
-                            <div v-if="sanPhamDaChon.length === 0" class="text-muted py-4 text-center">
-                                <i class="bi bi-cart display-4"></i>
-                                <p class="mt-2">Chưa có sản phẩm nào</p>
-                            </div>
-                            <div v-else style="max-height: 300px; overflow-y: auto">
-                                <div v-for="item in sanPhamDaChon" :key="`cart-item-${item.id || item.chiTietSanPhamId}`" class="d-flex align-items-start border-bottom gap-3 p-3">
-                                    <div class="position-relative flex-shrink-0" style="width: 50px; height: 50px">
-                                        <img :src="getProductImage(item)" :alt="item.tenSanPham || 'Sản phẩm'" @error="handleImageError" class="w-100 h-100 rounded" style="object-fit: cover" />
-                                        <div
-                                            class="position-absolute rounded-circle bottom-0 end-0"
-                                            :style="{ backgroundColor: getMauHex(item.mauSac?.tenMau), width: '12px', height: '12px', border: '2px solid white' }"
-                                            :title="item.mauSac?.tenMau || 'N/A'"
-                                        ></div>
-                                    </div>
-
-                                    <div class="flex-grow-1 min-w-0">
-                                        <div class="d-flex justify-content-between align-items-start mb-1">
-                                            <h6 class="text-truncate mb-0 pe-2" :title="item.tenSanPham || 'Sản phẩm'">
-                                                {{ item.tenSanPham || 'Sản phẩm' }}
-                                            </h6>
-                                            <button @click="xoaKhoiGioHang(item)" class="btn btn-sm btn-outline-danger flex-shrink-0" title="Xóa sản phẩm">
-                                                <i class="bi bi-x-lg" style="font-size: 0.75rem"></i>
-                                            </button>
-                                        </div>
-
-                                        <div class="d-flex mb-2 flex-wrap gap-1">
-                                            <span class="badge bg-info text-white">
-                                                <span class="rounded-circle d-inline-block me-1" :style="{ backgroundColor: getMauHex(item.mauSac?.tenMau), width: '8px', height: '8px' }"></span>
-                                                {{ item.mauSac?.tenMau || 'N/A' }}
-                                            </span>
-                                            <span class="badge bg-secondary">
-                                                <i class="bi bi-rulers me-1" style="font-size: 0.75rem"></i>
-                                                {{ item.kichCo?.tenKichCo || 'N/A' }}
-                                            </span>
-                                        </div>
-
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <span class="fw-bold text-danger">{{ formatPrice(Number(item.giaBan) || 0) }}</span>
-                                                <small v-if="item.giaGoc && Number(item.giaGoc) > Number(item.giaBan)" class="text-muted text-decoration-line-through ms-1">
-                                                    {{ formatPrice(Number(item.giaGoc)) }}
-                                                </small>
-                                            </div>
-
-                                            <div class="d-flex align-items-center gap-1">
-                                                <button @click="giamSoLuong(item)" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 28px; height: 28px" title="Giảm số lượng">
-                                                    <i class="bi bi-dash"></i>
-                                                </button>
-                                                <span class="fw-bold mx-2">{{ Number(item.soLuongDaChon) || 0 }}</span>
-                                                <button
-                                                    @click="tangSoLuong(item)"
-                                                    class="btn btn-outline-secondary btn-sm rounded-circle p-1"
-                                                    style="width: 28px; height: 28px"
-                                                    :disabled="(Number(item.soLuongDaChon) || 0) >= (Number(item.soLuong) || 999)"
-                                                    title="Tăng số lượng"
-                                                >
-                                                    <i class="bi bi-plus"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Summary -->
-                    <div class="card mb-3">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Tạm tính ({{ tongQuan.tongSoLuong }} sản phẩm):</span>
-                                <span>{{ formatPrice(tongQuan.tongTienGoc) }}</span>
-                            </div>
-                            <div v-if="tongQuan.tongTienKhuyenMai < tongQuan.tongTienGoc" class="d-flex justify-content-between text-success mb-2">
-                                <span>Khuyến mãi:</span>
-                                <span>-{{ formatPrice(tongQuan.tongTienGoc - tongQuan.tongTienKhuyenMai) }}</span>
-                            </div>
-                            <div v-if="voucher" class="d-flex justify-content-between text-success mb-2">
-                                <span>Voucher:</span>
-                                <span>-{{ formatPrice(tongQuan.tongTienVoucher) }}</span>
-                            </div>
-                            <hr />
-                            <div class="d-flex justify-content-between fw-bold h5">
-                                <span>Tổng thanh toán:</span>
-                                <span class="text-danger">{{ formatPrice(tongQuan.tongTienThanhToan) }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Payment Button -->
-                    <button @click="showPaymentModal = true" :disabled="sanPhamDaChon.length === 0" class="btn w-100 btn-lg" :class="sanPhamDaChon.length === 0 ? 'btn-secondary' : 'btn-success'">
-                        <i class="bi bi-credit-card me-2"></i>
-                        Thanh toán ({{ formatPrice(tongQuan.tongTienThanhToan) }})
-                    </button>
-                </div>
-
-                <!-- No Invoice Selected -->
-                <div v-else class="d-flex flex-column justify-content-center align-items-center h-100 text-muted">
-                    <i class="bi bi-file-text display-1"></i>
-                    <h5 class="mt-3">Chọn hoặc tạo hóa đơn</h5>
-                    <button @click="taoHoaDonMoi" class="btn btn-primary mt-3"><i class="bi bi-plus-lg me-1"></i>Tạo hóa đơn mới</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modals -->
-        <!-- Customer Selection Modal -->
-        <div v-if="showCustomerModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-person me-2"></i>Chọn khách hàng</h5>
-                        <button @click="showCustomerModal = false" type="button" class="btn-close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <div class="input-group">
-                                <input v-model="customerSearchKeyword" @input="debounceCustomerSearch" type="text" placeholder="Tìm khách hàng theo tên hoặc SĐT" class="form-control" />
-                                <button @click="showCreateCustomerForm = true" class="btn btn-success"><i class="bi bi-person-plus me-1"></i>Tạo mới</button>
-                            </div>
-                        </div>
-
-                        <div style="max-height: 400px; overflow-y: auto">
-                            <div v-if="loadingCustomers" class="py-4 text-center">
-                                <div class="spinner-border text-primary" role="status"></div>
-                                <p class="mt-2">Đang tìm kiếm...</p>
-                            </div>
-
-                            <div v-else-if="danhSachKhachHang.length === 0" class="text-muted py-4 text-center">
-                                <i class="bi bi-people display-4"></i>
-                                <p v-if="customerSearchKeyword" class="mt-2">Không tìm thấy khách hàng với từ khóa "{{ customerSearchKeyword }}"</p>
-                                <p v-else class="mt-2">Chưa có khách hàng nào trong hệ thống</p>
-                                <button
-                                    v-if="customerSearchKeyword"
-                                    @click="
-                                        customerSearchKeyword = '';
-                                        loadDanhSachKhachHang();
-                                    "
-                                    class="btn btn-outline-primary"
-                                >
-                                    Xem tất cả khách hàng
-                                </button>
-                            </div>
-
-                            <div v-else class="list-group">
-                                <button v-for="customer in danhSachKhachHang" :key="customer.id" @click="chonKhachHang(customer)" class="list-group-item list-group-item-action">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div class="d-flex align-items-center">
-                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3 bg-primary text-white" style="width: 40px; height: 40px">
-                                                <i class="bi bi-person"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-1">{{ customer.hoTen }}</h6>
-                                                <p class="text-muted mb-1">{{ customer.sdt }}</p>
-                                                <small class="text-muted">{{ customer.email || 'Chưa có email' }}</small>
-                                            </div>
-                                        </div>
-                                        <span class="badge bg-primary">{{ customer.diemTichLuy || 0 }} điểm</span>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button @click="showCustomerModal = false" class="btn btn-secondary">Đóng</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Create Customer Form Modal -->
-        <div v-if="showCreateCustomerForm" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Tạo khách hàng mới</h5>
-                        <button @click="showCreateCustomerForm = false" type="button" class="btn-close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Họ tên <span class="text-danger">*</span></label>
-                            <input v-model="newCustomer.hoTen" type="text" placeholder="Nhập họ tên" class="form-control" :class="{ 'is-invalid': newCustomerErrors.hoTen }" />
-                            <div v-if="newCustomerErrors.hoTen" class="invalid-feedback">{{ newCustomerErrors.hoTen }}</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Số điện thoại <span class="text-danger">*</span></label>
-                            <input v-model="newCustomer.sdt" type="tel" placeholder="Nhập số điện thoại" class="form-control" :class="{ 'is-invalid': newCustomerErrors.sdt }" />
-                            <div v-if="newCustomerErrors.sdt" class="invalid-feedback">{{ newCustomerErrors.sdt }}</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input v-model="newCustomer.email" type="email" placeholder="Nhập email (không bắt buộc)" class="form-control" :class="{ 'is-invalid': newCustomerErrors.email }" />
-                            <div v-if="newCustomerErrors.email" class="invalid-feedback">{{ newCustomerErrors.email }}</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Địa chỉ</label>
-                            <textarea v-model="newCustomer.diaChi" placeholder="Nhập địa chỉ (không bắt buộc)" class="form-control" rows="3"></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button @click="showCreateCustomerForm = false" class="btn btn-secondary">Hủy</button>
-                        <button @click="taoKhachHangMoi" :disabled="loadingCreateCustomer" class="btn btn-primary" :class="{ 'btn-secondary': loadingCreateCustomer }">
-                            <span v-if="loadingCreateCustomer" class="spinner-border spinner-border-sm me-2"></span>
-                            {{ loadingCreateCustomer ? 'Đang tạo...' : 'Tạo khách hàng' }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Voucher Selection Modal -->
-        <div v-if="showVoucherModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-ticket me-2"></i>Áp dụng voucher</h5>
-                        <button @click="showVoucherModal = false" type="button" class="btn-close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <div class="input-group">
-                                <input v-model="voucherCode" type="text" placeholder="Nhập mã voucher" class="form-control" @keyup.enter="kiemTraVoucher" />
-                                <button @click="kiemTraVoucher" :disabled="!voucherCode.trim() || loadingVoucherCheck" class="btn btn-success">
-                                    <span v-if="loadingVoucherCheck" class="spinner-border spinner-border-sm me-2"></span>
-                                    {{ loadingVoucherCheck ? 'Đang kiểm tra...' : 'Kiểm tra' }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style="max-height: 400px; overflow-y: auto">
-                            <div v-if="loadingVouchers" class="py-4 text-center">
-                                <div class="spinner-border text-success" role="status"></div>
-                                <p class="mt-2">Đang tải voucher...</p>
-                            </div>
-
-                            <div v-else-if="danhSachVoucher.length === 0" class="text-muted py-4 text-center">
-                                <i class="bi bi-ticket display-4"></i>
-                                <p v-if="khachHang" class="mt-2">Không có voucher khả dụng cho khách hàng này</p>
-                                <p v-else-if="tongQuan.tongTienKhuyenMai > 0" class="mt-2">Không có voucher phù hợp với đơn hàng {{ formatPrice(tongQuan.tongTienKhuyenMai) }}</p>
-                                <p v-else class="mt-2">Không có voucher khả dụng</p>
-                                <button @click="layDanhSachVoucher()" class="btn btn-outline-success">Tải lại voucher</button>
-                            </div>
-
-                            <div v-else class="list-group">
-                                <button v-for="voucher_item in danhSachVoucher" :key="voucher_item.id" @click="chonVoucher(voucher_item)" class="list-group-item list-group-item-action p-3">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div class="d-flex align-items-center flex-grow-1">
-                                            <!-- ✅ THÊM: Hiển thị hình ảnh voucher -->
-                                            <div class="position-relative me-3" style="width: 64px; height: 64px; flex-shrink: 0">
-                                                <img
-                                                    :src="getVoucherImage(voucher_item)"
-                                                    :alt="voucher_item.tenVoucher"
-                                                    @error="handleVoucherImageError"
-                                                    class="w-100 h-100 rounded-3 object-fit-cover border"
-                                                    style="border: 2px solid #e9ecef !important"
-                                                />
-                                                <!-- Badge loại voucher -->
-                                                <span class="position-absolute badge bg-success rounded-pill start-0 top-0" style="font-size: 0.6rem; transform: translate(-25%, -25%)">
-                                                    <i class="bi bi-ticket-fill"></i>
-                                                </span>
-                                            </div>
-
-                                            <div class="flex-grow-1">
-                                                <h6 class="fw-bold mb-1">{{ voucher_item.tenVoucher }}</h6>
-                                                <!-- ✅ SỬA: Hiển thị thông tin giảm giá rõ ràng hơn -->
-                                                <p class="text-muted small mb-1">
-                                                    <i class="bi bi-tag-fill text-success me-1"></i>
-                                                    <span v-if="voucher_item.loaiGiamGia === 'PHAN_TRAM'">
-                                                        Giảm {{ voucher_item.giaTriGiam }}%
-                                                        <span class="text-warning">(tối đa {{ formatPrice(voucher_item.giaTriGiamToiDa) }})</span>
-                                                    </span>
-                                                    <span v-else> Giảm {{ formatPrice(voucher_item.giaTriGiam) }} </span>
-                                                </p>
-                                                <div class="d-flex align-items-center gap-3">
-                                                    <small class="text-success">
-                                                        <i class="bi bi-cart-check me-1"></i>
-                                                        Đơn tối thiểu: {{ formatPrice(voucher_item.giaTriDonHangToiThieu || 0) }}
-                                                    </small>
-                                                    <small class="text-info">
-                                                        <i class="bi bi-box me-1"></i>
-                                                        Còn: {{ voucher_item.soLuongConLai }} lượt
-                                                    </small>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="ms-3 text-end">
-                                            <!-- ✅ SỬA: Badge giá trị giảm đẹp hơn -->
-                                            <div class="mb-2">
-                                                <span v-if="voucher_item.loaiGiamGia === 'PHAN_TRAM'" class="badge bg-gradient fs-6 bg-primary px-3 py-2"> -{{ voucher_item.giaTriGiam }}% </span>
-                                                <span v-else class="badge bg-gradient bg-success fs-6 px-3 py-2"> -{{ formatPrice(voucher_item.giaTriGiam) }} </span>
-                                            </div>
-                                            <div class="small text-muted">
-                                                <i class="bi bi-calendar3 me-1"></i>
-                                                HSD: {{ formatDate(voucher_item.ngayKetThuc) }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button @click="showVoucherModal = false" class="btn btn-secondary">Đóng</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- QR Scanner Modal với Camera -->
-        <div v-if="showQrScanner" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-qr-code-scan me-2"></i>Quét mã QR</h5>
-                        <button @click="showQrScanner = false" type="button" class="btn-close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <!-- Tab selection -->
-                        <ul class="nav nav-tabs mb-3">
-                            <li class="nav-item">
-                                <button class="nav-link" :class="{ active: qrMode === 'manual' }" @click="switchQrMode('manual')"><i class="bi bi-keyboard me-1"></i>Nhập thủ công</button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="nav-link" :class="{ active: qrMode === 'camera' }" @click="switchQrMode('camera')"><i class="bi bi-camera me-1"></i>Quét bằng camera</button>
-                            </li>
-                        </ul>
-
-                        <!-- Manual input -->
-                        <div v-if="qrMode === 'manual'" class="mb-3">
-                            <label class="form-label">Mã QR sản phẩm</label>
-                            <input ref="qrInput" v-model="qrCode" type="text" placeholder="Nhập mã QR sản phẩm (ví dụ: QR_1, QR_2...)" @keyup.enter="quetQR" class="form-control" />
-                            <div class="form-text">
-                                <i class="bi bi-info-circle me-1"></i>
-                                Nhập mã QR hoặc scan từ nhãn sản phẩm
-                            </div>
-                        </div>
-
-                        <!-- Camera scanner - cập nhật phần này trong template -->
-                        <div v-if="qrMode === 'camera'" class="mb-3">
-                            <label class="form-label">Camera Scanner</label>
-
-                            <!-- Camera container -->
-                            <div class="mb-2 rounded border p-2" style="min-height: 300px">
-                                <!-- Default state -->
-                                <div v-if="!cameraStarted && !cameraError" class="qr-loading-container">
-                                    <div class="text-center">
-                                        <i class="bi bi-camera display-4 text-muted"></i>
-                                        <p class="text-muted mt-3">Nhấn "Bắt đầu quét" để khởi động camera</p>
-                                        <button @click="startCamera" class="btn btn-success"><i class="bi bi-play me-1"></i>Bắt đầu quét</button>
-                                    </div>
-                                </div>
-
-                                <!-- Camera view -->
-                                <div v-if="cameraStarted && !cameraError" class="text-center">
-                                    <div id="qr-reader"></div>
-                                    <button @click="stopCamera" class="btn btn-danger btn-sm mt-2"><i class="bi bi-stop me-1"></i>Dừng camera</button>
-                                </div>
-
-                                <!-- Error state -->
-                                <div v-if="cameraError" class="qr-error-container">
-                                    <i class="bi bi-exclamation-triangle display-4 mb-3"></i>
-                                    <div class="text-center">
-                                        <p class="mb-3">{{ cameraError }}</p>
-                                        <div class="d-flex justify-content-center gap-2">
-                                            <button @click="retryCamera" class="btn btn-warning btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Thử lại</button>
-                                            <button @click="switchQrMode('manual')" class="btn btn-outline-secondary btn-sm"><i class="bi bi-keyboard me-1"></i>Nhập thủ công</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- QR code result -->
-                            <div v-if="qrCode" class="qr-success-container">
-                                <i class="bi bi-check-circle text-success me-2"></i>
-                                Đã quét được mã: <strong>{{ qrCode }}</strong>
-                            </div>
-                        </div>
-
-                        <!-- Action buttons -->
-                        <div class="d-flex gap-2">
-                            <button @click="quetQR" :disabled="!qrCode.trim() || loadingQR" class="btn btn-primary flex-grow-1">
-                                <span v-if="loadingQR" class="spinner-border spinner-border-sm me-2"></span>
-                                <i v-else class="bi bi-search me-1"></i>
-                                {{ loadingQR ? 'Đang tìm...' : 'Tìm sản phẩm' }}
-                            </button>
-
-                            <button @click="clearQrCode" v-if="qrCode" class="btn btn-outline-secondary">
-                                <i class="bi bi-x-lg"></i>
-                            </button>
-                        </div>
-
-                        <!-- QR History (optional) -->
-                        <div v-if="qrHistory.length > 0" class="mt-3">
-                            <h6 class="text-muted"><i class="bi bi-clock-history me-1"></i>Lịch sử quét gần đây</h6>
-                            <div class="d-flex flex-wrap gap-1">
-                                <button v-for="item in qrHistory.slice(0, 5)" :key="item.qrCode" @click="qrCode = item.qrCode" class="btn btn-outline-info btn-sm" :title="item.productName">
-                                    {{ item.qrCode }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Product Detail Modal -->
-        <div v-if="showProductDetail" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-eye me-2"></i>Chi tiết sản phẩm</h5>
-                        <button @click="showProductDetail = false" type="button" class="btn-close"></button>
-                    </div>
-                    <div class="modal-body" v-if="sanPhamDangXem">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <img :src="getProductImage(sanPhamDangXem)" :alt="sanPhamDangXem.tenSanPham" class="img-fluid rounded shadow" />
-                            </div>
-                            <div class="col-md-6">
-                                <h2 class="mb-3">{{ sanPhamDangXem.tenSanPham }}</h2>
-                                <h3 class="text-danger mb-3">{{ formatPrice(sanPhamDangXem.giaBan) }}</h3>
-
-                                <div v-if="sanPhamDangXem.giaGoc && sanPhamDangXem.giaGoc > sanPhamDangXem.giaBan" class="d-flex align-items-center mb-3 gap-3">
-                                    <span class="text-muted text-decoration-line-through h5">{{ formatPrice(sanPhamDangXem.giaGoc) }}</span>
-                                    <span class="badge bg-success">Giảm {{ Math.round((1 - sanPhamDangXem.giaBan / sanPhamDangXem.giaGoc) * 100) }}%</span>
-                                </div>
-
-                                <div class="row mb-4">
-                                    <div class="col-sm-6">
-                                        <div class="mb-3">
-                                            <label class="form-label text-muted">Màu sắc</label>
-                                            <div class="d-flex align-items-center">
-                                                <div
-                                                    class="rounded-circle me-2"
-                                                    style="width: 24px; height: 24px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1)"
-                                                    :style="{ backgroundColor: getMauHex(sanPhamDangXem.mauSac?.tenMau) }"
-                                                ></div>
-                                                <span>{{ sanPhamDangXem.mauSac?.tenMau || 'Chưa có' }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-sm-6">
-                                        <div class="mb-3">
-                                            <label class="form-label text-muted">Kích cỡ</label>
-                                            <div>
-                                                <span class="badge bg-light text-dark fs-6">{{ sanPhamDangXem.kichCo?.tenKichCo || 'Chưa có' }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-sm-6">
-                                        <div class="mb-3">
-                                            <label class="form-label text-muted">Thương hiệu</label>
-                                            <div>{{ sanPhamDangXem.thuongHieu?.tenThuongHieu || 'Chưa có' }}</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-sm-6">
-                                        <div class="mb-3">
-                                            <label class="form-label text-muted">Tồn kho</label>
-                                            <div>
-                                                <span class="badge" :class="getStockBadgeClass(sanPhamDangXem.soLuong)"> {{ sanPhamDangXem.soLuong }} sản phẩm </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <label class="form-label">Số lượng</label>
-                                    <div class="d-flex align-items-center gap-2" style="width: 160px">
-                                        <button @click="giamSoLuongModal" :disabled="soLuongChon <= 1" class="btn btn-outline-secondary rounded-circle p-1" style="width: 32px; height: 32px">
-                                            <i class="bi bi-dash"></i>
-                                        </button>
-                                        <input v-model.number="soLuongChon" type="number" min="1" :max="sanPhamDangXem.soLuong" class="form-control text-center" />
-                                        <button @click="tangSoLuongModal" :disabled="soLuongChon >= sanPhamDangXem.soLuong" class="btn btn-outline-secondary rounded-circle p-1" style="width: 32px; height: 32px">
-                                            <i class="bi bi-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button @click="showProductDetail = false" class="btn btn-secondary">Đóng</button>
-                        <button @click="themVaoHoaDonTuModal" :disabled="!sanPhamDangXem || sanPhamDangXem.soLuong <= 0" class="btn btn-primary" :class="{ 'btn-secondary': !sanPhamDangXem || sanPhamDangXem.soLuong <= 0 }">
-                            <i class="bi bi-cart-plus me-1"></i>
-                            Thêm {{ soLuongChon }} vào hóa đơn
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Payment Modal -->
-        <div v-if="showPaymentModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-credit-card me-2"></i>Thanh toán</h5>
-                        <button @click="showPaymentModal = false" type="button" class="btn-close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5 class="mb-3">Thông tin thanh toán</h5>
-
-                                <div class="mb-3">
-                                    <label class="form-label">Tổng tiền</label>
-                                    <input type="text" :value="formatPrice(tongQuan.tongTienThanhToan)" readonly class="form-control bg-light fw-bold text-danger" />
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">Tiền mặt</label>
-                                    <input v-model.number="thongTinThanhToan.tienMat" type="number" min="0" class="form-control" />
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">Chuyển khoản</label>
-                                    <input v-model.number="thongTinThanhToan.chuyenKhoan" type="number" min="0" class="form-control" />
-                                </div>
-
-                                <div v-if="khachHang && khachHang.diemTichLuy > 0" class="mb-3">
-                                    <label class="form-label">
-                                        Sử dụng điểm ({{ khachHang.diemTichLuy }} điểm có sẵn)
-                                        <small class="text-muted">- 1 điểm = 1.000₫</small>
-                                    </label>
-                                    <div class="input-group">
-                                        <input
-                                            v-model.number="thongTinThanhToan.diemSuDung"
-                                            type="number"
-                                            min="0"
-                                            :max="khachHang.diemTichLuy"
-                                            :class="{ 'is-invalid': !validateDiemSuDung() }"
-                                            placeholder="Nhập số điểm muốn sử dụng"
-                                            class="form-control"
-                                        />
-                                        <span class="input-group-text">điểm</span>
-                                    </div>
-                                    <div v-if="!validateDiemSuDung()" class="text-danger small">Số điểm không hợp lệ. Tối đa {{ khachHang.diemTichLuy }} điểm.</div>
-                                    <div v-if="thongTinThanhToan.diemSuDung > 0" class="text-success small">Giảm {{ formatPrice(thongTinThanhToan.diemSuDung * 1000) }}</div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">Ghi chú</label>
-                                    <textarea v-model="thongTinThanhToan.ghiChu" class="form-control" rows="3"></textarea>
-                                </div>
-
-                                <!-- Quick amount buttons -->
-                                <div class="mb-3">
-                                    <label class="form-label">Tiền mặt nhanh:</label>
-                                    <div class="row g-2">
-                                        <div v-for="amount in quickAmounts" :key="amount" class="col-6">
-                                            <button @click="chonTienNhanh(amount)" class="btn btn-outline-primary btn-sm w-100">
-                                                {{ formatPrice(amount) }}
-                                            </button>
-                                        </div>
-                                        <div class="col-12">
-                                            <button @click="chonTienVuaVua" class="btn btn-primary btn-sm w-100">Vừa vặn</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <h5 class="mb-3">Tóm tắt đơn hàng</h5>
-
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between mb-2">
-                                            <span>Tạm tính:</span>
-                                            <span>{{ formatPrice(tongQuan.tongTienGoc) }}</span>
-                                        </div>
-                                        <div v-if="tongQuan.tongTienKhuyenMai < tongQuan.tongTienGoc" class="d-flex justify-content-between text-success mb-2">
-                                            <span>Khuyến mãi:</span>
-                                            <span>-{{ formatPrice(tongQuan.tongTienGoc - tongQuan.tongTienKhuyenMai) }}</span>
-                                        </div>
-                                        <div v-if="voucher" class="d-flex justify-content-between text-success mb-2">
-                                            <span>Voucher:</span>
-                                            <span>-{{ formatPrice(tongQuan.tongTienVoucher) }}</span>
-                                        </div>
-                                        <div v-if="thongTinThanhToan.diemSuDung > 0" class="d-flex justify-content-between text-success mb-2">
-                                            <span>Điểm tích lũy:</span>
-                                            <span>-{{ formatPrice(thongTinThanhToan.diemSuDung * 1000) }}</span>
-                                        </div>
-                                        <hr />
-                                        <div class="d-flex justify-content-between fw-bold h5 mb-3">
-                                            <span>Tổng thanh toán:</span>
-                                            <span class="text-danger">{{ formatPrice(tinhTongThanhToan()) }}</span>
-                                        </div>
-                                        <hr />
-                                        <div class="d-flex justify-content-between mb-2">
-                                            <span>Tiền nhận:</span>
-                                            <span>{{ formatPrice(thongTinThanhToan.tienMat + thongTinThanhToan.chuyenKhoan) }}</span>
-                                        </div>
-                                        <div class="d-flex justify-content-between" :class="tinhTienThua() >= 0 ? 'text-success' : 'text-danger'">
-                                            <span>{{ tinhTienThua() >= 0 ? 'Tiền thừa:' : 'Còn thiếu:' }}</span>
-                                            <span class="fw-bold">{{ formatPrice(Math.abs(tinhTienThua())) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button @click="showPaymentModal = false" class="btn btn-secondary">Hủy</button>
-                        <button @click="xuLyThanhToan" :disabled="!coTheThanhToan() || loadingPayment" class="btn btn-success" :class="{ 'btn-secondary': !coTheThanhToan() || loadingPayment }">
-                            <span v-if="loadingPayment" class="spinner-border spinner-border-sm me-2"></span>
-                            {{ loadingPayment ? 'Đang xử lý...' : 'Xác nhận thanh toán' }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Invoice Print Modal -->
-        <div v-if="showInvoicePrint" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-printer me-2"></i>Hóa đơn bán hàng</h5>
-                        <button @click="showInvoicePrint = false" type="button" class="btn-close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div id="invoice-print" class="invoice-print">
-                            <div class="row mb-4">
-                                <div class="col-md-6">
-                                    <h2 class="fw-bold">BEE SHOES STORE</h2>
-                                    <p class="mb-1">Địa chỉ: 123 Đường ABC, Quận XYZ, TP.HCM</p>
-                                    <p class="mb-1">Điện thoại: 0123-456-789</p>
-                                    <p class="mb-0">Email: contact@beeshoes.com</p>
-                                </div>
-                                <div class="col-md-6 text-end">
-                                    <h3 class="fw-bold">HÓA ĐƠN BÁN HÀNG</h3>
-                                    <p class="mb-1"><strong>Số:</strong> {{ hoaDonDaThanhToan?.maHoaDon || 'HD001' }}</p>
-                                    <p class="mb-1"><strong>Ngày:</strong> {{ formatDateTime(new Date()) }}</p>
-                                    <p class="mb-0"><strong>Nhân viên:</strong> {{ nhanVienInfo.tenNhanVien }}</p>
-                                </div>
-                            </div>
-
-                            <div class="row mb-4">
-                                <div class="col-md-6">
-                                    <h5>Thông tin khách hàng</h5>
-                                    <!-- ✅ SỬA: Sử dụng thông tin từ thongTinThanhToanCuoi hoặc khachHang hiện tại -->
-                                    <p class="mb-1">
-                                        <strong>Họ tên:</strong>
-                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.hoTen || khachHang?.hoTen || 'Khách lẻ' }}
-                                    </p>
-                                    <p class="mb-1">
-                                        <strong>Điện thoại:</strong>
-                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.sdt || khachHang?.sdt || 'N/A' }}
-                                    </p>
-                                    <p class="mb-1">
-                                        <strong>Email:</strong>
-                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.email || khachHang?.email || 'N/A' }}
-                                    </p>
-                                    <p class="mb-0">
-                                        <strong>Điểm tích lũy:</strong>
-                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.diemTichLuy || khachHang?.diemTichLuy || 0 }} điểm
-                                    </p>
-                                </div>
-                                <div class="col-md-6">
-                                    <h5>Thông tin thanh toán</h5>
-                                    <p class="mb-1"><strong>Tiền mặt:</strong> {{ formatPrice(thongTinThanhToanCuoi?.tienMat || 0) }}</p>
-                                    <p class="mb-1"><strong>Chuyển khoản:</strong> {{ formatPrice(thongTinThanhToanCuoi?.chuyenKhoan || 0) }}</p>
-                                    <p class="mb-1"><strong>Tiền thừa:</strong> {{ formatPrice(thongTinThanhToanCuoi?.tienThua || 0) }}</p>
-                                    <p class="mb-0" v-if="thongTinThanhToanCuoi?.diemSuDung > 0"><strong>Điểm đã sử dụng:</strong> {{ thongTinThanhToanCuoi.diemSuDung }} điểm</p>
-                                </div>
-                            </div>
-
-                            <!-- ✅ SỬA: Phần chữ ký cuối hóa đơn -->
-                            <div class="row mt-5">
-                                <div class="col-6 text-center">
-                                    <p class="fw-bold">Người bán</p>
-                                    <br /><br /><br />
-                                    <p>{{ nhanVienInfo.tenNhanVien }}</p>
-                                </div>
-                                <div class="col-6 text-center">
-                                    <p class="fw-bold">Người mua</p>
-                                    <br /><br /><br />
-                                    <!-- ✅ SỬA: Hiển thị tên khách hàng thực tế -->
-                                    <p>{{ thongTinThanhToanCuoi?.khachHangInfo?.hoTen || khachHang?.hoTen || '.........................' }}</p>
-                                </div>
-                            </div>
-
-                            <div class="table-responsive mb-4">
-                                <table class="table-bordered table">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>STT</th>
-                                            <th>Mã sản phẩm</th>
-                                            <th>Tên sản phẩm</th>
-                                            <th>Màu sắc</th>
-                                            <th>Kích cỡ</th>
-                                            <th class="text-end">Số lượng</th>
-                                            <th class="text-end">Đơn giá</th>
-                                            <th class="text-end">Thành tiền</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(item, index) in sanPhamDaThanhToan" :key="index">
-                                            <td>{{ index + 1 }}</td>
-                                            <td>{{ item.maSanPham }}</td>
-                                            <td>{{ item.tenSanPham }}</td>
-                                            <td>{{ item.mauSac?.tenMau || 'N/A' }}</td>
-                                            <td>{{ item.kichCo?.tenKichCo || 'N/A' }}</td>
-                                            <td class="text-end">{{ item.soLuongDaChon }}</td>
-                                            <td class="text-end">{{ formatPrice(item.giaBan) }}</td>
-                                            <td class="text-end">{{ formatPrice(item.giaBan * item.soLuongDaChon) }}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6 offset-md-6">
-                                    <table class="table">
-                                        <tr>
-                                            <td>Tạm tính:</td>
-                                            <td class="text-end">{{ formatPrice(tongQuanDaThanhToan.tongTienGoc) }}</td>
-                                        </tr>
-                                        <tr v-if="tongQuanDaThanhToan.tongTienKhuyenMai < tongQuanDaThanhToan.tongTienGoc">
-                                            <td>Khuyến mãi:</td>
-                                            <td class="text-end">-{{ formatPrice(tongQuanDaThanhToan.tongTienGoc - tongQuanDaThanhToan.tongTienKhuyenMai) }}</td>
-                                        </tr>
-                                        <tr v-if="voucherDaThanhToan">
-                                            <td>Voucher ({{ voucherDaThanhToan.tenVoucher }}):</td>
-                                            <td class="text-end">-{{ formatPrice(voucherDaThanhToan.giaTriGiam) }}</td>
-                                        </tr>
-                                        <tr v-if="thongTinThanhToanCuoi.diemSuDung > 0">
-                                            <td>Điểm tích lũy:</td>
-                                            <td class="text-end">-{{ formatPrice(thongTinThanhToanCuoi.diemSuDung * 1000) }}</td>
-                                        </tr>
-                                        <tr class="table-dark">
-                                            <td><strong>Tổng thanh toán:</strong></td>
-                                            <td class="text-end">
-                                                <strong>{{ formatPrice(tongQuanDaThanhToan.tongTienThanhToan) }}</strong>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>Tiền mặt:</td>
-                                            <td class="text-end">{{ formatPrice(thongTinThanhToanCuoi.tienMat) }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td>Tiền thừa:</td>
-                                            <td class="text-end">{{ formatPrice(thongTinThanhToanCuoi.tienThua) }}</td>
-                                        </tr>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <div class="my-4 text-center">
-                                <p class="fw-bold">Cảm ơn quý khách đã mua hàng!</p>
-                                <p>Quý khách vui lòng kiểm tra kỹ hàng hóa trước khi rời khỏi cửa hàng.</p>
-                                <p>Hàng đã mua chỉ được đổi trả trong vòng 7 ngày kể từ ngày mua.</p>
-                            </div>
-
-                            <div class="row mt-5">
-                                <div class="col-6 text-center">
-                                    <p class="fw-bold">Người bán</p>
-                                    <br /><br /><br />
-                                    <p>{{ nhanVienInfo.tenNhanVien }}</p>
-                                </div>
-                                <div class="col-6 text-center">
-                                    <p class="fw-bold">Người mua</p>
-                                    <br /><br /><br />
-                                    <p>{{ khachHang?.hoTen || '.........................' }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button @click="showInvoicePrint = false" class="btn btn-secondary">Đóng</button>
-                        <button @click="printInvoice" class="btn btn-primary"><i class="bi bi-printer me-1"></i>In hóa đơn</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
 <script>
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+// import { jsQR } from 'jsqr';
+// Xóa dòng import ở đầu file và thay bằng:
+const loadJsQRFromCDN = () => {
+    return new Promise((resolve, reject) => {
+        // Kiểm tra xem đã load chưa
+        if (window.jsQR && typeof window.jsQR === 'function') {
+            console.log('jsQR already loaded');
+            resolve(window.jsQR);
+            return;
+        }
+
+        console.log('Loading jsQR from CDN...');
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+
+        script.onload = () => {
+            console.log('jsQR CDN loaded successfully');
+            if (window.jsQR && typeof window.jsQR === 'function') {
+                resolve(window.jsQR);
+            } else {
+                reject(new Error('jsQR not found after loading'));
+            }
+        };
+
+        script.onerror = (error) => {
+            console.error('Failed to load jsQR from CDN:', error);
+            reject(new Error('Failed to load jsQR library'));
+        };
+
+        document.head.appendChild(script);
+    });
+};
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 export default {
     name: 'BanHangTaiQuay',
@@ -1109,6 +44,11 @@ export default {
             tenNhanVien: 'Nguyễn Văn A',
             maNhanVien: 'NV001'
         });
+        // QR Scanner với jsQR
+        const videoRef = ref(null);
+        const canvasRef = ref(null);
+        const qrStream = ref(null);
+        const scanInterval = ref(null);
 
         // Invoice & Products
         const hoaDonCho = ref([]);
@@ -1492,25 +432,6 @@ export default {
             }
         };
 
-        // =================== INVOICE FUNCTIONS ===================
-        const taoHoaDonMoi = async () => {
-            try {
-                const nhanVienId = nhanVienInfo.value.maNhanVien || 1;
-                const data = await apiCall(`${API_BASE_URL}/hoa-don-cho/tao-moi?nhanVienId=${nhanVienId}`, {
-                    method: 'POST'
-                });
-
-                if (data.success) {
-                    await layDanhSachHoaDonCho();
-                    showToastMessage('Tạo hóa đơn mới thành công!');
-                } else {
-                    showToastMessage(data.message || 'Lỗi tạo hóa đơn', 'error');
-                }
-            } catch (error) {
-                showToastMessage('Lỗi tạo hóa đơn mới', 'error');
-            }
-        };
-
         const layDanhSachHoaDonCho = async () => {
             try {
                 const data = await apiCall(`${API_BASE_URL}/hoa-don-cho`);
@@ -1695,7 +616,8 @@ export default {
                 return;
             }
 
-            if (!product || !product.id) {
+            if (!product || (!product.id && !product.chiTietSanPhamId)) {
+                console.error('❌ Invalid product data:', product);
                 showToastMessage('Thông tin sản phẩm không hợp lệ', 'error');
                 return;
             }
@@ -1706,16 +628,30 @@ export default {
             }
 
             try {
+                // Lấy ID sản phẩm - ưu tiên chiTietSanPhamId
+                const productId = product.chiTietSanPhamId || product.id;
+
+                console.log('📦 Adding product to invoice:', {
+                    productId,
+                    productName: product.tenSanPham,
+                    quantity: soLuong,
+                    price: product.giaBan
+                });
+
                 const request = {
-                    chiTietSanPhamId: Number(product.id),
+                    chiTietSanPhamId: Number(productId),
                     soLuong: Number(soLuong),
                     donGia: Number(product.giaBan) || 0
                 };
+
+                console.log('📤 Request data:', request);
 
                 const data = await apiCall(`${API_BASE_URL}/hoa-don-cho/${hoaDonDangChon.value.id}/them-san-pham`, {
                     method: 'POST',
                     body: JSON.stringify(request)
                 });
+
+                console.log('📥 Response:', data);
 
                 if (data.success) {
                     showToastMessage(`Đã thêm ${product.tenSanPham} vào hóa đơn!`);
@@ -2447,7 +1383,7 @@ export default {
         onUnmounted(() => {
             // Cleanup camera khi component unmount
             stopCamera();
-            console.log('🧹 Component cleanup completed');
+            console.log('Component cleanup completed');
         });
 
         watch(showCreateCustomerForm, (newVal) => {
@@ -2462,7 +1398,6 @@ export default {
         const switchQrMode = async (mode) => {
             if (qrMode.value === mode) return;
 
-            // Dừng camera nếu đang chạy
             if (qrMode.value === 'camera' && cameraStarted.value) {
                 await stopCamera();
             }
@@ -2470,14 +1405,10 @@ export default {
             qrMode.value = mode;
 
             if (mode === 'manual') {
-                // Focus vào input field
                 await nextTick();
                 qrInput.value?.focus();
             } else if (mode === 'camera') {
-                // Đợi DOM render trước khi start camera
                 await nextTick();
-
-                // Đợi thêm một chút để đảm bảo element đã sẵn sàng
                 setTimeout(() => {
                     startCamera();
                 }, 100);
@@ -2488,145 +1419,144 @@ export default {
             try {
                 cameraError.value = '';
 
-                // Đợi DOM render xong
-                await nextTick();
-
-                // Kiểm tra element có tồn tại không
-                const qrReaderElement = document.getElementById('qr-reader');
-                if (!qrReaderElement) {
-                    throw new Error('Element #qr-reader không tìm thấy. Vui lòng thử lại.');
-                }
-
-                // Dừng camera cũ nếu có
-                if (html5QrCode) {
-                    try {
-                        await html5QrCode.stop();
-                        await html5QrCode.clear();
-                    } catch (e) {
-                        console.warn('Cleanup camera cũ:', e);
-                    }
-                }
+                // Load jsQR trước khi start camera
+                console.log('Loading jsQR...');
+                await loadJsQRFromCDN();
+                console.log('jsQR loaded, starting camera...');
 
                 cameraStarted.value = true;
+                await nextTick();
+                await new Promise((resolve) => setTimeout(resolve, 200));
 
-                // Khởi tạo Html5Qrcode
-                html5QrCode = new Html5Qrcode('qr-reader');
+                const video = document.getElementById('qr-video');
+                const canvas = document.getElementById('qr-canvas');
 
-                const config = {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0,
-                    disableFlip: false
-                };
+                if (!video || !canvas) {
+                    throw new Error('Video hoặc Canvas element không tìm thấy');
+                }
 
-                // Thử camera sau trước, nếu không có thì dùng camera trước
-                const cameraConstraints = [
-                    { facingMode: 'environment' }, // Camera sau
-                    { facingMode: 'user' }, // Camera trước
-                    'environment', // Fallback
-                    'user' // Fallback
-                ];
-
-                let cameraStarted = false;
-                let lastError = null;
-
-                for (const constraint of cameraConstraints) {
-                    try {
-                        console.log('🎥 Thử khởi động camera với constraint:', constraint);
-
-                        await html5QrCode.start(
-                            constraint,
-                            config,
-                            (decodedText, decodedResult) => {
-                                console.log('✅ QR Code detected:', decodedText);
-                                qrCode.value = decodedText;
-
-                                // Tự động tìm sản phẩm sau khi quét
-                                setTimeout(() => {
-                                    quetQR();
-                                }, 300);
-                            },
-                            (errorMessage) => {
-                                // Lỗi quét - bình thường, bỏ qua
-                            }
-                        );
-
-                        cameraStarted = true;
-                        console.log('📷 Camera started successfully');
-                        break;
-                    } catch (error) {
-                        console.warn(`❌ Camera constraint ${JSON.stringify(constraint)} failed:`, error);
-                        lastError = error;
-
-                        // Dọn dẹp trước khi thử constraint tiếp theo
-                        if (html5QrCode) {
-                            try {
-                                html5QrCode.clear();
-                            } catch (e) {
-                                // Ignore cleanup errors
-                            }
-                        }
-
-                        continue;
+                qrStream.value = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
                     }
-                }
+                });
 
-                if (!cameraStarted) {
-                    throw lastError || new Error('Không thể khởi động bất kỳ camera nào');
-                }
+                video.srcObject = qrStream.value;
+
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play().then(resolve).catch(resolve);
+                    };
+                });
+
+                // Bắt đầu quét sau khi video ready
+                await startQrScan(video, canvas);
+
+                console.log('Camera and QR scanning started successfully');
             } catch (error) {
-                console.error('❌ Camera start error:', error);
+                console.error('Camera start error:', error);
                 cameraStarted.value = false;
 
-                // Xử lý các loại lỗi khác nhau
                 if (error.name === 'NotAllowedError') {
-                    cameraError.value = 'Bạn cần cho phép truy cập camera để sử dụng tính năng này. Vui lòng nhấn "Allow" khi trình duyệt hỏi.';
+                    cameraError.value = 'Bạn cần cho phép truy cập camera';
                 } else if (error.name === 'NotFoundError') {
-                    cameraError.value = 'Không tìm thấy camera trên thiết bị này.';
-                } else if (error.name === 'NotReadableError') {
-                    cameraError.value = 'Camera đang được sử dụng bởi ứng dụng khác. Vui lòng đóng các ứng dụng khác và thử lại.';
-                } else if (error.name === 'OverconstrainedError') {
-                    cameraError.value = 'Camera không hỗ trợ cấu hình yêu cầu.';
-                } else if (error.message.includes('not found')) {
-                    cameraError.value = 'Element camera chưa sẵn sàng. Vui lòng thử lại.';
+                    cameraError.value = 'Không tìm thấy camera';
                 } else {
-                    cameraError.value = `Lỗi khởi động camera: ${error.message}`;
+                    cameraError.value = `Lỗi: ${error.message}`;
                 }
             }
         };
 
-        const stopCamera = async () => {
-            if (html5QrCode) {
+        const startQrScan = async (video, canvas) => {
+            const ctx = canvas.getContext('2d');
+
+            // Đảm bảo jsQR đã load
+            if (!window.jsQR) {
                 try {
-                    console.log('🛑 Stopping camera...');
-
-                    // Kiểm tra trạng thái trước khi stop
-                    const state = html5QrCode.getState();
-                    if (state === Html5QrcodeScannerState.SCANNING) {
-                        await html5QrCode.stop();
-                    }
-
-                    // Clear element
-                    await html5QrCode.clear();
-                    html5QrCode = null;
-
-                    console.log('📷 Camera stopped successfully');
+                    await loadJsQRFromCDN();
                 } catch (error) {
-                    console.warn('⚠️ Lỗi dừng camera:', error);
-
-                    // Force cleanup
-                    html5QrCode = null;
-
-                    // Clear HTML element manually
-                    const qrReaderElement = document.getElementById('qr-reader');
-                    if (qrReaderElement) {
-                        qrReaderElement.innerHTML = '';
-                    }
+                    cameraError.value = 'Không thể tải thư viện quét QR';
+                    return;
                 }
             }
 
-            cameraStarted.value = false;
-            cameraError.value = '';
+            const scan = () => {
+                if (!cameraStarted.value || !video.videoWidth || !video.videoHeight) {
+                    return;
+                }
+
+                try {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                    // Gọi jsQR từ window object
+                    const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (code && code.data) {
+                        console.log('QR Code detected:', code.data);
+                        qrCode.value = code.data;
+
+                        // Hiển thị overlay thành công
+                        showQRDetectionSuccess(code.data);
+
+                        // Dừng quét
+                        if (scanInterval.value) {
+                            clearInterval(scanInterval.value);
+                            scanInterval.value = null;
+                        }
+
+                        setTimeout(() => {
+                            stopCamera();
+                            quetQR();
+                        }, 1000); // Delay để user thấy thông báo thành công
+
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('QR scan error:', error);
+                }
+            };
+
+            // Quét mỗi 200ms
+            scanInterval.value = setInterval(scan, 200);
+            console.log('QR scanning started');
+        };
+
+        const stopCamera = async () => {
+            try {
+                console.log('Stopping camera...');
+
+                // Dừng interval quét
+                if (scanInterval.value) {
+                    clearInterval(scanInterval.value);
+                    scanInterval.value = null;
+                }
+
+                // Dừng video stream
+                if (qrStream.value) {
+                    qrStream.value.getTracks().forEach((track) => track.stop());
+                    qrStream.value = null;
+                }
+
+                // Reset video element
+                const video = document.getElementById('qr-video');
+                if (video) {
+                    video.srcObject = null;
+                }
+
+                cameraStarted.value = false;
+                cameraError.value = '';
+
+                console.log('Camera stopped successfully');
+            } catch (error) {
+                console.warn('Lỗi dừng camera:', error);
+                cameraStarted.value = false;
+            }
         };
 
         const retryCamera = () => {
@@ -2634,7 +1564,6 @@ export default {
             cameraStarted.value = false;
             startCamera();
         };
-
         const clearQrCode = () => {
             qrCode.value = '';
         };
@@ -2697,6 +1626,73 @@ export default {
                 loadingQR.value = false;
             }
         };
+        const manualScanFrame = async () => {
+            const video = document.getElementById('qr-video');
+            const canvas = document.getElementById('qr-canvas');
+
+            if (!video || !canvas) {
+                showToastMessage('Không tìm thấy video hoặc canvas', 'error');
+                return;
+            }
+
+            // Đảm bảo jsQR đã load
+            if (!window.jsQR) {
+                try {
+                    await loadJsQRFromCDN();
+                } catch (error) {
+                    showToastMessage('Không thể tải thư viện quét QR', 'error');
+                    return;
+                }
+            }
+
+            try {
+                const ctx = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code && code.data) {
+                    qrCode.value = code.data;
+                    showQRDetectionSuccess(code.data);
+
+                    setTimeout(() => {
+                        stopCamera();
+                        quetQR();
+                    }, 1000);
+                } else {
+                    showToastMessage('Không tìm thấy mã QR. Hãy đưa QR code gần camera hơn', 'warning');
+                }
+            } catch (error) {
+                console.error('Manual scan error:', error);
+                showToastMessage('Lỗi quét thủ công: ' + error.message, 'error');
+            }
+        };
+
+        const enhanceImageForQR = (canvas, ctx) => {
+            // Tăng độ tương phản để dễ quét hơn
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                // Chuyển sang grayscale
+                const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+
+                // Tăng contrast
+                const contrast = 1.5;
+                const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+                const newGray = factor * (gray - 128) + 128;
+
+                data[i] = newGray; // Red
+                data[i + 1] = newGray; // Green
+                data[i + 2] = newGray; // Blue
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            return ctx.getImageData(0, 0, canvas.width, canvas.height);
+        };
         const qrMode = ref('manual'); // 'manual' hoặc 'camera'
         const cameraError = ref('');
         const cameraStarted = ref(false);
@@ -2723,9 +1719,148 @@ export default {
             console.log('🧪 Testing with fake QR code:', qrCode.value);
             quetQR();
         };
+        const showQRDetectionSuccess = (qrData) => {
+            // Hiển thị overlay thành công trên video
+            const video = document.getElementById('qr-video');
+            if (video) {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(40, 167, 69, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            z-index: 1000;
+            animation: fadeInOut 1s ease-in-out;
+        `;
+                overlay.innerHTML = `✅ Đã quét: ${qrData}`;
+
+                video.parentElement.style.position = 'relative';
+                video.parentElement.appendChild(overlay);
+
+                setTimeout(() => {
+                    overlay.remove();
+                }, 1000);
+            }
+
+            showToastMessage(`Đã quét được mã: ${qrData}`, 'success');
+        };
+
+        const loadingDelete = ref(null);
+        const loadingCreateInvoice = ref(false);
+        const confirmDeleteHoaDon = async (hoaDon) => {
+            const index = hoaDonCho.value.findIndex((hd) => hd.id === hoaDon.id) + 1;
+            const confirmMessage = `Bạn có chắc muốn xóa hóa đơn ${index}?\n\nLưu ý: Hành động này không thể hoàn tác.`;
+
+            if (!confirm(confirmMessage)) return;
+
+            await xoaHoaDonWithLoading(hoaDon);
+        };
+
+        const xoaHoaDonWithLoading = async (hoaDon) => {
+            // Set loading state
+            loadingDelete.value = hoaDon.id;
+
+            try {
+                console.log('🗑️ [DELETE] Starting delete process for invoice:', hoaDon.id);
+
+                const data = await apiCall(`${API_BASE_URL}/hoa-don-cho/${hoaDon.id}`, {
+                    method: 'DELETE'
+                });
+
+                console.log('📡 [DELETE] API Response:', data);
+
+                if (data.success) {
+                    console.log('✅ [DELETE] Invoice deleted successfully');
+
+                    // Nếu đang xóa hóa đơn hiện tại, chọn hóa đơn khác
+                    if (hoaDonDangChon.value?.id === hoaDon.id) {
+                        const otherInvoice = hoaDonCho.value.find((hd) => hd.id !== hoaDon.id);
+                        if (otherInvoice) {
+                            hoaDonDangChon.value = otherInvoice;
+                        }
+                    }
+
+                    // Reload danh sách hóa đơn
+                    await layDanhSachHoaDonCho();
+
+                    // Show success message
+                    showToastMessage(`Đã xóa hóa đơn thành công!`, 'success');
+                } else {
+                    console.error('❌ [DELETE] Failed:', data.message);
+                    showToastMessage(data.message || 'Lỗi xóa hóa đơn', 'error');
+                }
+            } catch (error) {
+                console.error('❌ [DELETE] Error:', error);
+
+                // Handle different error types
+                if (error.message.includes('HTTP 404')) {
+                    showToastMessage('Hóa đơn không tồn tại hoặc đã bị xóa', 'error');
+                } else if (error.message.includes('HTTP 403')) {
+                    showToastMessage('Bạn không có quyền xóa hóa đơn này', 'error');
+                } else if (error.message.includes('HTTP 400')) {
+                    showToastMessage('Không thể xóa hóa đơn đã có sản phẩm', 'error');
+                } else {
+                    showToastMessage(`Lỗi xóa hóa đơn: ${error.message}`, 'error');
+                }
+
+                // Reload to sync state
+                await layDanhSachHoaDonCho();
+            } finally {
+                // Clear loading state
+                loadingDelete.value = null;
+            }
+        };
+
+        // Improved create invoice function
+        const taoHoaDonMoi = async () => {
+            if (loadingCreateInvoice.value) return;
+
+            loadingCreateInvoice.value = true;
+
+            try {
+                console.log('🆕 [CREATE] Creating new invoice...');
+
+                const nhanVienId = nhanVienInfo.value.maNhanVien || 1;
+                const data = await apiCall(`${API_BASE_URL}/hoa-don-cho/tao-moi?nhanVienId=${nhanVienId}`, {
+                    method: 'POST'
+                });
+
+                console.log('📡 [CREATE] API Response:', data);
+
+                if (data.success) {
+                    console.log('✅ [CREATE] Invoice created successfully');
+
+                    await layDanhSachHoaDonCho();
+                    showToastMessage('Tạo hóa đơn mới thành công!', 'success');
+
+                    // Auto select the new invoice
+                    const newInvoice = hoaDonCho.value[hoaDonCho.value.length - 1];
+                    if (newInvoice) {
+                        await chonHoaDon(newInvoice);
+                    }
+                } else {
+                    console.error('❌ [CREATE] Failed:', data.message);
+                    showToastMessage(data.message || 'Lỗi tạo hóa đơn', 'error');
+                }
+            } catch (error) {
+                console.error('❌ [CREATE] Error:', error);
+                showToastMessage(`Lỗi tạo hóa đơn: ${error.message}`, 'error');
+            } finally {
+                loadingCreateInvoice.value = false;
+            }
+        };
 
         // =================== RETURN ===================
         return {
+            loadingDelete,
+            loadingCreateInvoice,
+            confirmDeleteHoaDon,
+            xoaHoaDonWithLoading,
             // Reactive Data
             nhanVienInfo,
             hoaDonCho,
@@ -2862,11 +1997,1141 @@ export default {
             stopCamera,
             retryCamera,
             clearQrCode,
-            quetQR
+            quetQR,
+            manualScanFrame,
+            loadJsQRFromCDN,
+            showQRDetectionSuccess,
+            enhanceImageForQR
         };
     }
 };
 </script>
+<template>
+    <div class="pos-container">
+        <!-- Toast Notifications -->
+        <div class="toast-container position-fixed end-0 top-0 p-3" style="z-index: 1100">
+            <div v-if="showToast" class="toast show" :class="{ 'text-bg-success': toastType === 'success', 'text-bg-danger': toastType === 'error' }">
+                <div class="toast-body">
+                    {{ toastMessage }}
+                </div>
+            </div>
+        </div>
+
+        <div class="pos-layout d-flex">
+            <!-- Left Panel - Products -->
+            <div class="left-panel col-lg-8 border-end bg-light">
+                <!-- Header -->
+                <div class="bg-primary p-3 text-white">
+                    <div class="row align-items-center g-3">
+                        <div class="col-auto">
+                            <h4 class="mb-0">
+                                <i class="bi bi-shop me-2"></i>
+                                Bán Hàng Tại Quầy
+                            </h4>
+                        </div>
+
+                        <div class="col">
+                            <div class="input-group">
+                                <input ref="searchInput" v-model="searchKeyword" @input="debounceSearch" type="text" placeholder="Tìm sản phẩm hoặc quét mã QR..." class="form-control" />
+                                <button @click="showQrScanner = true" class="btn btn-outline-light">
+                                    <i class="bi bi-qr-code-scan"></i>
+                                </button>
+                                <button @click="timKiemSanPham(0)" class="btn btn-light">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="col-auto">
+                            <div class="text-center">
+                                <small class="d-block opacity-75">Tìm thấy</small>
+                                <strong>{{ tongSoPhanTu }} sản phẩm</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="bg-info p-3 text-white">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Danh mục</label>
+                            <select v-model="filters.danhMucId" @change="applyFilters" class="form-select form-select-sm">
+                                <option value="">Tất cả danh mục</option>
+                                <option v-for="dm in danhSachDanhMuc" :key="dm.id" :value="dm.id">
+                                    {{ dm.tenDanhMuc }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Thương hiệu</label>
+                            <select v-model="filters.thuongHieuId" @change="applyFilters" class="form-select form-select-sm">
+                                <option value="">Tất cả thương hiệu</option>
+                                <option v-for="th in danhSachThuongHieu" :key="th.id" :value="th.id">
+                                    {{ th.tenThuongHieu }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1">Khoảng giá</label>
+                            <div class="input-group input-group-sm">
+                                <input v-model="filters.minPrice" @input="debouncePriceFilter" type="number" placeholder="Từ" class="form-control" />
+                                <span class="input-group-text">-</span>
+                                <input v-model="filters.maxPrice" @input="debouncePriceFilter" type="number" placeholder="Đến" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="col-md-2">
+                            <button @click="resetFilters" class="btn btn-light btn-sm w-100"><i class="bi bi-arrow-clockwise me-1"></i>Reset</button>
+                        </div>
+                    </div>
+
+                    <!-- Employee Info -->
+                    <div class="row mt-3">
+                        <div class="col">
+                            <div class="card border-0 bg-white bg-opacity-25">
+                                <div class="card-body p-2">
+                                    <div class="row text-center">
+                                        <div class="col">
+                                            <small class="d-block opacity-75">Nhân viên</small>
+                                            <strong class="small">{{ nhanVienInfo.tenNhanVien || 'Nhân viên' }}</strong>
+                                        </div>
+                                        <div class="col">
+                                            <small class="d-block opacity-75">Mã NV</small>
+                                            <strong class="small">{{ nhanVienInfo.maNhanVien || '001' }}</strong>
+                                        </div>
+                                        <div class="col">
+                                            <small class="d-block opacity-75">Sản phẩm</small>
+                                            <strong class="small">{{ danhSachSanPham.length }}/{{ tongSoPhanTu }}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products Section -->
+                <div class="flex-grow-1 p-3" style="height: calc(100vh - 200px); overflow-y: auto">
+                    <!-- Loading -->
+                    <div v-if="loading" class="py-5 text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Đang tải...</span>
+                        </div>
+                        <p class="text-muted mt-3">Đang tải sản phẩm...</p>
+                    </div>
+
+                    <!-- Error -->
+                    <div v-if="error" class="alert alert-danger text-center">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        {{ error }}
+                        <button @click="timKiemSanPham(0)" class="btn btn-outline-danger btn-sm mt-2"><i class="bi bi-arrow-clockwise me-1"></i>Thử lại</button>
+                    </div>
+
+                    <!-- Products -->
+                    <div v-if="!loading && !error">
+                        <!-- Empty State -->
+                        <div v-if="danhSachSanPham.length === 0" class="py-5 text-center">
+                            <i class="bi bi-search display-1 text-muted"></i>
+                            <h5 class="mt-3">Không tìm thấy sản phẩm</h5>
+                            <p class="text-muted">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc</p>
+                        </div>
+
+                        <!-- Products Grid -->
+                        <div v-else class="row g-3">
+                            <div v-for="product in danhSachSanPham" :key="product.id" class="col-md-6">
+                                <div class="card product-card h-100" @click="xemChiTietSanPham(product)" style="cursor: pointer">
+                                    <div class="position-relative" style="height: 220px; overflow: hidden">
+                                        <img :src="getProductImage(product)" :alt="product.tenSanPham" @error="handleImageError" class="card-img-top w-100 h-100" style="object-fit: cover" />
+
+                                        <!-- Discount Badge - Top Left -->
+                                        <div v-if="product.giaGoc && product.giaGoc > product.giaBan" class="position-absolute start-0 top-0 m-2">
+                                            <span class="badge bg-success">-{{ Math.round((1 - product.giaBan / product.giaGoc) * 100) }}%</span>
+                                        </div>
+
+                                        <!-- Stock Badge - Top Right -->
+                                        <div class="position-absolute end-0 top-0 m-2">
+                                            <span v-if="product.soLuong <= 0" class="badge bg-danger">Hết hàng</span>
+                                            <span v-else-if="product.soLuong <= 5" class="badge bg-warning text-dark">Còn {{ product.soLuong }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="card-body p-3">
+                                        <h6 class="card-title mb-3" :title="product.tenSanPham" style="height: 2.8rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 1rem; font-weight: 600">
+                                            {{ product.tenSanPham }}
+                                        </h6>
+
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <div class="d-flex align-items-center">
+                                                <span class="rounded-circle me-2" :style="{ backgroundColor: getMauHex(product.mauSac?.tenMau), width: '18px', height: '18px', border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }"></span>
+                                                <small class="text-muted">{{ product.mauSac?.tenMau || 'N/A' }}</small>
+                                            </div>
+                                            <span class="badge bg-light text-dark">Size: {{ product.kichCo?.tenKichCo || 'N/A' }}</span>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <div class="d-flex align-items-baseline gap-2">
+                                                <span class="h5 text-danger fw-bold mb-0">{{ formatPrice(product.giaBan) }}</span>
+                                                <small v-if="product.giaGoc && product.giaGoc > product.giaBan" class="text-muted text-decoration-line-through">
+                                                    {{ formatPrice(product.giaGoc) }}
+                                                </small>
+                                            </div>
+                                        </div>
+
+                                        <button @click.stop="themVaoHoaDon(product)" :disabled="product.soLuong <= 0" class="btn btn-sm w-100" :class="product.soLuong <= 0 ? 'btn-secondary' : 'btn-primary'">
+                                            <i class="bi bi-cart-plus me-1"></i>
+                                            {{ product.soLuong <= 0 ? 'Hết hàng' : 'Thêm vào hóa đơn' }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pagination -->
+                        <nav v-if="tongSoTrang > 1" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                <li class="page-item" :class="{ disabled: trangHienTai === 0 }">
+                                    <a class="page-link" @click="chuyenTrang(trangHienTai - 1)" href="#" @click.prevent>
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                    q
+                                </li>
+                                <li class="page-item active">
+                                    <span class="page-link">{{ trangHienTai + 1 }} / {{ tongSoTrang }}</span>
+                                </li>
+                                <li class="page-item" :class="{ disabled: trangHienTai >= tongSoTrang - 1 }">
+                                    <a class="page-link" @click="chuyenTrang(trangHienTai + 1)" href="#" @click.prevent>
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Invoice -->
+            <div class="right-panel col-lg-4 bg-white">
+                <!-- Invoice Tabs -->
+                <div class="bg-primary p-2 text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex flex-grow-1 gap-1 overflow-auto">
+                            <div v-for="(hoaDon, index) in hoaDonCho" :key="hoaDon.id" class="position-relative">
+                                <button class="btn btn-sm position-relative" :class="hoaDonDangChon?.id === hoaDon.id ? 'btn-light text-dark' : 'btn-outline-light'" @click="chonHoaDon(hoaDon)" :disabled="loadingDelete === hoaDon.id">
+                                    <span v-if="loadingDelete === hoaDon.id" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    <i v-else class="bi bi-file-text me-1"></i>
+                                    HĐ{{ index + 1 }}
+                                </button>
+
+                                <!-- Button xóa riêng -->
+                                <button
+                                    v-if="hoaDonCho.length > 1"
+                                    @click.stop="confirmDeleteHoaDon(hoaDon)"
+                                    :disabled="loadingDelete === hoaDon.id"
+                                    class="btn btn-danger btn-sm position-absolute"
+                                    style="top: -8px; right: -8px; width: 20px; height: 20px; padding: 0; border-radius: 50%; font-size: 0.7rem; z-index: 10"
+                                    :title="`Xóa hóa đơn ${index + 1}`"
+                                >
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button @click="taoHoaDonMoi" :disabled="loadingCreateInvoice" class="btn btn-success btn-sm ms-2 flex-shrink-0">
+                            <span v-if="loadingCreateInvoice" class="spinner-border spinner-border-sm me-1"></span>
+                            <i v-else class="bi bi-plus-lg me-1"></i>
+                            {{ loadingCreateInvoice ? 'Đang tạo...' : 'Tạo HĐ' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Invoice Content -->
+                <div v-if="hoaDonDangChon" class="p-3" style="height: calc(100vh - 60px); overflow-y: auto">
+                    <!-- Customer Section -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-person me-2"></i>Khách hàng</h6>
+                            <button @click="showCustomerModal = true" class="btn btn-outline-primary btn-sm"><i class="bi bi-search me-1"></i>Chọn</button>
+                        </div>
+                        <div class="card-body">
+                            <div v-if="khachHang" class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <!-- ✅ SỬA: Hiển thị đầy đủ thông tin -->
+                                    <div class="fw-bold">{{ khachHang.hoTen || 'Chưa có tên' }}</div>
+                                    <small class="text-muted d-block">📞 {{ khachHang.sdt || 'Chưa có SĐT' }}</small>
+                                    <small class="text-muted d-block" v-if="khachHang.email"> ✉️ {{ khachHang.email }} </small>
+                                    <div class="small mt-1 text-primary">💎 Điểm tích lũy: {{ khachHang.diemTichLuy || 0 }} điểm</div>
+                                </div>
+                                <button @click="boKhachHang" class="btn btn-outline-danger btn-sm" title="Bỏ khách hàng">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                            <div v-else class="text-muted py-2 text-center">
+                                <i class="bi bi-person me-2"></i>Khách lẻ
+                                <div class="small mt-1">Chưa chọn khách hàng</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Voucher Section -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-ticket me-2"></i>Voucher</h6>
+                            <button @click="showVoucherModal = true" class="btn btn-outline-success btn-sm"><i class="bi bi-search me-1"></i>Áp dụng</button>
+                        </div>
+                        <div class="card-body">
+                            <div v-if="voucher" class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center flex-grow-1">
+                                    <!-- ✅ THÊM: Hình ảnh voucher đã chọn -->
+                                    <div class="position-relative me-3" style="width: 48px; height: 48px; flex-shrink: 0">
+                                        <img :src="getVoucherImage(voucher)" :alt="voucher.tenVoucher" @error="handleVoucherImageError" class="w-100 h-100 rounded-3 object-fit-cover border-success border" style="border-width: 2px !important" />
+                                        <!-- Badge success indicator -->
+                                        <span class="position-absolute badge bg-success rounded-circle start-0 top-0" style="width: 16px; height: 16px; transform: translate(-50%, -50%); font-size: 0.6rem">
+                                            <i class="bi bi-check"></i>
+                                        </span>
+                                    </div>
+
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-truncate" style="max-width: 200px">{{ voucher.tenVoucher }}</div>
+                                        <div class="text-success small">
+                                            <i class="bi bi-tag-fill me-1"></i>
+                                            <span v-if="voucher.loaiGiamGia === 'PHAN_TRAM'"> Giảm {{ voucher.giaTriGiam }}% </span>
+                                            <span v-else> Giảm {{ formatPrice(voucher.giaTriGiam) }} </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button @click="boVoucher" class="btn btn-outline-danger btn-sm ms-2" title="Bỏ voucher">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+
+                            <div v-else class="text-muted py-2 text-center">
+                                <div class="mb-2">
+                                    <i class="bi bi-ticket display-6 text-muted"></i>
+                                </div>
+                                <div>Chưa có voucher</div>
+                                <small class="text-muted">Nhấn "Áp dụng" để chọn voucher</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cart Items -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-cart me-2"></i>Sản phẩm</h6>
+                            <span class="badge bg-primary">{{ tongQuan.soLuongSanPham }} loại - {{ tongQuan.tongSoLuong }} sp</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div v-if="sanPhamDaChon.length === 0" class="text-muted py-4 text-center">
+                                <i class="bi bi-cart display-4"></i>
+                                <p class="mt-2">Chưa có sản phẩm nào</p>
+                            </div>
+                            <div v-else style="max-height: 300px; overflow-y: auto">
+                                <div v-for="item in sanPhamDaChon" :key="`cart-item-${item.id || item.chiTietSanPhamId}`" class="d-flex align-items-start border-bottom gap-3 p-3">
+                                    <div class="position-relative flex-shrink-0" style="width: 50px; height: 50px">
+                                        <img :src="getProductImage(item)" :alt="item.tenSanPham || 'Sản phẩm'" @error="handleImageError" class="w-100 h-100 rounded" style="object-fit: cover" />
+                                        <div
+                                            class="position-absolute rounded-circle bottom-0 end-0"
+                                            :style="{ backgroundColor: getMauHex(item.mauSac?.tenMau), width: '12px', height: '12px', border: '2px solid white' }"
+                                            :title="item.mauSac?.tenMau || 'N/A'"
+                                        ></div>
+                                    </div>
+
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="d-flex justify-content-between align-items-start mb-1">
+                                            <h6 class="text-truncate mb-0 pe-2" :title="item.tenSanPham || 'Sản phẩm'">
+                                                {{ item.tenSanPham || 'Sản phẩm' }}
+                                            </h6>
+                                            <button @click="xoaKhoiGioHang(item)" class="btn btn-sm btn-outline-danger flex-shrink-0" title="Xóa sản phẩm">
+                                                <i class="bi bi-x-lg" style="font-size: 0.75rem"></i>
+                                            </button>
+                                        </div>
+
+                                        <div class="d-flex mb-2 flex-wrap gap-1">
+                                            <span class="badge bg-info text-white">
+                                                <span class="rounded-circle d-inline-block me-1" :style="{ backgroundColor: getMauHex(item.mauSac?.tenMau), width: '8px', height: '8px' }"></span>
+                                                {{ item.mauSac?.tenMau || 'N/A' }}
+                                            </span>
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-rulers me-1" style="font-size: 0.75rem"></i>
+                                                {{ item.kichCo?.tenKichCo || 'N/A' }}
+                                            </span>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="fw-bold text-danger">{{ formatPrice(Number(item.giaBan) || 0) }}</span>
+                                                <small v-if="item.giaGoc && Number(item.giaGoc) > Number(item.giaBan)" class="text-muted text-decoration-line-through ms-1">
+                                                    {{ formatPrice(Number(item.giaGoc)) }}
+                                                </small>
+                                            </div>
+
+                                            <div class="d-flex align-items-center gap-1">
+                                                <button @click="giamSoLuong(item)" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 28px; height: 28px" title="Giảm số lượng">
+                                                    <i class="bi bi-dash"></i>
+                                                </button>
+                                                <span class="fw-bold mx-2">{{ Number(item.soLuongDaChon) || 0 }}</span>
+                                                <button
+                                                    @click="tangSoLuong(item)"
+                                                    class="btn btn-outline-secondary btn-sm rounded-circle p-1"
+                                                    style="width: 28px; height: 28px"
+                                                    :disabled="(Number(item.soLuongDaChon) || 0) >= (Number(item.soLuong) || 999)"
+                                                    title="Tăng số lượng"
+                                                >
+                                                    <i class="bi bi-plus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Tạm tính ({{ tongQuan.tongSoLuong }} sản phẩm):</span>
+                                <span>{{ formatPrice(tongQuan.tongTienGoc) }}</span>
+                            </div>
+                            <div v-if="tongQuan.tongTienKhuyenMai < tongQuan.tongTienGoc" class="d-flex justify-content-between text-success mb-2">
+                                <span>Khuyến mãi:</span>
+                                <span>-{{ formatPrice(tongQuan.tongTienGoc - tongQuan.tongTienKhuyenMai) }}</span>
+                            </div>
+                            <div v-if="voucher" class="d-flex justify-content-between text-success mb-2">
+                                <span>Voucher:</span>
+                                <span>-{{ formatPrice(tongQuan.tongTienVoucher) }}</span>
+                            </div>
+                            <hr />
+                            <div class="d-flex justify-content-between fw-bold h5">
+                                <span>Tổng thanh toán:</span>
+                                <span class="text-danger">{{ formatPrice(tongQuan.tongTienThanhToan) }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Button -->
+                    <button @click="showPaymentModal = true" :disabled="sanPhamDaChon.length === 0" class="btn w-100 btn-lg" :class="sanPhamDaChon.length === 0 ? 'btn-secondary' : 'btn-success'">
+                        <i class="bi bi-credit-card me-2"></i>
+                        Thanh toán ({{ formatPrice(tongQuan.tongTienThanhToan) }})
+                    </button>
+                </div>
+
+                <!-- No Invoice Selected -->
+                <div v-else class="d-flex flex-column justify-content-center align-items-center h-100 text-muted">
+                    <i class="bi bi-file-text display-1"></i>
+                    <h5 class="mt-3">Chọn hoặc tạo hóa đơn</h5>
+                    <button @click="taoHoaDonMoi" class="btn btn-primary mt-3"><i class="bi bi-plus-lg me-1"></i>Tạo hóa đơn mới</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modals -->
+        <!-- Customer Selection Modal -->
+        <div v-if="showCustomerModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-person me-2"></i>Chọn khách hàng</h5>
+                        <button @click="showCustomerModal = false" type="button" class="btn-close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <div class="input-group">
+                                <input v-model="customerSearchKeyword" @input="debounceCustomerSearch" type="text" placeholder="Tìm khách hàng theo tên hoặc SĐT" class="form-control" />
+                                <button @click="showCreateCustomerForm = true" class="btn btn-success"><i class="bi bi-person-plus me-1"></i>Tạo mới</button>
+                            </div>
+                        </div>
+
+                        <div style="max-height: 400px; overflow-y: auto">
+                            <div v-if="loadingCustomers" class="py-4 text-center">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2">Đang tìm kiếm...</p>
+                            </div>
+
+                            <div v-else-if="danhSachKhachHang.length === 0" class="text-muted py-4 text-center">
+                                <i class="bi bi-people display-4"></i>
+                                <p v-if="customerSearchKeyword" class="mt-2">Không tìm thấy khách hàng với từ khóa "{{ customerSearchKeyword }}"</p>
+                                <p v-else class="mt-2">Chưa có khách hàng nào trong hệ thống</p>
+                                <button
+                                    v-if="customerSearchKeyword"
+                                    @click="
+                                        customerSearchKeyword = '';
+                                        loadDanhSachKhachHang();
+                                    "
+                                    class="btn btn-outline-primary"
+                                >
+                                    Xem tất cả khách hàng
+                                </button>
+                            </div>
+
+                            <div v-else class="list-group">
+                                <button v-for="customer in danhSachKhachHang" :key="customer.id" @click="chonKhachHang(customer)" class="list-group-item list-group-item-action">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3 bg-primary text-white" style="width: 40px; height: 40px">
+                                                <i class="bi bi-person"></i>
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-1">{{ customer.hoTen }}</h6>
+                                                <p class="text-muted mb-1">{{ customer.sdt }}</p>
+                                                <small class="text-muted">{{ customer.email || 'Chưa có email' }}</small>
+                                            </div>
+                                        </div>
+                                        <span class="badge bg-primary">{{ customer.diemTichLuy || 0 }} điểm</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="showCustomerModal = false" class="btn btn-secondary">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Customer Form Modal -->
+        <div v-if="showCreateCustomerForm" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Tạo khách hàng mới</h5>
+                        <button @click="showCreateCustomerForm = false" type="button" class="btn-close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Họ tên <span class="text-danger">*</span></label>
+                            <input v-model="newCustomer.hoTen" type="text" placeholder="Nhập họ tên" class="form-control" :class="{ 'is-invalid': newCustomerErrors.hoTen }" />
+                            <div v-if="newCustomerErrors.hoTen" class="invalid-feedback">{{ newCustomerErrors.hoTen }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Số điện thoại <span class="text-danger">*</span></label>
+                            <input v-model="newCustomer.sdt" type="tel" placeholder="Nhập số điện thoại" class="form-control" :class="{ 'is-invalid': newCustomerErrors.sdt }" />
+                            <div v-if="newCustomerErrors.sdt" class="invalid-feedback">{{ newCustomerErrors.sdt }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input v-model="newCustomer.email" type="email" placeholder="Nhập email (không bắt buộc)" class="form-control" :class="{ 'is-invalid': newCustomerErrors.email }" />
+                            <div v-if="newCustomerErrors.email" class="invalid-feedback">{{ newCustomerErrors.email }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Địa chỉ</label>
+                            <textarea v-model="newCustomer.diaChi" placeholder="Nhập địa chỉ (không bắt buộc)" class="form-control" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="showCreateCustomerForm = false" class="btn btn-secondary">Hủy</button>
+                        <button @click="taoKhachHangMoi" :disabled="loadingCreateCustomer" class="btn btn-primary" :class="{ 'btn-secondary': loadingCreateCustomer }">
+                            <span v-if="loadingCreateCustomer" class="spinner-border spinner-border-sm me-2"></span>
+                            {{ loadingCreateCustomer ? 'Đang tạo...' : 'Tạo khách hàng' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voucher Selection Modal -->
+        <div v-if="showVoucherModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-ticket me-2"></i>Áp dụng voucher</h5>
+                        <button @click="showVoucherModal = false" type="button" class="btn-close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <div class="input-group">
+                                <input v-model="voucherCode" type="text" placeholder="Nhập mã voucher" class="form-control" @keyup.enter="kiemTraVoucher" />
+                                <button @click="kiemTraVoucher" :disabled="!voucherCode.trim() || loadingVoucherCheck" class="btn btn-success">
+                                    <span v-if="loadingVoucherCheck" class="spinner-border spinner-border-sm me-2"></span>
+                                    {{ loadingVoucherCheck ? 'Đang kiểm tra...' : 'Kiểm tra' }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="max-height: 400px; overflow-y: auto">
+                            <div v-if="loadingVouchers" class="py-4 text-center">
+                                <div class="spinner-border text-success" role="status"></div>
+                                <p class="mt-2">Đang tải voucher...</p>
+                            </div>
+
+                            <div v-else-if="danhSachVoucher.length === 0" class="text-muted py-4 text-center">
+                                <i class="bi bi-ticket display-4"></i>
+                                <p v-if="khachHang" class="mt-2">Không có voucher khả dụng cho khách hàng này</p>
+                                <p v-else-if="tongQuan.tongTienKhuyenMai > 0" class="mt-2">Không có voucher phù hợp với đơn hàng {{ formatPrice(tongQuan.tongTienKhuyenMai) }}</p>
+                                <p v-else class="mt-2">Không có voucher khả dụng</p>
+                                <button @click="layDanhSachVoucher()" class="btn btn-outline-success">Tải lại voucher</button>
+                            </div>
+
+                            <div v-else class="list-group">
+                                <button v-for="voucher_item in danhSachVoucher" :key="voucher_item.id" @click="chonVoucher(voucher_item)" class="list-group-item list-group-item-action p-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center flex-grow-1">
+                                            <!-- ✅ THÊM: Hiển thị hình ảnh voucher -->
+                                            <div class="position-relative me-3" style="width: 64px; height: 64px; flex-shrink: 0">
+                                                <img
+                                                    :src="getVoucherImage(voucher_item)"
+                                                    :alt="voucher_item.tenVoucher"
+                                                    @error="handleVoucherImageError"
+                                                    class="w-100 h-100 rounded-3 object-fit-cover border"
+                                                    style="border: 2px solid #e9ecef !important"
+                                                />
+                                                <!-- Badge loại voucher -->
+                                                <span class="position-absolute badge bg-success rounded-pill start-0 top-0" style="font-size: 0.6rem; transform: translate(-25%, -25%)">
+                                                    <i class="bi bi-ticket-fill"></i>
+                                                </span>
+                                            </div>
+
+                                            <div class="flex-grow-1">
+                                                <h6 class="fw-bold mb-1">{{ voucher_item.tenVoucher }}</h6>
+                                                <!-- ✅ SỬA: Hiển thị thông tin giảm giá rõ ràng hơn -->
+                                                <p class="text-muted small mb-1">
+                                                    <i class="bi bi-tag-fill text-success me-1"></i>
+                                                    <span v-if="voucher_item.loaiGiamGia === 'PHAN_TRAM'">
+                                                        Giảm {{ voucher_item.giaTriGiam }}%
+                                                        <span class="text-warning">(tối đa {{ formatPrice(voucher_item.giaTriGiamToiDa) }})</span>
+                                                    </span>
+                                                    <span v-else> Giảm {{ formatPrice(voucher_item.giaTriGiam) }} </span>
+                                                </p>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <small class="text-success">
+                                                        <i class="bi bi-cart-check me-1"></i>
+                                                        Đơn tối thiểu: {{ formatPrice(voucher_item.giaTriDonHangToiThieu || 0) }}
+                                                    </small>
+                                                    <small class="text-info">
+                                                        <i class="bi bi-box me-1"></i>
+                                                        Còn: {{ voucher_item.soLuongConLai }} lượt
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="ms-3 text-end">
+                                            <!-- ✅ SỬA: Badge giá trị giảm đẹp hơn -->
+                                            <div class="mb-2">
+                                                <span v-if="voucher_item.loaiGiamGia === 'PHAN_TRAM'" class="badge bg-gradient fs-6 bg-primary px-3 py-2"> -{{ voucher_item.giaTriGiam }}% </span>
+                                                <span v-else class="badge bg-gradient bg-success fs-6 px-3 py-2"> -{{ formatPrice(voucher_item.giaTriGiam) }} </span>
+                                            </div>
+                                            <div class="small text-muted">
+                                                <i class="bi bi-calendar3 me-1"></i>
+                                                HSD: {{ formatDate(voucher_item.ngayKetThuc) }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="showVoucherModal = false" class="btn btn-secondary">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Scanner Modal với jsQR -->
+        <div v-if="showQrScanner" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-qr-code-scan me-2"></i>Quét mã QR</h5>
+                        <button @click="showQrScanner = false" type="button" class="btn-close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Tab selection -->
+                        <ul class="nav nav-tabs mb-3">
+                            <li class="nav-item">
+                                <button class="nav-link" :class="{ active: qrMode === 'manual' }" @click="switchQrMode('manual')"><i class="bi bi-keyboard me-1"></i>Nhập thủ công</button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link" :class="{ active: qrMode === 'camera' }" @click="switchQrMode('camera')"><i class="bi bi-camera me-1"></i>Quét bằng camera</button>
+                            </li>
+                        </ul>
+
+                        <!-- Manual input -->
+                        <div v-if="qrMode === 'manual'" class="mb-3">
+                            <label class="form-label">Mã QR sản phẩm</label>
+                            <input ref="qrInput" v-model="qrCode" type="text" placeholder="Nhập mã QR sản phẩm" @keyup.enter="quetQR" class="form-control" />
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Nhập mã QR hoặc scan từ nhãn sản phẩm
+                            </div>
+                        </div>
+
+                        <!-- Camera scanner -->
+                        <div v-if="qrMode === 'camera'" class="mb-3">
+                            <label class="form-label">Camera Scanner</label>
+
+                            <!-- Camera container -->
+                            <div class="mb-2 rounded border p-2" style="min-height: 300px">
+                                <!-- Default state -->
+                                <div v-if="!cameraStarted && !cameraError" class="qr-loading-container">
+                                    <div class="text-center">
+                                        <i class="bi bi-camera display-4 text-muted"></i>
+                                        <p class="text-muted mt-3">Nhấn "Bắt đầu quét" để khởi động camera</p>
+                                        <button @click="startCamera" class="btn btn-success"><i class="bi bi-play me-1"></i>Bắt đầu quét</button>
+                                    </div>
+                                </div>
+
+                                <!-- Camera view -->
+                                <div v-show="cameraStarted && !cameraError" class="position-relative text-center">
+                                    <div class="video-container position-relative d-inline-block">
+                                        <video id="qr-video" autoplay playsinline muted style="width: 100%; max-width: 400px; border-radius: 8px; background: #000"></video>
+
+                                        <!-- QR Scanner Overlay -->
+                                        <div class="qr-overlay position-absolute top-50 start-50 translate-middle">
+                                            <div class="qr-scanner-box"></div>
+                                            <div class="mt-2 text-center text-white">
+                                                <small>Đưa mã QR vào khung vuông</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <canvas id="qr-canvas" style="display: none"></canvas>
+
+                                    <div class="mt-2">
+                                        <button @click="stopCamera" class="btn btn-danger btn-sm"><i class="bi bi-stop me-1"></i>Dừng camera</button>
+                                        <button @click="manualScanFrame" class="btn btn-info btn-sm ms-2"><i class="bi bi-search me-1"></i>Quét thủ công</button>
+                                    </div>
+
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            Đang quét tự động... Đưa QR code vào camera
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- Error state -->
+                                <div v-if="cameraError" class="qr-error-container">
+                                    <i class="bi bi-exclamation-triangle display-4 mb-3"></i>
+                                    <div class="text-center">
+                                        <p class="mb-3">{{ cameraError }}</p>
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <button @click="retryCamera" class="btn btn-warning btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Thử lại</button>
+                                            <button @click="switchQrMode('manual')" class="btn btn-outline-secondary btn-sm"><i class="bi bi-keyboard me-1"></i>Nhập thủ công</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- QR code result -->
+                            <div v-if="qrCode" class="qr-success-container">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                Đã quét được mã: <strong>{{ qrCode }}</strong>
+                            </div>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="d-flex gap-2">
+                            <button @click="quetQR" :disabled="!qrCode.trim() || loadingQR" class="btn btn-primary flex-grow-1">
+                                <span v-if="loadingQR" class="spinner-border spinner-border-sm me-2"></span>
+                                <i v-else class="bi bi-search me-1"></i>
+                                {{ loadingQR ? 'Đang tìm...' : 'Tìm sản phẩm' }}
+                            </button>
+
+                            <button @click="clearQrCode" v-if="qrCode" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+
+                        <!-- QR History -->
+                        <div v-if="qrHistory.length > 0" class="mt-3">
+                            <h6 class="text-muted"><i class="bi bi-clock-history me-1"></i>Lịch sử quét gần đây</h6>
+                            <div class="d-flex flex-wrap gap-1">
+                                <button v-for="item in qrHistory.slice(0, 5)" :key="item.qrCode" @click="qrCode = item.qrCode" class="btn btn-outline-info btn-sm" :title="item.productName">
+                                    {{ item.qrCode }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Detail Modal -->
+        <div v-if="showProductDetail" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-eye me-2"></i>Chi tiết sản phẩm</h5>
+                        <button @click="showProductDetail = false" type="button" class="btn-close"></button>
+                    </div>
+                    <div class="modal-body" v-if="sanPhamDangXem">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <img :src="getProductImage(sanPhamDangXem)" :alt="sanPhamDangXem.tenSanPham" class="img-fluid rounded shadow" />
+                            </div>
+                            <div class="col-md-6">
+                                <h2 class="mb-3">{{ sanPhamDangXem.tenSanPham }}</h2>
+                                <h3 class="text-danger mb-3">{{ formatPrice(sanPhamDangXem.giaBan) }}</h3>
+
+                                <div v-if="sanPhamDangXem.giaGoc && sanPhamDangXem.giaGoc > sanPhamDangXem.giaBan" class="d-flex align-items-center mb-3 gap-3">
+                                    <span class="text-muted text-decoration-line-through h5">{{ formatPrice(sanPhamDangXem.giaGoc) }}</span>
+                                    <span class="badge bg-success">Giảm {{ Math.round((1 - sanPhamDangXem.giaBan / sanPhamDangXem.giaGoc) * 100) }}%</span>
+                                </div>
+
+                                <div class="row mb-4">
+                                    <div class="col-sm-6">
+                                        <div class="mb-3">
+                                            <label class="form-label text-muted">Màu sắc</label>
+                                            <div class="d-flex align-items-center">
+                                                <div
+                                                    class="rounded-circle me-2"
+                                                    style="width: 24px; height: 24px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1)"
+                                                    :style="{ backgroundColor: getMauHex(sanPhamDangXem.mauSac?.tenMau) }"
+                                                ></div>
+                                                <span>{{ sanPhamDangXem.mauSac?.tenMau || 'Chưa có' }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-sm-6">
+                                        <div class="mb-3">
+                                            <label class="form-label text-muted">Kích cỡ</label>
+                                            <div>
+                                                <span class="badge bg-light text-dark fs-6">{{ sanPhamDangXem.kichCo?.tenKichCo || 'Chưa có' }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-sm-6">
+                                        <div class="mb-3">
+                                            <label class="form-label text-muted">Thương hiệu</label>
+                                            <div>{{ sanPhamDangXem.thuongHieu?.tenThuongHieu || 'Chưa có' }}</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-sm-6">
+                                        <div class="mb-3">
+                                            <label class="form-label text-muted">Tồn kho</label>
+                                            <div>
+                                                <span class="badge" :class="getStockBadgeClass(sanPhamDangXem.soLuong)"> {{ sanPhamDangXem.soLuong }} sản phẩm </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label">Số lượng</label>
+                                    <div class="d-flex align-items-center gap-2" style="width: 160px">
+                                        <button @click="giamSoLuongModal" :disabled="soLuongChon <= 1" class="btn btn-outline-secondary rounded-circle p-1" style="width: 32px; height: 32px">
+                                            <i class="bi bi-dash"></i>
+                                        </button>
+                                        <input v-model.number="soLuongChon" type="number" min="1" :max="sanPhamDangXem.soLuong" class="form-control text-center" />
+                                        <button @click="tangSoLuongModal" :disabled="soLuongChon >= sanPhamDangXem.soLuong" class="btn btn-outline-secondary rounded-circle p-1" style="width: 32px; height: 32px">
+                                            <i class="bi bi-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="showProductDetail = false" class="btn btn-secondary">Đóng</button>
+                        <button @click="themVaoHoaDonTuModal" :disabled="!sanPhamDangXem || sanPhamDangXem.soLuong <= 0" class="btn btn-primary" :class="{ 'btn-secondary': !sanPhamDangXem || sanPhamDangXem.soLuong <= 0 }">
+                            <i class="bi bi-cart-plus me-1"></i>
+                            Thêm {{ soLuongChon }} vào hóa đơn
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Modal -->
+        <div v-if="showPaymentModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-credit-card me-2"></i>Thanh toán</h5>
+                        <button @click="showPaymentModal = false" type="button" class="btn-close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Thông tin thanh toán</h5>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Tổng tiền</label>
+                                    <input type="text" :value="formatPrice(tongQuan.tongTienThanhToan)" readonly class="form-control bg-light fw-bold text-danger" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Tiền mặt</label>
+                                    <input v-model.number="thongTinThanhToan.tienMat" type="number" min="0" class="form-control" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Chuyển khoản</label>
+                                    <input v-model.number="thongTinThanhToan.chuyenKhoan" type="number" min="0" class="form-control" />
+                                </div>
+
+                                <div v-if="khachHang && khachHang.diemTichLuy > 0" class="mb-3">
+                                    <label class="form-label">
+                                        Sử dụng điểm ({{ khachHang.diemTichLuy }} điểm có sẵn)
+                                        <small class="text-muted">- 1 điểm = 1.000₫</small>
+                                    </label>
+                                    <div class="input-group">
+                                        <input
+                                            v-model.number="thongTinThanhToan.diemSuDung"
+                                            type="number"
+                                            min="0"
+                                            :max="khachHang.diemTichLuy"
+                                            :class="{ 'is-invalid': !validateDiemSuDung() }"
+                                            placeholder="Nhập số điểm muốn sử dụng"
+                                            class="form-control"
+                                        />
+                                        <span class="input-group-text">điểm</span>
+                                    </div>
+                                    <div v-if="!validateDiemSuDung()" class="text-danger small">Số điểm không hợp lệ. Tối đa {{ khachHang.diemTichLuy }} điểm.</div>
+                                    <div v-if="thongTinThanhToan.diemSuDung > 0" class="text-success small">Giảm {{ formatPrice(thongTinThanhToan.diemSuDung * 1000) }}</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Ghi chú</label>
+                                    <textarea v-model="thongTinThanhToan.ghiChu" class="form-control" rows="3"></textarea>
+                                </div>
+
+                                <!-- Quick amount buttons -->
+                                <div class="mb-3">
+                                    <label class="form-label">Tiền mặt nhanh:</label>
+                                    <div class="row g-2">
+                                        <div v-for="amount in quickAmounts" :key="amount" class="col-6">
+                                            <button @click="chonTienNhanh(amount)" class="btn btn-outline-primary btn-sm w-100">
+                                                {{ formatPrice(amount) }}
+                                            </button>
+                                        </div>
+                                        <div class="col-12">
+                                            <button @click="chonTienVuaVua" class="btn btn-primary btn-sm w-100">Vừa vặn</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Tóm tắt đơn hàng</h5>
+
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Tạm tính:</span>
+                                            <span>{{ formatPrice(tongQuan.tongTienGoc) }}</span>
+                                        </div>
+                                        <div v-if="tongQuan.tongTienKhuyenMai < tongQuan.tongTienGoc" class="d-flex justify-content-between text-success mb-2">
+                                            <span>Khuyến mãi:</span>
+                                            <span>-{{ formatPrice(tongQuan.tongTienGoc - tongQuan.tongTienKhuyenMai) }}</span>
+                                        </div>
+                                        <div v-if="voucher" class="d-flex justify-content-between text-success mb-2">
+                                            <span>Voucher:</span>
+                                            <span>-{{ formatPrice(tongQuan.tongTienVoucher) }}</span>
+                                        </div>
+                                        <div v-if="thongTinThanhToan.diemSuDung > 0" class="d-flex justify-content-between text-success mb-2">
+                                            <span>Điểm tích lũy:</span>
+                                            <span>-{{ formatPrice(thongTinThanhToan.diemSuDung * 1000) }}</span>
+                                        </div>
+                                        <hr />
+                                        <div class="d-flex justify-content-between fw-bold h5 mb-3">
+                                            <span>Tổng thanh toán:</span>
+                                            <span class="text-danger">{{ formatPrice(tinhTongThanhToan()) }}</span>
+                                        </div>
+                                        <hr />
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Tiền nhận:</span>
+                                            <span>{{ formatPrice(thongTinThanhToan.tienMat + thongTinThanhToan.chuyenKhoan) }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between" :class="tinhTienThua() >= 0 ? 'text-success' : 'text-danger'">
+                                            <span>{{ tinhTienThua() >= 0 ? 'Tiền thừa:' : 'Còn thiếu:' }}</span>
+                                            <span class="fw-bold">{{ formatPrice(Math.abs(tinhTienThua())) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="showPaymentModal = false" class="btn btn-secondary">Hủy</button>
+                        <button @click="xuLyThanhToan" :disabled="!coTheThanhToan() || loadingPayment" class="btn btn-success" :class="{ 'btn-secondary': !coTheThanhToan() || loadingPayment }">
+                            <span v-if="loadingPayment" class="spinner-border spinner-border-sm me-2"></span>
+                            {{ loadingPayment ? 'Đang xử lý...' : 'Xác nhận thanh toán' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Print Modal -->
+        <div v-if="showInvoicePrint" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-printer me-2"></i>Hóa đơn bán hàng</h5>
+                        <button @click="showInvoicePrint = false" type="button" class="btn-close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="invoice-print" class="invoice-print">
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <h2 class="fw-bold">BEE SHOES STORE</h2>
+                                    <p class="mb-1">Địa chỉ: 123 Đường ABC, Quận XYZ, TP.HCM</p>
+                                    <p class="mb-1">Điện thoại: 0123-456-789</p>
+                                    <p class="mb-0">Email: contact@beeshoes.com</p>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <h3 class="fw-bold">HÓA ĐƠN BÁN HÀNG</h3>
+                                    <p class="mb-1"><strong>Số:</strong> {{ hoaDonDaThanhToan?.maHoaDon || 'HD001' }}</p>
+                                    <p class="mb-1"><strong>Ngày:</strong> {{ formatDateTime(new Date()) }}</p>
+                                    <p class="mb-0"><strong>Nhân viên:</strong> {{ nhanVienInfo.tenNhanVien }}</p>
+                                </div>
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <h5>Thông tin khách hàng</h5>
+                                    <!-- ✅ SỬA: Sử dụng thông tin từ thongTinThanhToanCuoi hoặc khachHang hiện tại -->
+                                    <p class="mb-1">
+                                        <strong>Họ tên:</strong>
+                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.hoTen || khachHang?.hoTen || 'Khách lẻ' }}
+                                    </p>
+                                    <p class="mb-1">
+                                        <strong>Điện thoại:</strong>
+                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.sdt || khachHang?.sdt || 'N/A' }}
+                                    </p>
+                                    <p class="mb-1">
+                                        <strong>Email:</strong>
+                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.email || khachHang?.email || 'N/A' }}
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Điểm tích lũy:</strong>
+                                        {{ thongTinThanhToanCuoi?.khachHangInfo?.diemTichLuy || khachHang?.diemTichLuy || 0 }} điểm
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Thông tin thanh toán</h5>
+                                    <p class="mb-1"><strong>Tiền mặt:</strong> {{ formatPrice(thongTinThanhToanCuoi?.tienMat || 0) }}</p>
+                                    <p class="mb-1"><strong>Chuyển khoản:</strong> {{ formatPrice(thongTinThanhToanCuoi?.chuyenKhoan || 0) }}</p>
+                                    <p class="mb-1"><strong>Tiền thừa:</strong> {{ formatPrice(thongTinThanhToanCuoi?.tienThua || 0) }}</p>
+                                    <p class="mb-0" v-if="thongTinThanhToanCuoi?.diemSuDung > 0"><strong>Điểm đã sử dụng:</strong> {{ thongTinThanhToanCuoi.diemSuDung }} điểm</p>
+                                </div>
+                            </div>
+
+                            <!-- ✅ SỬA: Phần chữ ký cuối hóa đơn -->
+                            <div class="row mt-5">
+                                <div class="col-6 text-center">
+                                    <p class="fw-bold">Người bán</p>
+                                    <br /><br /><br />
+                                    <p>{{ nhanVienInfo.tenNhanVien }}</p>
+                                </div>
+                                <div class="col-6 text-center">
+                                    <p class="fw-bold">Người mua</p>
+                                    <br /><br /><br />
+                                    <!-- ✅ SỬA: Hiển thị tên khách hàng thực tế -->
+                                    <p>{{ thongTinThanhToanCuoi?.khachHangInfo?.hoTen || khachHang?.hoTen || '.........................' }}</p>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive mb-4">
+                                <table class="table-bordered table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>STT</th>
+                                            <th>Mã sản phẩm</th>
+                                            <th>Tên sản phẩm</th>
+                                            <th>Màu sắc</th>
+                                            <th>Kích cỡ</th>
+                                            <th class="text-end">Số lượng</th>
+                                            <th class="text-end">Đơn giá</th>
+                                            <th class="text-end">Thành tiền</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(item, index) in sanPhamDaThanhToan" :key="index">
+                                            <td>{{ index + 1 }}</td>
+                                            <td>{{ item.maSanPham }}</td>
+                                            <td>{{ item.tenSanPham }}</td>
+                                            <td>{{ item.mauSac?.tenMau || 'N/A' }}</td>
+                                            <td>{{ item.kichCo?.tenKichCo || 'N/A' }}</td>
+                                            <td class="text-end">{{ item.soLuongDaChon }}</td>
+                                            <td class="text-end">{{ formatPrice(item.giaBan) }}</td>
+                                            <td class="text-end">{{ formatPrice(item.giaBan * item.soLuongDaChon) }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 offset-md-6">
+                                    <table class="table">
+                                        <tr>
+                                            <td>Tạm tính:</td>
+                                            <td class="text-end">{{ formatPrice(tongQuanDaThanhToan.tongTienGoc) }}</td>
+                                        </tr>
+                                        <tr v-if="tongQuanDaThanhToan.tongTienKhuyenMai < tongQuanDaThanhToan.tongTienGoc">
+                                            <td>Khuyến mãi:</td>
+                                            <td class="text-end">-{{ formatPrice(tongQuanDaThanhToan.tongTienGoc - tongQuanDaThanhToan.tongTienKhuyenMai) }}</td>
+                                        </tr>
+                                        <tr v-if="voucherDaThanhToan">
+                                            <td>Voucher ({{ voucherDaThanhToan.tenVoucher }}):</td>
+                                            <td class="text-end">-{{ formatPrice(voucherDaThanhToan.giaTriGiam) }}</td>
+                                        </tr>
+                                        <tr v-if="thongTinThanhToanCuoi.diemSuDung > 0">
+                                            <td>Điểm tích lũy:</td>
+                                            <td class="text-end">-{{ formatPrice(thongTinThanhToanCuoi.diemSuDung * 1000) }}</td>
+                                        </tr>
+                                        <tr class="table-dark">
+                                            <td><strong>Tổng thanh toán:</strong></td>
+                                            <td class="text-end">
+                                                <strong>{{ formatPrice(tongQuanDaThanhToan.tongTienThanhToan) }}</strong>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Tiền mặt:</td>
+                                            <td class="text-end">{{ formatPrice(thongTinThanhToanCuoi.tienMat) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Tiền thừa:</td>
+                                            <td class="text-end">{{ formatPrice(thongTinThanhToanCuoi.tienThua) }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="my-4 text-center">
+                                <p class="fw-bold">Cảm ơn quý khách đã mua hàng!</p>
+                                <p>Quý khách vui lòng kiểm tra kỹ hàng hóa trước khi rời khỏi cửa hàng.</p>
+                                <p>Hàng đã mua chỉ được đổi trả trong vòng 7 ngày kể từ ngày mua.</p>
+                            </div>
+
+                            <div class="row mt-5">
+                                <div class="col-6 text-center">
+                                    <p class="fw-bold">Người bán</p>
+                                    <br /><br /><br />
+                                    <p>{{ nhanVienInfo.tenNhanVien }}</p>
+                                </div>
+                                <div class="col-6 text-center">
+                                    <p class="fw-bold">Người mua</p>
+                                    <br /><br /><br />
+                                    <p>{{ khachHang?.hoTen || '.........................' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="showInvoicePrint = false" class="btn btn-secondary">Đóng</button>
+                        <button @click="printInvoice" class="btn btn-primary"><i class="bi bi-printer me-1"></i>In hóa đơn</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
 <style scoped>
 /* Container & Layout */
 .pos-container {
@@ -3618,5 +3883,130 @@ export default {
         margin: 0.5rem;
         max-width: calc(100vw - 1rem);
     }
+}
+/* Thêm vào phần <style scoped> */
+
+.video-container {
+    position: relative;
+    display: inline-block;
+}
+
+.qr-overlay {
+    pointer-events: none;
+    z-index: 10;
+}
+
+.qr-scanner-box {
+    width: 200px;
+    height: 200px;
+    border: 3px solid #00ff00;
+    border-radius: 12px;
+    background: rgba(0, 255, 0, 0.1);
+    position: relative;
+    animation: pulse 2s infinite;
+}
+
+.qr-scanner-box::before,
+.qr-scanner-box::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #00ff00;
+}
+
+.qr-scanner-box::before {
+    top: -3px;
+    left: -3px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.qr-scanner-box::after {
+    bottom: -3px;
+    right: -3px;
+    border-left: none;
+    border-top: none;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 255, 0, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 0, 0);
+    }
+}
+
+/* Responsive overlay */
+@media (max-width: 768px) {
+    .qr-scanner-box {
+        width: 150px;
+        height: 150px;
+    }
+}
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+/* Custom styles for better UX */
+.invoice-tab {
+    transition: all 0.2s ease;
+    min-width: 80px;
+}
+
+.invoice-tab:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.invoice-tab:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.delete-btn {
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.delete-btn:hover:not(:disabled) {
+    transform: scale(1.1);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.delete-btn:active {
+    transform: scale(0.95);
+}
+
+/* Loading animation */
+.spinner-border-sm {
+    width: 0.8rem;
+    height: 0.8rem;
+}
+
+/* Improved positioning */
+.position-relative .btn-danger {
+    transition: opacity 0.2s ease;
+}
+
+.position-relative:not(:hover) .btn-danger {
+    opacity: 0.7;
+}
+
+.position-relative:hover .btn-danger {
+    opacity: 1;
 }
 </style>

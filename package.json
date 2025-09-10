@@ -11,13 +11,15 @@
         "lint": "eslint --fix . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
     },
     "dependencies": {
+        "5": "^0.0.1",
         "@popperjs/core": "^2.11.8",
         "@primeuix/themes": "^1.0.0",
         "axios": "^1.10.0",
-        "bootstrap": "^5.3.7",
+        "bootstrap": "^5.3.8",
         "bootstrap-icons": "^1.13.1",
         "chart.js": "3.3.2",
         "html5-qrcode": "^2.3.8",
+        "jsqr": "^1.4.0",
         "primeicons": "^7.0.0",
         "primevue": "^4.3.5",
         "swiper": "^10.2.0",
