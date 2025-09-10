@@ -52,7 +52,7 @@ const filters = ref({
 
 const statuses = ref([
     { label: 'ĐANG HOẠT ĐỘNG', value: 1 },
-    { label: 'NGỪNG HOẠT ĐỘNG', value: 0 }
+    { label: 'Không HOẠT ĐỘNG', value: 0 }
 ]);
 
 // Quick Add Dialogs
@@ -457,21 +457,9 @@ function generateQRCode(data) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}`;
 }
 
-function showProductQR(prod) {
-    const qrData = JSON.stringify({
-        type: 'Sản phẩm',
-        code: prod.maSanPham,
-    });
-    
-    currentQRData.value = generateQRCode(qrData);
-    currentQRTitle.value = `QR Code - Sản phẩm: ${prod.tenSanPham}`;
-    qrDialog.value = true;
-}
-
 function showDetailQR(detailData, productName) {
     const qrData = JSON.stringify({
-        type: 'Chi tiết sản phẩm',
-        code: detailData.maChiTiet,
+        maQR : detailData.maQR,
     });
     
     currentQRData.value = generateQRCode(qrData);
@@ -479,14 +467,69 @@ function showDetailQR(detailData, productName) {
     qrDetailDialog.value = true;
 }
 
-function downloadQR(filename) {
-    const link = document.createElement('a');
-    link.href = currentQRData.value;
-    link.download = `${filename}_QR.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+// Hàm tải xuống QR code đã được sửa
+async function downloadQR(filename) {
+    try {
+        // Fetch hình ảnh từ URL
+        const response = await fetch(currentQRData.value);
+        const blob = await response.blob();
+        
+        // Tạo URL blob local
+        const url = window.URL.createObjectURL(blob);
+        
+        // Tạo link download
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Tạo tên file với timestamp để tránh trùng
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        const finalFilename = `${filename}_${timestamp}_QR.png`;
+        
+        link.download = finalFilename;
+        
+        // Force download thay vì mở trong tab mới
+        link.setAttribute('download', finalFilename);
+        link.style.display = 'none';
+        
+        // Thêm vào DOM, click, rồi xóa
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Cleanup URL object
+        window.URL.revokeObjectURL(url);
+        
+        // Thông báo thành công
+        toast.add({
+            severity: 'success',
+            summary: 'Tải thành công',
+            detail: `File QR code đã được lưu: ${finalFilename}`,
+            life: 4000
+        });
+        
+    } catch (error) {
+        console.error('Lỗi khi tải QR code:', error);
+        
+        // Fallback: thử phương pháp cũ
+        const link = document.createElement('a');
+        link.href = currentQRData.value;
+        link.download = `${filename}_QR.png`;
+        link.target = '_blank';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.add({
+            severity: 'warn',
+            summary: 'Lưu ý',
+            detail: 'Nếu file mở trong tab mới, hãy click chuột phải và chọn "Save image as"',
+            life: 5000
+        });
+    }
 }
+
 
 // Hàm xóa tất cả biến thể trùng lặp
 function removeAllDuplicateVariants() {
@@ -1683,7 +1726,7 @@ function exportCSV() {
                 item.brand || '',
                 item.material || '',
                 item.sole || '',
-                item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động',
+                item.trangThai === 1 ? 'Hoạt động' : 'Không hoạt động',
                 item.ngayTao || ''
             ];
         });
@@ -1836,7 +1879,7 @@ function collapseAll() {
                 </Column>
                 <Column header="Trạng thái" sortable field="trangThai" style="min-width: 10rem">
                     <template #body="slotProps">
-                        <Tag :value="slotProps.data.trangThai === 1 ? 'HOẠT ĐỘNG' : 'NGỪNG'" :severity="getStatusLabel(slotProps.data.trangThai)" />
+                        <Tag :value="slotProps.data.trangThai === 1 ? 'Hoạt động' : 'Không hoạt động'" :severity="getStatusLabel(slotProps.data.trangThai)" />
                     </template>
                 </Column>
                 <Column header="Ngày tạo" sortable style="min-width: 10rem">
@@ -1846,10 +1889,10 @@ function collapseAll() {
                 </Column>
                 <Column :exportable="false" style="min-width: 12rem">
                     <template #body="slotProps">
-                        <div class="flex gap-1">
+                        <div class="flex gap-3">
                             <Button icon="pi pi-pencil" outlined rounded size="small" @click="editProduct(slotProps.data)" v-tooltip.top="'Chỉnh sửa'" :disabled="loading" />
                             <Button icon="pi pi-trash" outlined rounded size="small" severity="danger" @click="confirmDeleteProduct(slotProps.data)" v-tooltip.top="'Xóa'" :disabled="loading" />
-                            <Button icon="pi pi-qrcode" outlined rounded size="small" severity="info" @click="showProductQR(slotProps.data)" v-tooltip.top="'QR Code'" :disabled="loading" />
+                            <!-- <Button icon="pi pi-qrcode" outlined rounded size="small" severity="info" @click="showProductQR(slotProps.data)" v-tooltip.top="'QR Code'" :disabled="loading" /> -->
                         </div>
                     </template>
                 </Column>
@@ -1931,7 +1974,7 @@ function collapseAll() {
                             </Column>
                             <Column header="Trạng thái" sortable field="trangThai" style="min-width: 10rem">
                                 <template #body="detailProps">
-                                    <Tag :value="detailProps.data.trangThai === 1 ? 'HOẠT ĐỘNG' : 'NGỪNG'" :severity="getStatusLabel(detailProps.data.trangThai)" />
+                                    <Tag :value="detailProps.data.trangThai === 1 ? 'Hoạt động' : 'Không hoạt động'" :severity="getStatusLabel(detailProps.data.trangThai)" />
                                 </template>
                             </Column>
                             <Column header="Ngày tạo" sortable style="min-width: 10rem">
