@@ -79,35 +79,78 @@
             <Column field="ngayKetThuc" header="Ngày kết thúc" sortable style="min-width: 12rem">
                 <template #body="slotProps">{{ formatDate(slotProps.data.ngayKetThuc) }}</template>
             </Column>
+            
+            <!-- CỘT TRẠNG THÁI ĐÃ CẬP NHẬT -->
             <Column field="trangThai" header="Trạng thái" sortable style="min-width: 12rem">
                 <template #body="slotProps">
-                    <Tag :value="slotProps.data.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'" :severity="getStatusLabel(slotProps.data.trangThai)" />
+                    <Tag 
+                        :severity="getVoucherStatusDisplay(slotProps.data).severity"
+                    >
+                        <div class="flex items-center gap-2">
+                            <i :class="getVoucherStatusDisplay(slotProps.data).icon"></i>
+                            <span>{{ getVoucherStatusDisplay(slotProps.data).label }}</span>
+                        </div>
+                    </Tag>
                 </template>
             </Column>
+            
             <Column :exportable="false" style="width: 10rem">
                 <template #body="slotProps">
                     <div class="flex justify-center gap-2">
                         <Button icon="pi pi-pencil" outlined rounded size="small" @click="editVoucher(slotProps.data)" :disabled="loading" />
                         <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteVoucher(slotProps.data)" :disabled="loading" />
-                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" :disabled="loading" />
+                        <!-- CHỈ CHO PHÉP THAY ĐỔI TRẠNG THÁI KHI ĐANG ACTIVE -->
+                        <Button 
+                            icon="pi pi-ban" 
+                            outlined 
+                            rounded 
+                            severity="warning" 
+                            size="small" 
+                            @click="deactivateVoucher(slotProps.data)" 
+                            :disabled="loading || getVoucherStatus(slotProps.data) !== 'DANG_DIEN_RA' || slotProps.data.trangThai === 0"
+                            v-tooltip.top="'Đặt không hoạt động'"
+                        />
                     </div>
                 </template>
             </Column>
         </DataTable>
 
-        <!-- DIALOG THÊM/SỬA VOUCHER -->
+        <!-- DIALOG THÊM/SỬA VOUCHER với validation cải thiện -->
         <Dialog v-model:visible="voucherDialog" :style="{ width: '600px' }" header="Chi tiết Voucher" :modal="true">
             <div class="flex flex-col gap-6">
+                <!-- Mã Voucher -->
                 <div>
                     <label for="maVoucher" class="mb-3 block font-bold">Mã Voucher</label>
-                    <InputText id="maVoucher" v-model.trim="voucher.maVoucher" required="true" autofocus :invalid="submitted && !voucher.maVoucher" fluid readonly="true" />
-                    <small v-if="submitted && !voucher.maVoucher" class="text-red-500">Mã Voucher là bắt buộc.</small>
+                    <InputText 
+                        id="maVoucher" 
+                        v-model.trim="voucher.maVoucher" 
+                        fluid 
+                        readonly="true" 
+                        class="bg-gray-50"
+                    />
                 </div>
 
+                <!-- Tên Voucher -->
                 <div>
-                    <label for="tenVoucher" class="mb-3 block font-bold">Tên Voucher</label>
-                    <InputText id="tenVoucher" v-model.trim="voucher.tenVoucher" required="true" :invalid="submitted && !voucher.tenVoucher" fluid />
-                    <small v-if="submitted && !voucher.tenVoucher" class="text-red-500">Tên Voucher là bắt buộc.</small>
+                    <label for="tenVoucher" class="mb-3 block font-bold">
+                        Tên Voucher <span class="text-red-500">*</span>
+                    </label>
+                    <InputText 
+                        id="tenVoucher" 
+                        v-model.trim="voucher.tenVoucher" 
+                        required="true" 
+                        :invalid="submitted && (!voucher.tenVoucher || duplicateErrors.tenVoucher)" 
+                        fluid 
+                        @blur="validateField('tenVoucher')"
+                        @input="() => { if (submitted) validateField('tenVoucher') }"
+                        placeholder="Nhập tên voucher..."
+                    />
+                    <small v-if="submitted && !voucher.tenVoucher" class="text-red-500">
+                        Tên voucher là bắt buộc.
+                    </small>
+                    <small v-else-if="submitted && duplicateErrors.tenVoucher" class="text-red-500">
+                        {{ duplicateErrors.tenVoucher }}
+                    </small>
                 </div>
 
                 <!-- PHẦN UPLOAD FILE -->
@@ -136,70 +179,233 @@
                     </div>
                 </div>
 
+                <!-- Loại Giảm Giá -->
                 <div>
-                    <label for="loaiGiamGia" class="mb-3 block font-bold">Loại giảm giá</label>
+                    <label for="loaiGiamGia" class="mb-3 block font-bold">
+                        Loại giảm giá <span class="text-red-500">*</span>
+                    </label>
                     <Select
                         id="loaiGiamGia"
                         v-model="voucher.loaiGiamGia"
                         :options="discountTypes"
                         optionLabel="label"
                         optionValue="value"
-                        placeholder="Chọn loại giảm giá"
+                        placeholder="Chọn loại giảm giá..."
                         fluid
                         :invalid="submitted && !voucher.loaiGiamGia"
-                        @change="onDiscountTypeChange"
+                        @change="validateField('loaiGiamGia')"
                     />
-                    <small v-if="submitted && !voucher.loaiGiamGia" class="text-red-500">Loại giảm giá là bắt buộc.</small>
+                    <small v-if="submitted && !voucher.loaiGiamGia" class="text-red-500">
+                        Loại giảm giá là bắt buộc.
+                    </small>
                 </div>
 
+                <!-- Giá Trị Giảm (theo loại) -->
                 <div v-if="voucher.loaiGiamGia === 'PHAN_TRAM'">
-                    <label for="giaTriGiam" class="mb-3 block font-bold">Phần trăm giảm (1% - 100%)</label>
-                    <InputText id="giaTriGiam" v-model.number="voucher.giaTriGiam" fluid :min="1" :max="100" :invalid="submitted && (!voucher.giaTriGiam || voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)" />
-                    <small v-if="submitted && (!voucher.giaTriGiam || voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)" class="text-red-500">Phần trăm giảm phải từ 1% đến 100%.</small>
+                    <label for="giaTriGiam" class="mb-3 block font-bold">
+                        Phần trăm giảm (1% - 100%) <span class="text-red-500">*</span>
+                    </label>
+                    <InputText
+                        id="giaTriGiam" 
+                        v-model="voucher.giaTriGiam" 
+                        fluid 
+                        :min="1" 
+                        :max="100" 
+                        suffix="%"
+                        :invalid="submitted && (!isValidNumber(voucher.giaTriGiam) || voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)"
+                        @blur="validateField('giaTriGiam')"
+                        placeholder="Nhập % giảm..."
+                    />
+                    <small v-if="submitted && ( voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)" class="text-red-500">
+                        Phần trăm giảm là bắt buộc phải từ 1% đến 100%.
+                    </small>
+                    <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiam)" class="text-red-500">
+                        Phần trăm giảm phải là số.
+                    </small>
                 </div>
 
+                <div v-else-if="voucher.loaiGiamGia === 'SO_TIEN_CO_DINH'">
+                    <label for="giaTriGiam" class="mb-3 block font-bold">
+                        Số tiền giảm (VND) <span class="text-red-500">*</span>
+                    </label>
+                    <InputText
+                        id="giaTriGiam" 
+                        v-model="voucher.giaTriGiam" 
+                        fluid 
+                        :min="1000"
+                        :max="99999999"
+                        mode="currency"
+                        currency="VND"
+                        locale="vi-VN"
+                        :invalid="submitted && (!isValidNumber(voucher.giaTriGiam) || voucher.giaTriGiam <= 0 || voucher.giaTriGiam >= 100000000)"
+                        @blur="validateField('giaTriGiam')"
+                        placeholder="Nhập số tiền giảm..."
+                    />
+                    <small v-if="submitted && ( voucher.giaTriGiam <= 0)" class="text-red-500">
+                        Số tiền giảm phải lớn hơn 0.
+                    </small>
+                    <small v-else-if="submitted && voucher.giaTriGiam >= 100000000" class="text-red-500">
+                        Số tiền giảm phải < 100,000,000 VND.
+                    </small>
+                    <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiam)" class="text-red-500">
+                        Số tiền giảm phải là số.
+                    </small>
+                </div>
+
+                <!-- Đơn hàng tối thiểu và Giảm tối đa -->
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="giaTriGiamToiThieu" class="mb-3 block font-bold">Đơn hàng tối thiểu (VND)</label>
-                        <InputText id="giaTriGiamToiThieu" v-model.number="voucher.giaTriGiamToiThieu" fluid :min="0" :invalid="submitted && (voucher.giaTriGiamToiThieu == null || voucher.giaTriGiamToiThieu < 0)" />
-                        <small v-if="submitted && (voucher.giaTriGiamToiThieu == null || voucher.giaTriGiamToiThieu < 0)" class="text-red-500">Giá trị không hợp lệ.</small>
+                        <label for="giaTriGiamToiThieu" class="mb-3 block font-bold">
+                            Đơn hàng tối thiểu (VND) <span class="text-red-500">*</span>
+                        </label>
+                        <InputText 
+                            id="giaTriGiamToiThieu" 
+                            v-model="voucher.giaTriGiamToiThieu" 
+                            fluid 
+                            :min="0"
+                            :max="99999999"
+                            mode="currency"
+                            currency="VND"
+                            locale="vi-VN"
+                            :invalid="submitted && (!isValidNumber(voucher.giaTriGiamToiThieu) || voucher.giaTriGiamToiThieu < 0 || voucher.giaTriGiamToiThieu >= 100000000)"
+                            @blur="validateField('giaTriGiamToiThieu')"
+                            placeholder="Nhập giá trị đơn hàng tối thiểu..."
+                        />
+                        <small v-if="submitted && ( voucher.giaTriGiamToiThieu <= 0)" class="text-red-500">
+                            Giá trị đơn hàng tối thiểu là bắt buộc và phải > 0.
+                        </small>
+                        <small v-else-if="submitted && voucher.giaTriGiamToiThieu >= 100000000" class="text-red-500">
+                            Giá trị phải < 100,000,000 VND.
+                        </small>
+                        <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiamToiThieu)" class="text-red-500">
+                            Giá trị đơn hàng tối thiểu phải là số.
+                        </small>
                     </div>
                     <div class="col-span-6">
-                        <label for="giaTriGiamToiDa" class="mb-3 block font-bold">Giảm tối đa (VND)</label>
-                        <InputText id="giaTriGiamToiDa" v-model.number="voucher.giaTriGiamToiDa" fluid :min="0" :invalid="submitted && (voucher.giaTriGiamToiDa == null || voucher.giaTriGiamToiDa < 0)" />
-                        <small v-if="submitted && (voucher.giaTriGiamToiDa == null || voucher.giaTriGiamToiDa < 0)" class="text-red-500">Giá trị không hợp lệ.</small>
+                        <label for="giaTriGiamToiDa" class="mb-3 block font-bold">
+                            Giảm tối đa (VND) <span class="text-red-500">*</span>
+                        </label>
+                        <InputText 
+                            id="giaTriGiamToiDa" 
+                            v-model="voucher.giaTriGiamToiDa" 
+                            fluid 
+                            :min="1000"
+                            :max="99999999"
+                            mode="currency"
+                            currency="VND"
+                            locale="vi-VN"
+                            :invalid="submitted && (!isValidNumber(voucher.giaTriGiamToiDa) || voucher.giaTriGiamToiDa <= 0 || voucher.giaTriGiamToiDa >= 100000000)"
+                            @blur="validateField('giaTriGiamToiDa')"
+                            placeholder="Nhập giá trị giảm tối đa..."
+                        />
+                        <small v-if="submitted && ( voucher.giaTriGiamToiDa <= 0)" class="text-red-500">
+                            Giá trị giảm tối đa là bắt buộc và phải > 0.
+                        </small>
+                        <small v-else-if="submitted && voucher.giaTriGiamToiDa >= 100000000" class="text-red-500">
+                            Giá trị phải < 100,000,000 VND.
+                        </small>
+                        <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiamToiDa)" class="text-red-500">
+                            Giá trị giảm tối đa phải là số.
+                        </small>
                     </div>
                 </div>
 
+                <!-- Số Lượng -->
                 <div>
-                    <label for="soLuong" class="mb-3 block font-bold">Số lượng</label>
-                    <InputText id="soLuong" v-model.number="voucher.soLuong" fluid :min="0" :invalid="submitted && (voucher.soLuong == null || voucher.soLuong < 0)" />
-                    <small v-if="submitted && (voucher.soLuong == null || voucher.soLuong < 0)" class="text-red-500">Số lượng không hợp lệ.</small>
+                    <label for="soLuong" class="mb-3 block font-bold">
+                        Số lượng <span class="text-red-500">*</span>
+                    </label>
+                    <InputText
+                        id="soLuong"
+                        v-model="voucher.soLuong"
+                        fluid
+                        :min="1"
+                        :max="99999"
+                        :invalid="submitted && (!isValidNumber(voucher.soLuong) || voucher.soLuong <= 0 || voucher.soLuong >= 100000)"
+                        @blur="validateField('soLuong')"
+                        placeholder="Nhập số lượng voucher (1-99,999)..."
+                    />
+                    <small v-if="submitted && (voucher.soLuong <= 0)" class="text-red-500">
+                        Số lượng là bắt buộc và phải > 0.
+                    </small>
+                    <small v-else-if="submitted && voucher.soLuong >= 100000" class="text-red-500">
+                        Số lượng phải < 100,000.
+                    </small>
+                    <small v-else-if="submitted && !isValidNumber(voucher.soLuong)" class="text-red-500">
+                        Số lượng phải là số.
+                    </small>
                 </div>
 
+                <!-- Ngày bắt đầu và Ngày kết thúc -->
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="ngayBatDau" class="mb-3 block font-bold">Ngày bắt đầu</label>
-                        <Calendar id="ngayBatDau" v-model="voucher.ngayBatDau" showIcon fluid dateFormat="dd/mm/yy" :invalid="submitted && !voucher.ngayBatDau" />
-                        <small v-if="submitted && !voucher.ngayBatDau" class="text-red-500">Ngày bắt đầu là bắt buộc.</small>
+                        <label for="ngayBatDau" class="mb-3 block font-bold">
+                            Ngày bắt đầu <span class="text-red-500">*</span>
+                        </label>
+                        <Calendar 
+                            id="ngayBatDau" 
+                            v-model="voucher.ngayBatDau" 
+                            showIcon 
+                            fluid 
+                            dateFormat="dd/mm/yy" 
+                            :invalid="submitted && !voucher.ngayBatDau"
+                            @date-select="validateField('ngayBatDau')"
+                            placeholder="Chọn ngày bắt đầu..."
+                        />
+                        <small v-if="submitted && !voucher.ngayBatDau" class="text-red-500">
+                            Ngày bắt đầu là bắt buộc.
+                        </small>
                     </div>
                     <div class="col-span-6">
-                        <label for="ngayKetThuc" class="mb-3 block font-bold">Ngày kết thúc</label>
-                        <Calendar id="ngayKetThuc" v-model="voucher.ngayKetThuc" showIcon fluid dateFormat="dd/mm/yy" :invalid="submitted && !voucher.ngayKetThuc" />
-                        <small v-if="submitted && !voucher.ngayKetThuc" class="text-red-500">Ngày kết thúc là bắt buộc.</small>
+                        <label for="ngayKetThuc" class="mb-3 block font-bold">
+                            Ngày kết thúc <span class="text-red-500">*</span>
+                        </label>
+                        <Calendar 
+                            id="ngayKetThuc" 
+                            v-model="voucher.ngayKetThuc" 
+                            showIcon 
+                            fluid 
+                            dateFormat="dd/mm/yy" 
+                            :invalid="submitted && !voucher.ngayKetThuc"
+                            @date-select="validateField('ngayKetThuc')"
+                            placeholder="Chọn ngày kết thúc..."
+                        />
+                        <small v-if="submitted && !voucher.ngayKetThuc" class="text-red-500">
+                            Ngày kết thúc là bắt buộc.
+                        </small>
                     </div>
                 </div>
 
+                <!-- TRẠNG THÁI CHỈ CHO SỬA KHI ĐANG ACTIVE -->
                 <div>
-                    <label for="trangThai" class="mb-3 block font-bold">Trạng thái</label>
-                    <Select id="trangThai" v-model="voucher.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid :invalid="submitted && voucher.trangThai == null" />
-                    <small v-if="submitted && voucher.trangThai == null" class="text-red-500">Trạng thái là bắt buộc.</small>
+                    <label for="trangThai" class="mb-3 block font-bold">
+                        Trạng thái thủ công <span class="text-red-500">*</span>
+                    </label>
+                    <Select 
+                        id="trangThai" 
+                        v-model="voucher.trangThai" 
+                        :options="manualStatuses" 
+                        optionLabel="label" 
+                        optionValue="value" 
+                        placeholder="Chọn trạng thái..." 
+                        fluid 
+                        :invalid="submitted && voucher.trangThai == null"
+                    />
+                    <small v-if="submitted && voucher.trangThai == null" class="text-red-500">
+                        Trạng thái là bắt buộc.
+                    </small>
                 </div>
             </div>
 
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveVoucher" :loading="uploading || loading" />
+                <Button 
+                    label="Lưu" 
+                    icon="pi pi-check" 
+                    @click="saveVoucher" 
+                    :loading="uploading || loading"
+                    :disabled="uploading || loading"
+                />
             </template>
         </Dialog>
 
@@ -245,6 +451,7 @@
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
+import { InputText } from 'primevue';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 
@@ -260,6 +467,12 @@ const voucher = ref({});
 const selectedVouchers = ref();
 const submitted = ref(false);
 const loading = ref(false);
+
+// Thêm ref để lưu trữ lỗi trùng lặp
+const duplicateErrors = ref({
+    maVoucher: '',
+    tenVoucher: ''
+});
 
 // CÁC REF CHO UPLOAD FILE
 const fileInput = ref();
@@ -277,9 +490,10 @@ const filters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
 
-const statuses = ref([
-    { label: 'Còn hạn', value: 1 },
-    { label: 'Hết hạn', value: 0 }
+// CẬP NHẬT CÁC OPTIONS TRẠNG THÁI
+const manualStatuses = ref([
+    { label: 'Hoạt động', value: 1 },
+    { label: 'Không hoạt động', value: 0 }
 ]);
 
 const discountTypes = ref([
@@ -287,10 +501,228 @@ const discountTypes = ref([
     { label: 'Số tiền cố định', value: 'SO_TIEN_CO_DINH' }
 ]);
 
+// ===== HÀM TÍNH TOÁN TRẠNG THÁI DỰA TRÊN THỜI GIAN =====
+function getVoucherStatus(voucherData) {
+    if (!voucherData.ngayBatDau || !voucherData.ngayKetThuc) {
+        return 'UNKNOWN';
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Đặt về đầu ngày để so sánh chính xác
+
+    const startDate = new Date(voucherData.ngayBatDau);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(voucherData.ngayKetThuc);
+    endDate.setHours(23, 59, 59, 999); // Đặt về cuối ngày
+
+    // Kiểm tra trạng thái thủ công trước
+    if (voucherData.trangThai === 0) {
+        return 'VO_HIEU_HOA';
+    }
+
+    // Tính toán dựa trên thời gian
+    if (today < startDate) {
+        return 'CHUA_DIEN_RA';
+    } else if (today > endDate) {
+        return 'DA_KET_THUC';
+    } else {
+        return 'DANG_DIEN_RA';
+    }
+}
+
+function getVoucherStatusDisplay(voucherData) {
+    const status = getVoucherStatus(voucherData);
+    
+    switch (status) {
+        case 'CHUA_DIEN_RA':
+            return { 
+                label: 'Chưa diễn ra', 
+                severity: 'info', 
+                icon: 'pi pi-clock' 
+            };
+        case 'DANG_DIEN_RA':
+            return { 
+                label: 'Đang diễn ra', 
+                severity: 'success', 
+                icon: 'pi pi-check-circle' 
+            };
+        case 'DA_KET_THUC':
+            return { 
+                label: 'Đã hết hạn', 
+                severity: 'danger', 
+                icon: 'pi pi-times-circle' 
+            };
+        case 'VO_HIEU_HOA':
+            return { 
+                label: 'Không hoạt động', 
+                severity: 'secondary', 
+                icon: 'pi pi-ban' 
+            };
+        default:
+            return { 
+                label: 'Không xác định', 
+                severity: 'secondary', 
+                icon: 'pi pi-question-circle' 
+            };
+    }
+}
+
 // ===== LIFECYCLE =====
 onMounted(() => {
     fetchData();
 });
+
+// ===== DUPLICATE CHECK FUNCTIONS =====
+function checkDuplicate() {
+    duplicateErrors.value = {
+        maVoucher: '',
+        tenVoucher: ''
+    };
+
+    if (!voucher.value.maVoucher && !voucher.value.tenVoucher) {
+        return;
+    }
+
+    if (voucher.value.maVoucher) {
+        const existingMa = vouchers.value.find(item => 
+            item.maVoucher === voucher.value.maVoucher && 
+            item.id !== voucher.value.id
+        );
+        if (existingMa) {
+            duplicateErrors.value.maVoucher = 'Mã voucher đã tồn tại';
+        }
+    }
+
+    if (voucher.value.tenVoucher) {
+        const existingTen = vouchers.value.find(item => 
+            item.tenVoucher.toLowerCase().trim() === voucher.value.tenVoucher.toLowerCase().trim() && 
+            item.id !== voucher.value.id
+        );
+        if (existingTen) {
+            duplicateErrors.value.tenVoucher = 'Tên voucher đã tồn tại';
+        }
+    }
+}
+
+function validateVoucherDuplicates() {
+    checkDuplicate();
+    const hasDuplicateError = duplicateErrors.value.maVoucher || duplicateErrors.value.tenVoucher;
+    return !hasDuplicateError;
+}
+
+// ===== VALIDATION FUNCTIONS =====
+function validateVoucherForm() {
+    const errors = [];
+    
+    const isValidNumber = (value) => {
+        return value !== null && value !== undefined && value !== '' && !isNaN(value);
+    };
+    
+    if (!voucher.value.tenVoucher || !voucher.value.tenVoucher.trim()) {
+        errors.push('Tên voucher là bắt buộc');
+    }
+    
+    if (!voucher.value.loaiGiamGia) {
+        errors.push('Loại giảm giá là bắt buộc');
+    }
+    
+    if (voucher.value.loaiGiamGia === 'PHAN_TRAM') {
+        if ( voucher.value.giaTriGiam <= 0 || voucher.value.giaTriGiam > 100) {
+            errors.push('Phần trăm giảm phải từ 1% đến 100% và phải là số');
+        }else if(!isValidNumber(voucher.value.giaTriGiam)){
+            errors.push('Phần trăm giảm phải là số');
+        }
+    } else if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
+        if ( voucher.value.giaTriGiam <= 0) {
+            errors.push('Số tiền giảm phải lớn hơn 0');
+        } 
+        else if(!isValidNumber(voucher.value.giaTriGiam)){
+            errors.push('Số tiền giảm phải là số');
+        }
+        else if (voucher.value.giaTriGiam >= 100000000) {
+            errors.push('Số tiền giảm phải < 100,000,000 VND');
+        }
+    }
+    
+    if (voucher.value.giaTriGiamToiThieu < 0) {
+        errors.push('Giá trị đơn hàng tối thiểu là bắt buộc và phải ≥ 0');
+    }
+    else if (!isValidNumber(voucher.value.giaTriGiamToiThieu)){
+        errors.push('Giá trị đơn hàng tối thiểu phải là số');
+    }
+    else if (voucher.value.giaTriGiamToiThieu >= 100000000) {
+        errors.push('Giá trị đơn hàng tối thiểu phải < 100,000,000 VND');
+    }
+    
+    if (voucher.value.giaTriGiamToiDa <= 0) {
+        errors.push('Giá trị giảm tối đa là bắt buộc và phải > 0');
+    } 
+    else if(!isValidNumber(voucher.value.giaTriGiamToiDa)){
+        errors.push('Giá trị giảm tối đa phải là số');
+    }
+    else if (voucher.value.giaTriGiamToiDa >= 100000000) {
+        errors.push('Giá trị giảm tối đa phải < 100,000,000 VND');
+    }
+    
+    if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
+        if (isValidNumber(voucher.value.giaTriGiamToiDa) && isValidNumber(voucher.value.giaTriGiamToiThieu) && 
+            voucher.value.giaTriGiamToiDa > voucher.value.giaTriGiamToiThieu && voucher.value.giaTriGiamToiThieu > 0) {
+            errors.push('Số tiền giảm cố định không được lớn hơn giá trị đơn hàng tối thiểu');
+        }
+    }
+    
+    if (voucher.value.soLuong <= 0) {
+        errors.push('Số lượng là bắt buộc và phải > 0');
+    }
+    else if (!isValidNumber(voucher.value.soLuong)){
+        errors.push('Số lượng phải là số');
+    }
+    else if (voucher.value.soLuong >= 100000) {
+        errors.push('Số lượng phải < 100,000');
+    }
+    
+    if (!voucher.value.ngayBatDau) {
+        errors.push('Ngày bắt đầu là bắt buộc');
+    }
+    
+    if (!voucher.value.ngayKetThuc) {
+        errors.push('Ngày kết thúc là bắt buộc');
+    }
+    
+    if (voucher.value.ngayBatDau && voucher.value.ngayKetThuc) {
+        if (new Date(voucher.value.ngayBatDau) >= new Date(voucher.value.ngayKetThuc)) {
+            errors.push('Ngày bắt đầu phải trước ngày kết thúc');
+        }
+    }
+    
+    if (voucher.value.trangThai == null) {
+        errors.push('Trạng thái là bắt buộc');
+    }
+    
+    return errors;
+}
+
+function validateField(fieldName) {
+    switch (fieldName) {
+        case 'tenVoucher':
+            if (voucher.value.tenVoucher && voucher.value.tenVoucher.trim()) {
+                checkDuplicate();
+            }
+            break;
+        case 'loaiGiamGia':
+            onDiscountTypeChange();
+            break;
+        case 'giaTriGiam':
+        case 'giaTriGiamToiThieu':
+        case 'giaTriGiamToiDa':
+        case 'soLuong':
+            break;
+        case 'ngayBatDau':
+        case 'ngayKetThuc':
+            break;
+    }
+}
 
 // ===== API FUNCTIONS =====
 async function fetchData() {
@@ -345,8 +777,8 @@ function createId() {
     return 'V' + id;
 }
 
-function getStatusLabel(status) {
-    return status === 1 ? 'success' : 'danger';
+function isValidNumber(value) {
+    return value !== null && value !== undefined && value !== '' && !isNaN(value);
 }
 
 // ===== DIALOG FUNCTIONS =====
@@ -356,10 +788,10 @@ function openNew() {
         tenVoucher: '',
         duongDanHinhAnh: '',
         loaiGiamGia: null,
-        giaTriGiam: 0,
-        giaTriGiamToiThieu: 0,
-        giaTriGiamToiDa: 0,
-        soLuong: 0,
+        giaTriGiam: null,
+        giaTriGiamToiThieu: null,
+        giaTriGiamToiDa: null,
+        soLuong: null,
         ngayBatDau: null,
         ngayKetThuc: null,
         trangThai: 1
@@ -367,6 +799,10 @@ function openNew() {
 
     clearFile();
     submitted.value = false;
+    duplicateErrors.value = {
+        maVoucher: '',
+        tenVoucher: ''
+    };
     voucherDialog.value = true;
 }
 
@@ -374,40 +810,46 @@ function hideDialog() {
     voucherDialog.value = false;
     submitted.value = false;
     clearFile();
+    duplicateErrors.value = {
+        maVoucher: '',
+        tenVoucher: ''
+    };
 }
 
 function editVoucher(voucherData) {
     voucher.value = {
         ...voucherData,
-        giaTriGiam: voucherData.giaTriGiam ?? 0,
-        giaTriGiamToiThieu: voucherData.giaTriGiamToiThieu ?? 0,
-        giaTriGiamToiDa: voucherData.giaTriGiamToiDa ?? 0,
-        soLuong: voucherData.soLuong ?? 0,
+        giaTriGiam: voucherData.giaTriGiam ?? null,
+        giaTriGiamToiThieu: voucherData.giaTriGiamToiThieu ?? null,
+        giaTriGiamToiDa: voucherData.giaTriGiamToiDa ?? null,
+        soLuong: voucherData.soLuong ?? null,
         ngayBatDau: voucherData.ngayBatDau ? new Date(voucherData.ngayBatDau) : null,
         ngayKetThuc: voucherData.ngayKetThuc ? new Date(voucherData.ngayKetThuc) : null,
         trangThai: voucherData.trangThai ?? 1
     };
 
-    // Reset file upload khi edit
     selectedFile.value = null;
     selectedFileName.value = '';
     imagePreview.value = '';
 
-    // Hiển thị hình ảnh hiện có nếu có
     if (voucherData.duongDanHinhAnh) {
         imagePreview.value = `http://localhost:8080${voucherData.duongDanHinhAnh}`;
         selectedFileName.value = voucherData.tenVoucher;
     }
 
     submitted.value = false;
+    duplicateErrors.value = {
+        maVoucher: '',
+        tenVoucher: ''
+    };
     voucherDialog.value = true;
 }
 
 function onDiscountTypeChange() {
     if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
-        voucher.value.giaTriGiam = voucher.value.giaTriGiamToiDa || 0;
+        voucher.value.giaTriGiam = null;
     } else if (voucher.value.loaiGiamGia === 'PHAN_TRAM') {
-        voucher.value.giaTriGiam = Math.min(voucher.value.giaTriGiam || 10, 100);
+        voucher.value.giaTriGiam = null;
     }
 }
 
@@ -416,7 +858,6 @@ function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Kiểm tra loại file
     if (!file.type.startsWith('image/')) {
         toast.add({
             severity: 'error',
@@ -427,7 +868,6 @@ function handleFileSelect(event) {
         return;
     }
 
-    // Kiểm tra kích thước file (5MB)
     if (file.size > 5 * 1024 * 1024) {
         toast.add({
             severity: 'error',
@@ -441,7 +881,6 @@ function handleFileSelect(event) {
     selectedFile.value = file;
     selectedFileName.value = file.name;
 
-    // Tạo preview
     const reader = new FileReader();
     reader.onload = (e) => {
         imagePreview.value = e.target.result;
@@ -458,7 +897,6 @@ function clearFile() {
     }
 }
 
-// UPLOAD FILE
 async function uploadFile(file) {
     try {
         const formData = new FormData();
@@ -486,82 +924,33 @@ async function uploadFile(file) {
     }
 }
 
-// ===== SAVE VOUCHER =====
+// ===== IMPROVED SAVE VOUCHER FUNCTION =====
 async function saveVoucher() {
     submitted.value = true;
 
-    // KIỂM TRA CƠ BẢN
-    if (!voucher.value.maVoucher?.trim()) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Mã voucher là bắt buộc', life: 3000 });
-        return;
-    }
-    if (!voucher.value.tenVoucher?.trim()) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Tên voucher là bắt buộc', life: 3000 });
-        return;
-    }
-    if (!voucher.value.loaiGiamGia) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Loại giảm giá là bắt buộc', life: 3000 });
-        return;
-    }
-    if (voucher.value.loaiGiamGia === 'PHAN_TRAM' && (!voucher.value.giaTriGiam || voucher.value.giaTriGiam <= 0 || voucher.value.giaTriGiam > 100)) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Phần trăm giảm phải từ 1% đến 100%', life: 3000 });
-        return;
-    }
-    if (voucher.value.giaTriGiamToiThieu == null || voucher.value.giaTriGiamToiThieu < 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá trị đơn hàng tối thiểu phải >= 0', life: 3000 });
-        return;
-    }
-    if (voucher.value.giaTriGiamToiDa == null || voucher.value.giaTriGiamToiDa <= 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Giá trị giảm tối đa phải > 0', life: 3000 });
-        return;
+    const formErrors = validateVoucherForm();
+    
+    if (!validateVoucherDuplicates()) {
+        formErrors.push('Voucher đã tồn tại');
     }
 
-    // Validation theo loại giảm giá
-    if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
-        if (voucher.value.giaTriGiamToiDa > voucher.value.giaTriGiamToiThieu && voucher.value.giaTriGiamToiThieu > 0) {
-            toast.add({
-                severity: 'error',
-                summary: 'Lỗi',
-                detail: 'Số tiền giảm cố định không được lớn hơn giá trị đơn hàng tối thiểu',
-                life: 3000
-            });
-            return;
-        }
-    }
-
-    if (voucher.value.soLuong == null || voucher.value.soLuong < 0) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Số lượng không hợp lệ', life: 3000 });
-        return;
-    }
-    if (!voucher.value.ngayBatDau) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Ngày bắt đầu là bắt buộc', life: 3000 });
-        return;
-    }
-    if (!voucher.value.ngayKetThuc) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Ngày kết thúc là bắt buộc', life: 3000 });
-        return;
-    }
-
-    // Kiểm tra ngày
-    if (new Date(voucher.value.ngayBatDau) >= new Date(voucher.value.ngayKetThuc)) {
+    if (formErrors.length > 0) {
+        const errorMessage = formErrors.length === 1 
+            ? formErrors[0] 
+            : `Vui lòng kiểm tra lại:\n• ${formErrors.join('\n• ')}`;
+            
         toast.add({
             severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Ngày bắt đầu phải trước ngày kết thúc',
-            life: 3000
+            summary: 'Không để trống thông tin ',
+            detail: errorMessage,
+            life: 5000
         });
-        return;
-    }
-
-    if (voucher.value.trangThai == null) {
-        toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Trạng thái là bắt buộc', life: 3000 });
         return;
     }
 
     try {
         uploading.value = true;
 
-        // NẾU CÓ FILE MỚI, UPLOAD TRƯỚC
         if (selectedFile.value) {
             const uploadedPath = await uploadFile(selectedFile.value);
             if (uploadedPath) {
@@ -585,7 +974,6 @@ async function saveVoucher() {
         };
 
         if (voucher.value.id) {
-            // CẬP NHẬT
             await axios.put(`http://localhost:8080/voucher/${voucher.value.id}`, voucherData);
             toast.add({
                 severity: 'success',
@@ -594,7 +982,6 @@ async function saveVoucher() {
                 life: 3000
             });
         } else {
-            // THÊM MỚI
             await axios.post('http://localhost:8080/voucher', voucherData);
             toast.add({
                 severity: 'success',
@@ -610,16 +997,57 @@ async function saveVoucher() {
         clearFile();
     } catch (error) {
         console.error('💥 Save error:', error);
+        
+        let errorMessage = 'Lưu voucher thất bại';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.response?.status === 409) {
+            errorMessage = 'Dữ liệu bị trùng lặp';
+        } else if (error.response?.data) {
+            errorMessage = error.response.data;
+        }
+        
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: `Lưu voucher thất bại: ${error.response?.data || error.message}`,
+            detail: errorMessage,
             life: 3000
         });
     } finally {
         uploading.value = false;
         loading.value = false;
         submitted.value = false;
+    }
+}
+
+// ===== ĐẶT VOUCHER KHÔNG HOẠT ĐỘNG =====
+async function deactivateVoucher(voucherData) {
+    try {
+        loading.value = true;
+        const updatedVoucher = { 
+            ...voucherData, 
+            trangThai: 0,
+            ngayBatDau: new Date(voucherData.ngayBatDau).toISOString().split('T')[0],
+            ngayKetThuc: new Date(voucherData.ngayKetThuc).toISOString().split('T')[0]
+        };
+        await axios.put(`http://localhost:8080/voucher/${voucherData.id}`, updatedVoucher);
+        await fetchData();
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Đặt voucher không hoạt động thành công',
+            life: 3000
+        });
+    } catch (error) {
+        console.error('💥 Deactivate error:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Đặt voucher không hoạt động thất bại',
+            life: 3000
+        });
+    } finally {
+        loading.value = false;
     }
 }
 
@@ -687,31 +1115,6 @@ async function deleteSelectedVouchers() {
     }
 }
 
-async function changeStatus(voucherData) {
-    try {
-        loading.value = true;
-        const updatedVoucher = { ...voucherData, trangThai: voucherData.trangThai === 1 ? 0 : 1 };
-        await axios.put(`http://localhost:8080/voucher/${voucherData.id}`, updatedVoucher);
-        await fetchData();
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Cập nhật trạng thái thành công',
-            life: 3000
-        });
-    } catch (error) {
-        console.error('💥 Status change error:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Cập nhật trạng thái thất bại',
-            life: 3000
-        });
-    } finally {
-        loading.value = false;
-    }
-}
-
 // ===== IMAGE PREVIEW =====
 function previewImage(voucherData) {
     if (voucherData.duongDanHinhAnh) {
@@ -755,7 +1158,7 @@ function exportCSV() {
             item.soLuong || 0,
             formatDate(item.ngayBatDau) || '',
             formatDate(item.ngayKetThuc) || '',
-            item.trangThai === 1 ? 'Còn hạn' : 'Hết hạn'
+            getVoucherStatusDisplay(item).label
         ]);
 
         const csvContent = [headers, ...csvData]
@@ -813,5 +1216,20 @@ function exportCSV() {
     padding: 2rem;
     border-radius: 10px;
     margin-bottom: 1rem;
+}
+
+/* Styling cho status tags với icon */
+.p-tag {
+    font-weight: 500;
+}
+
+.p-tag i {
+    font-size: 0.875rem;
+}
+
+/* Flex layout cho tag content */
+.flex.items-center.gap-2 {
+    align-items: center;
+    gap: 0.375rem;
 }
 </style>

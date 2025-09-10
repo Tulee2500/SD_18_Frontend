@@ -55,7 +55,7 @@
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="kichCoDialog" :style="{ width: '450px' }" header="Chi tiết Kích Cỡ" :modal="true">
+        <Dialog v-model:visible="kichCoDialog" :style="{ width: '450px' }" header="Chi Tiết Kích Cỡ" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maKichCo" class="block font-bold mb-3">Mã Kích Cỡ</label>
@@ -64,9 +64,24 @@
                 </div>
                 <div>
                     <label for="tenKichCo" class="block font-bold mb-3">Tên Kích Cỡ</label>
-                    <InputText id="tenKichCo" v-model.trim="kichCo.tenKichCo" required="true" :invalid="submitted && !kichCo.tenKichCo" fluid />
-                    <small v-if="submitted && !kichCo.tenKichCo" class="text-red-500">Tên Kích Cỡ là bắt buộc.</small>
+                    <InputText 
+                        id="tenKichCo" 
+                        v-model.trim="kichCo.tenKichCo" 
+                        required="true" 
+                        :invalid="submitted && (!kichCo.tenKichCo || isDuplicateName || !isValidNumber)" 
+                        fluid 
+                    />
+                    <small v-if="submitted && !kichCo.tenKichCo" class="text-red-500">
+                        Tên Kích Cỡ là bắt buộc.
+                    </small>
+                    <small v-else-if="submitted && !isValidNumber" class="text-red-500">
+                        Tên Kích Cỡ phải là số.
+                    </small>
+                    <small v-else-if="submitted && isDuplicateName" class="text-red-500">
+                        Tên Kích Cỡ đã tồn tại, vui lòng chọn tên khác.
+                    </small>
                 </div>
+
                 <div>
                     <label for="trangThai" class="block font-bold mb-3">Trạng Thái</label>
                     <Select id="trangThai" v-model="kichCo.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
@@ -109,7 +124,7 @@
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 
 const toast = useToast();
 const dt = ref();
@@ -127,6 +142,21 @@ const statuses = ref([
     { label: 'Hoạt động', value: 1 },
     { label: 'Ngừng hoạt động', value: 0 }
 ]);
+
+// Computed property to check for duplicate names
+const isDuplicateName = computed(() => {
+    if (!kichCo.value.tenKichCo) return false;
+    
+    const trimmedName = kichCo.value.tenKichCo.trim().toLowerCase();
+    
+    return ListKichCo.value.some(item => {
+        // Skip checking against itself when editing
+        if (kichCo.value.id && item.id === kichCo.value.id) {
+            return false;
+        }
+        return item.tenKichCo && item.tenKichCo.trim().toLowerCase() === trimmedName;
+    });
+});
 
 onMounted(() => {
     fetchData();
@@ -148,13 +178,13 @@ async function fetchData() {
 }
 
 function createId() {
-        let id = '';
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 8; i++) {
-            id += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return 'KC' + id;
+    let id = '';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+    return 'KC' + id;
+}
 
 function openNew() {
     kichCo.value = { 
@@ -171,10 +201,24 @@ function hideDialog() {
     submitted.value = false;
 }
 
+const isValidNumber = computed(() => {
+    if (!kichCo.value.tenKichCo) return true; // Cho phép rỗng để hiển thị lỗi "bắt buộc"
+    
+    const trimmedName = kichCo.value.tenKichCo.trim();
+    // Kiểm tra xem có phải là số không (bao gồm số thập phân)
+    return !isNaN(trimmedName) && !isNaN(parseFloat(trimmedName)) && trimmedName !== '';
+});
+
+
+
 async function saveKichCo() {
     submitted.value = true;
 
-    if (kichCo.value.maKichCo?.trim() && kichCo.value.tenKichCo?.trim()) {
+    // Check if required fields are filled, name is valid number, and name is not duplicate
+    if (kichCo.value.maKichCo?.trim() && 
+        kichCo.value.tenKichCo?.trim() && 
+        isValidNumber.value && 
+        !isDuplicateName.value) {
         try {
             if (kichCo.value.id) {
                 await axios.put(`http://localhost:8080/kich-co/${kichCo.value.id}`, kichCo.value);
@@ -207,12 +251,29 @@ async function saveKichCo() {
             });
         }
     } else {
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
-            life: 3000
-        });
+        // Hiển thị thông báo lỗi cụ thể
+        if (!isValidNumber.value) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Tên kích cỡ phải là số',
+                life: 3000
+            });
+        } else if (isDuplicateName.value) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Tên kích cỡ đã tồn tại, vui lòng chọn tên khác',
+                life: 3000
+            });
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+                life: 3000
+            });
+        }
     }
 }
 
@@ -303,10 +364,6 @@ async function changeStatus(kc) {
 function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
 }
-
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
 
 function exportCSV() {
     try {

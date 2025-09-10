@@ -304,13 +304,16 @@
         </span>
       </button>
     </div>
+    <!-- ===== ĐÃ THÊM CHATBOT COMPONENT ===== -->
+    <ChatBot />
   </main>
 </template>
 
 <script>
-import Nav from '@/components/user/Nav.vue';
+import Nav from '@/components/user/Nav.vue';  
 import Footer from '@/views/user/Footer.vue';
 import Hero from '../Hero.vue';
+import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
 
 export default {
   name: 'Lienhe',
@@ -318,6 +321,7 @@ export default {
     Nav,
     Footer,
     Hero,
+    ChatBot
   },
 };
 </script>

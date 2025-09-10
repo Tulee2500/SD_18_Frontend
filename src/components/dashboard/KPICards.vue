@@ -3,7 +3,6 @@
     <StatCard
       title="Tổng Doanh Thu"
       :value="formatCurrency(stats.totalRevenue)"
-      change="+12.5% so với tháng trước"
       :icon="DollarSignIcon"
       trend="up"
       color="green"
@@ -11,7 +10,6 @@
     <StatCard
       title="Đơn Hàng"
       :value="formatNumber(stats.totalOrders)"
-      change="+8.3% so với tháng trước"
       :icon="ShoppingCartIcon"
       trend="up"
       color="blue"
@@ -19,7 +17,6 @@
     <StatCard
       title="Khách Hàng"
       :value="formatNumber(stats.totalCustomers)"
-      change="+15.2% so với tháng trước"
       :icon="UsersIcon"
       trend="up"
       color="purple"
@@ -27,7 +24,6 @@
     <StatCard
       title="Sản Phẩm"
       :value="formatNumber(stats.totalProducts)"
-      change="+5.1% so với tháng trước"
       :icon="PackageIcon"
       trend="up"
       color="orange"
@@ -36,19 +32,38 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+
 import { 
   DollarSign as DollarSignIcon, 
   ShoppingCart as ShoppingCartIcon, 
   Users as UsersIcon, 
   Package as PackageIcon 
 } from 'lucide-vue-next'
+
 import StatCard from '@/components/common/StatCard.vue'
 import { formatCurrency, formatNumber } from '@/utils/formatters'
 
-defineProps({
-  stats: {
-    type: Object,
-    required: true
+// reactive state
+const stats = ref({
+  totalRevenue: 0,
+  totalOrders: 0,
+  totalCustomers: 0,
+  totalProducts: 0
+})
+
+// fetch data from backend
+const fetchStats = async () => {
+  try {
+    const res = await axios.get('http://localhost:8080/thong-ke')
+    stats.value = res.data
+  } catch (error) {
+    console.error("Lỗi khi lấy dữ liệu thống kê:", error)
   }
+}
+
+onMounted(() => {
+  fetchStats()
 })
 </script>

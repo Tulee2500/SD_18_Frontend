@@ -1,511 +1,465 @@
-<template>
-    <div class="nike-complete-layout">
-      <!-- Navigation Component -->
-      <Nav />
-      <section id="home" class="xl:padding-l wide:padding-r padding-b overflow-hidden">
-        <Hero />
-      </section>
-      <!-- Main Content -->
-      <main class="nike-layout">
-        <div class="main-container">
-          <!-- Sidebar Categories -->
-          <aside class="categories-sidebar" :class="{ 'mobile-open': isMobileMenuOpen }">
-            <div class="sidebar-header">
-              <h3 class="sidebar-title">
-                <svg class="category-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                </svg>
-                Danh Mục
-              </h3>
-              <button class="mobile-close-btn" @click="isMobileMenuOpen = false">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                </svg>
-              </button>
-            </div>
+<script>
+import Nav from '@/components/user/Nav.vue';
+import ScrollToggler from '@/components/user/ScrollToggler.vue';
+import Footer from '@/views/user/Footer.vue';
+import axios from 'axios';
+import Hero from '../Hero.vue';
+// ===== ĐÃ THÊM CHATBOT IMPORT =====
+import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
 
-            <div class="categories-list">
-              <div
-                v-if="loadingCategories"
-                class="category-skeleton"
-                v-for="n in 5"
-                :key="n"
-              >
-                <div class="skeleton-text"></div>
-              </div>
-
-              <div v-else>
-                <div
-                  class="category-item"
-                  :class="{ active: selectedCategory === null }"
-                  @click="selectCategory(null)"
-                >
-                  <span class="category-name">Tất cả sản phẩm</span>
-                  <span class="category-count">{{ totalProducts }}</span>
-                </div>
-
-                <div
-                  v-for="category in categories"
-                  :key="category.id"
-                  class="category-item"
-                  :class="{ active: selectedCategory === category.id }"
-                  @click="selectCategory(category.id)"
-                >
-                  <span class="category-name">{{ category.tenDanhMuc }}</span>
-                  <span class="category-arrow">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
-                    </svg>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="sidebar-footer">
-              <div class="filter-section">
-                <h4 class="filter-title">Bộ lọc nâng cao</h4>
-                <button class="filter-btn">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
-                  </svg>
-                  <span>Lọc sản phẩm</span>
-                </button>
-              </div>
-            </div>
-          </aside>
-
-          <!-- Mobile Menu Toggle -->
-          <button class="mobile-menu-toggle" @click="isMobileMenuOpen = true">
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
-            </svg>
-            <span>Danh mục</span>
-          </button>
-
-          <!-- Products Section -->
-          <div class="products-container">
-            <div class="section-header">
-              <div class="section-badge">Sản phẩm nổi bật</div>
-              <h2 class="section-title">
-                <span class="highlight-gradient">Sản Phẩm</span>
-                {{ selectedCategoryName }}
-              </h2>
-              <p class="section-description">
-                {{ selectedCategory ? `Khám phá bộ sưu tập ${selectedCategoryName.toLowerCase()} chất lượng cao` : 'Trải nghiệm chất lượng và phong cách hàng đầu với các lựa chọn được tìm kiếm nhiều nhất' }}
-              </p>
-            </div>
-
-            <!-- Loading State -->
-            <div v-if="loading" class="products-grid">
-              <div v-for="n in 8" :key="n" class="product-card-skeleton">
-                <div class="skeleton-image"></div>
-                <div class="skeleton-content">
-                  <div class="skeleton-line skeleton-rating"></div>
-                  <div class="skeleton-line skeleton-title"></div>
-                  <div class="skeleton-line skeleton-price"></div>
-                  <div class="skeleton-button"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Products Grid -->
-            <div v-else class="products-grid">
-              <div
-                v-for="(product, index) in filteredProducts"
-                :key="product.id"
-                @click="goToProductDetail(product)"
-                class="product-card"
-                :style="{ animationDelay: `${index * 0.1}s` }"
-              >
-                <!-- Product Image Container -->
-                <div class="product-image-container">
-                  <!-- Nếu có ảnh thì hiển thị ảnh -->
-                  <div v-if="product.imgUrl" class="product-image-wrapper">
-                    <img
-                      :src="product.imgUrl"
-                      :alt="product.label"
-                      class="product-image"
-                      @error="handleImageError"
-                    />
-                  </div>
-
-                  <!-- Nếu không có ảnh thì hiển thị placeholder -->
-                  <div v-else class="product-placeholder">
-                    <svg viewBox="0 0 120 80" class="placeholder-icon">
-                      <defs>
-                        <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stop-color="#e5e7eb"/>
-                          <stop offset="50%" stop-color="#f3f4f6"/>
-                          <stop offset="100%" stop-color="#e5e7eb"/>
-                        </linearGradient>
-                      </defs>
-                      <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)"/>
-                      <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db"/>
-                    </svg>
-                  </div>
-
-                  <!-- Product Badge -->
-                  <div class="product-badge">
-                    <span>Mới</span>
-                  </div>
-
-                  <!-- Hover Overlay -->
-                  <div class="product-overlay">
-                    <div class="quick-view-btn">
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Product Info -->
-                <div class="product-info">
-                  <!-- Rating -->
-                  <div class="product-rating">
-                    <div class="stars">
-                      <span
-                        v-for="i in 5"
-                        :key="i"
-                        class="star"
-                        :class="{ filled: i <= Math.floor(product.rating) }"
-                      >
-                        ★
-                      </span>
-                    </div>
-                    <span class="rating-value">({{ product.rating }})</span>
-                  </div>
-
-                  <!-- Product Name -->
-                  <h3 class="product-name">{{ product.label }}</h3>
-
-                  <!-- Product Price -->
-                  <div class="price-container">
-                    <p class="product-price">₫{{ formatPrice(product.price) }}</p>
-                    <p class="price-label">Giá tốt nhất</p>
-                  </div>
-
-                  <!-- Add to Cart Button -->
-                  <button class="add-to-cart-btn" @click.stop="addToCart(product)">
-                    <span class="btn-content">
-                      <svg class="cart-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2z"/>
-                        <path d="M1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
-                      </svg>
-                      <span class="btn-text">Thêm vào giỏ</span>
-                    </span>
-                    <div class="btn-background"></div>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Empty State -->
-            <div v-if="!loading && filteredProducts.length === 0" class="empty-state">
-              <svg viewBox="0 0 24 24" class="empty-icon">
-                <path fill="currentColor" d="M19,2H5A3,3 0 0,0 2,5V19A3,3 0 0,0 5,22H19A3,3 0 0,0 22,19V5A3,3 0 0,0 19,2M19,19H5V5H19V19M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z"/>
-              </svg>
-              <p class="empty-text">Không có sản phẩm nào trong danh mục này</p>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      <!-- Footer Component -->
-      <section id="#" class="padding-x padding-t bg-black pb-8">
-        <Footer />
-      </section>
-      <ScrollToggler />
-    </div>
-  </template>
-
-  <script>
-  import Nav from '@/components/user/Nav.vue';
-  import ScrollToggler from '@/components/user/ScrollToggler.vue';
-  import Footer from '@/views/user/Footer.vue';
-  import axios from 'axios';
-  import Hero from '../Hero.vue';
-
-  export default {
+export default {
     name: 'ProductList',
 
     components: {
-      Nav,
-      Footer,
-      Hero,
-      ScrollToggler
+        Nav,
+        Footer,
+        Hero,
+        ScrollToggler,
+        ChatBot // ✅ giữ ChatBot
     },
 
     data() {
-      return {
-        products: [],
-        categories: [],
-        selectedCategory: null,
-        cartItems: 0,
-        loading: true,
-        loadingCategories: true,
-        isMobileMenuOpen: false
-      }
+        return {
+            products: [],
+            categories: [],
+            selectedCategory: null,
+            cartItems: 0,
+            loading: true,
+            loadingCategories: true,
+            isMobileMenuOpen: false
+        };
     },
 
     computed: {
-      filteredProducts() {
-        if (!this.selectedCategory) {
-          return this.products;
-        }
-        return this.products.filter(product =>
-          product.categoryId === this.selectedCategory
-        );
-      },
+        filteredProducts() {
+            if (!this.selectedCategory) {
+                return this.products;
+            }
+            return this.products.filter((product) => product.categoryId === this.selectedCategory);
+        },
 
-      selectedCategoryName() {
-        if (!this.selectedCategory) {
-          return 'Phổ Biến';
-        }
-        const category = this.categories.find(cat => cat.id === this.selectedCategory);
-        return category ? category.tenDanhMuc : 'Phổ Biến';
-      },
+        selectedCategoryName() {
+            if (!this.selectedCategory) {
+                return 'Phổ Biến';
+            }
+            const category = this.categories.find((cat) => cat.id === this.selectedCategory);
+            return category ? category.tenDanhMuc : 'Phổ Biến';
+        },
 
-      totalProducts() {
-        return this.products.length;
-      }
+        totalProducts() {
+            return this.products.length;
+        }
     },
 
     methods: {
-      selectCategory(categoryId) {
-        this.selectedCategory = categoryId;
-        this.isMobileMenuOpen = false;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      },
+        selectCategory(categoryId) {
+            this.selectedCategory = categoryId;
+            this.isMobileMenuOpen = false;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
 
-      scrollToProducts() {
-        if (this.$refs.productsSection) {
-          this.$refs.productsSection.scrollIntoView({ behavior: 'smooth' });
-        }
-      },
+        scrollToProducts() {
+            if (this.$refs.productsSection) {
+                this.$refs.productsSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        },
 
-      goToProductDetail(product) {
-        // Chuyển đến trang chi tiết với id của chi tiết sản phẩm đầu tiên
-        this.$router.push({
-          name: 'product',
-          params: { id: product.firstDetailId || product.id }
-        });
-      },
+        goToProductDetail(product) {
+            this.$router.push({
+                name: 'product',
+                params: { id: product.firstDetailId || product.id }
+            });
+        },
 
-      addToCart(product) {
-        this.cartItems++;
-        console.log('Added to cart:', product);
-        this.$emit('add-to-cart', product);
+        addToCart(product) {
+            this.cartItems++;
+            console.log('Added to cart:', product);
+            this.$emit('add-to-cart', product);
 
-        // Hiển thị thông báo thành công
-        this.$toast?.success(`Đã thêm ${product.label} vào giỏ hàng!`) ||
-        alert(`Đã thêm ${product.label} vào giỏ hàng!`);
-      },
+            this.$toast?.success(`Đã thêm ${product.label} vào giỏ hàng!`) ||
+            alert(`Đã thêm ${product.label} vào giỏ hàng!`);
+        },
 
-      handleImageError(event) {
-        // Ẩn ảnh lỗi và hiển thị placeholder
-        event.target.style.display = 'none';
-        // Tìm và hiển thị placeholder nếu có
-        const placeholder = event.target.parentElement.querySelector('.product-placeholder');
-        if (placeholder) {
-          placeholder.style.display = 'flex';
-        }
-      },
+        handleImageError(event) {
+            event.target.style.display = 'none';
+            const placeholder = event.target.parentElement.querySelector('.product-placeholder');
+            if (placeholder) {
+                placeholder.style.display = 'flex';
+            }
+        },
 
-      formatPrice(price) {
-        if (!price) return '0';
-        return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-      },
+        formatPrice(price) {
+            if (!price) return '0';
+            return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        },
 
-      async fetchCategories() {
-        try {
-          this.loadingCategories = true;
-          const response = await axios.get('http://localhost:8080/danh-muc');
-          this.categories = response.data.filter(cat => cat.trangThai === 1);
-          console.log('Categories loaded:', this.categories.length);
-        } catch (error) {
-          console.error("Lỗi khi gọi API danh mục:", error);
-          this.categories = [];
-        } finally {
-          this.loadingCategories = false;
-        }
-      },
+        async fetchCategories() {
+            try {
+                this.loadingCategories = true;
+                const response = await axios.get('http://localhost:8080/danh-muc');
+                this.categories = response.data.filter((cat) => cat.trangThai === 1);
+                console.log('Categories loaded:', this.categories.length);
+            } catch (error) {
+                console.error('Lỗi khi gọi API danh mục:', error);
+                this.categories = [];
+            } finally {
+                this.loadingCategories = false;
+            }
+        },
 
-      async fetchProducts() {
-        try {
-          this.loading = true;
+        async fetchProducts() {
+            try {
+                this.loading = true;
 
-          // Gọi cả 2 API
-          const [productsResponse, detailsResponse] = await Promise.all([
-            axios.get('http://localhost:8080/api/san-pham'),
-            axios.get('http://localhost:8080/api/san-pham-chi-tiet')
-          ]);
+                const [productsResponse, detailsResponse] = await Promise.all([
+                    axios.get('http://localhost:8080/api/san-pham'),
+                    axios.get('http://localhost:8080/api/san-pham-chi-tiet')
+                ]);
 
-          console.log('Products API Response:', productsResponse.data);
-          console.log('Details API Response:', detailsResponse.data);
+                console.log('Products API Response:', productsResponse.data);
+                console.log('Details API Response:', detailsResponse.data);
 
-          if (!productsResponse.data || productsResponse.data.length === 0) {
-            console.warn('No products data received from API');
-            this.products = [];
-            return;
-          }
+                if (!productsResponse.data || productsResponse.data.length === 0) {
+                    console.warn('No products data received from API');
+                    this.products = [];
+                    return;
+                }
 
-          // Tạo map để lưu chi tiết đầu tiên, giá thấp nhất và hình ảnh của mỗi sản phẩm
-          const firstDetailMap = new Map();
-          const priceMap = new Map();
-          const imageMap = new Map();
+                const firstDetailMap = new Map();
+                const priceMap = new Map();
+                const imageMap = new Map();
 
-          // Xử lý dữ liệu chi tiết sản phẩm
-          detailsResponse.data.forEach(detail => {
-            if (detail.sanPham?.id) {
-              const productId = detail.sanPham.id;
+                detailsResponse.data.forEach((detail) => {
+                    if (detail.sanPham?.id) {
+                        const productId = detail.sanPham.id;
 
-              // Lưu chi tiết đầu tiên của mỗi sản phẩm
-              if (!firstDetailMap.has(productId)) {
-                firstDetailMap.set(productId, detail.id);
-              }
+                        if (!firstDetailMap.has(productId)) {
+                            firstDetailMap.set(productId, detail.id);
+                        }
 
-              // Xử lý giá - lấy giá thấp nhất
-              if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
-                priceMap.set(productId, {
-                  giaBan: detail.giaBan,
-                  giaGoc: detail.giaGoc
+                        if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
+                            priceMap.set(productId, {
+                                giaBan: detail.giaBan,
+                                giaGoc: detail.giaGoc
+                            });
+                        }
+
+                        if (!imageMap.has(productId) && detail.hinhAnh) {
+                            let imageUrl = '';
+                            if (typeof detail.hinhAnh === 'object') {
+                                imageUrl = detail.hinhAnh.duongDan || detail.hinhAnh.url || detail.hinhAnh.path || detail.hinhAnh.link || detail.hinhAnh.src || '';
+                            } else if (typeof detail.hinhAnh === 'string') {
+                                imageUrl = detail.hinhAnh;
+                            }
+
+                            if (imageUrl && !imageUrl.startsWith('http')) {
+                                imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
+                            }
+
+                            if (imageUrl) {
+                                imageMap.set(productId, imageUrl);
+                            }
+                        }
+                    }
                 });
-              }
 
-              // Xử lý hình ảnh - lấy hình ảnh đầu tiên
-              if (!imageMap.has(productId) && detail.hinhAnh) {
-                let imageUrl = '';
-                if (typeof detail.hinhAnh === 'object') {
-                  imageUrl = detail.hinhAnh.duongDan ||
-                             detail.hinhAnh.url ||
-                             detail.hinhAnh.path ||
-                             detail.hinhAnh.link ||
-                             detail.hinhAnh.src || '';
-                } else if (typeof detail.hinhAnh === 'string') {
-                  imageUrl = detail.hinhAnh;
-                }
+                this.products = productsResponse.data.map((p, index) => {
+                    if (index < 3) {
+                        console.log(`Product ${index + 1} full data:`, p);
+                    }
 
-                if (imageUrl && !imageUrl.startsWith('http')) {
-                  imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-                }
+                    const priceInfo = priceMap.get(p.id) || { giaBan: 0, giaGoc: 0 };
+                    const imageUrl = imageMap.get(p.id) || null;
+                    const firstDetailId = firstDetailMap.get(p.id);
 
-                if (imageUrl) {
-                  imageMap.set(productId, imageUrl);
-                }
-              }
+                    const product = {
+                        id: p.id,
+                        firstDetailId,
+                        imgUrl: imageUrl,
+                        label: p.tenSanPham || 'Sản phẩm không tên',
+                        price: priceInfo.giaBan,
+                        originalPrice: priceInfo.giaGoc,
+                        rating: 4.5 + Math.random() * 0.5,
+                        brandId: p.thuongHieu?.id,
+                        brandName: p.thuongHieu?.tenThuongHieu || '',
+                        categoryId: p.danhMuc?.id,
+                        categoryName: p.danhMuc?.tenDanhMuc || '',
+                        materialId: p.chatLieu?.id,
+                        materialName: p.chatLieu?.tenChatLieu || '',
+                        soleId: p.deGiay?.id,
+                        soleName: p.deGiay?.tenDeGiay || '',
+                        maSanPham: p.maSanPham,
+                        soLuong: p.soLuong || 0,
+                        trangThai: p.trangThai
+                    };
+
+                    if (index < 3) {
+                        console.log(`Processed product ${index + 1}:`, product);
+                    }
+
+                    return product;
+                });
+
+                console.log('Total processed products:', this.products.length);
+                console.log('Products with prices:', this.products.filter((p) => p.price > 0).length);
+                console.log('Products with images:', this.products.filter((p) => p.imgUrl).length);
+            } catch (error) {
+                console.error('Error fetching products:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    response: error.response,
+                    request: error.request
+                });
+                this.products = [];
+            } finally {
+                this.loading = false;
             }
-          });
+        },
 
-          // Map sản phẩm với thông tin từ chi tiết
-          this.products = productsResponse.data.map((p, index) => {
-            if (index < 3) {
-              console.log(`Product ${index + 1} full data:`, p);
+        getRandomProducts(excludeProductId = null, count = 4) {
+            let availableProducts = this.products;
+
+            if (excludeProductId) {
+                availableProducts = this.products.filter((p) => p.id !== excludeProductId);
             }
 
-            // Lấy thông tin từ các map
-            const priceInfo = priceMap.get(p.id) || { giaBan: 0, giaGoc: 0 };
-            const imageUrl = imageMap.get(p.id) || null;
-            const firstDetailId = firstDetailMap.get(p.id);
-
-            const product = {
-              id: p.id,
-              firstDetailId: firstDetailId, // ID của chi tiết đầu tiên để navigation
-              imgUrl: imageUrl,
-              label: p.tenSanPham || 'Sản phẩm không tên',
-              price: priceInfo.giaBan,
-              originalPrice: priceInfo.giaGoc,
-              rating: 4.5 + (Math.random() * 0.5), // Random rating từ 4.5-5.0
-              brandId: p.thuongHieu?.id,
-              brandName: p.thuongHieu?.tenThuongHieu || '',
-              categoryId: p.danhMuc?.id,
-              categoryName: p.danhMuc?.tenDanhMuc || '',
-              materialId: p.chatLieu?.id,
-              materialName: p.chatLieu?.tenChatLieu || '',
-              soleId: p.deGiay?.id,
-              soleName: p.deGiay?.tenDeGiay || '',
-              maSanPham: p.maSanPham,
-              soLuong: p.soLuong || 0,
-              trangThai: p.trangThai
-            };
-
-            if (index < 3) {
-              console.log(`Processed product ${index + 1}:`, product);
-            }
-
-            return product;
-          });
-
-          console.log('Total processed products:', this.products.length);
-          console.log('Products with prices:', this.products.filter(p => p.price > 0).length);
-          console.log('Products with images:', this.products.filter(p => p.imgUrl).length);
-
-        } catch (error) {
-          console.error("Error fetching products:", error);
-          console.error("Error details:", {
-            message: error.message,
-            response: error.response,
-            request: error.request
-          });
-          this.products = [];
-        } finally {
-          this.loading = false;
+            const shuffled = availableProducts.sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, count);
         }
-      },
-
-      // Method để get random products - sẽ được gọi từ Product.vue
-      getRandomProducts(excludeProductId = null, count = 4) {
-        let availableProducts = this.products;
-
-        // Loại trừ sản phẩm hiện tại nếu có
-        if (excludeProductId) {
-          availableProducts = this.products.filter(p => p.id !== excludeProductId);
-        }
-
-        // Shuffle và lấy số lượng cần thiết
-        const shuffled = availableProducts.sort(() => 0.5 - Math.random());
-        return shuffled.slice(0, count);
-      }
     },
 
     mounted() {
-      console.log('ProductList component mounted');
-      this.fetchCategories();
-      this.fetchProducts();
+        console.log('ProductList component mounted');
+        this.fetchCategories();
+        this.fetchProducts();
     },
 
     beforeUnmount() {
-      console.log('ProductList component unmounting');
+        console.log('ProductList component unmounting');
     },
 
-    // Expose methods cho component khác có thể gọi
     expose() {
-      return {
-        getRandomProducts: this.getRandomProducts,
-        products: this.products
-      };
+        return {
+            getRandomProducts: this.getRandomProducts,
+            products: this.products
+        };
     }
-  }
-  </script>
+};
+</script>
 
-  <style lang="scss" scoped>
-  .nike-complete-layout {
+
+<template>
+    <div class="nike-complete-layout">
+        <!-- Navigation Component -->
+        <Nav />
+        <section id="home" class="xl:padding-l wide:padding-r padding-b overflow-hidden">
+            <Hero />
+        </section>
+        <!-- Main Content -->
+        <main class="nike-layout">
+            <div class="main-container">
+                <!-- Sidebar Categories -->
+                <aside class="categories-sidebar" :class="{ 'mobile-open': isMobileMenuOpen }">
+                    <div class="sidebar-header">
+                        <h3 class="sidebar-title">
+                            <svg class="category-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+                            </svg>
+                            Danh Mục
+                        </h3>
+                        <button class="mobile-close-btn" @click="isMobileMenuOpen = false">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="categories-list">
+                        <div v-if="loadingCategories" class="category-skeleton" v-for="n in 5" :key="n">
+                            <div class="skeleton-text"></div>
+                        </div>
+
+                        <div v-else>
+                            <div class="category-item" :class="{ active: selectedCategory === null }" @click="selectCategory(null)">
+                                <span class="category-name">Tất cả sản phẩm</span>
+                                <span class="category-count">{{ totalProducts }}</span>
+                            </div>
+
+                            <div v-for="category in categories" :key="category.id" class="category-item" :class="{ active: selectedCategory === category.id }" @click="selectCategory(category.id)">
+                                <span class="category-name">{{ category.tenDanhMuc }}</span>
+                                <span class="category-arrow">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-footer">
+                        <div class="filter-section">
+                            <h4 class="filter-title">Bộ lọc nâng cao</h4>
+                            <button class="filter-btn">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                                </svg>
+                                <span>Lọc sản phẩm</span>
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Mobile Menu Toggle -->
+                <button class="mobile-menu-toggle" @click="isMobileMenuOpen = true">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+                    </svg>
+                    <span>Danh mục</span>
+                </button>
+
+                <!-- Products Section -->
+                <div class="products-container">
+                    <div class="section-header">
+                        <div class="section-badge">Sản phẩm nổi bật</div>
+                        <h2 class="section-title">
+                            <span class="highlight-gradient">Sản Phẩm</span>
+                            {{ selectedCategoryName }}
+                        </h2>
+                        <p class="section-description">
+                            {{ selectedCategory ? `Khám phá bộ sưu tập ${selectedCategoryName.toLowerCase()} chất lượng cao` : 'Trải nghiệm chất lượng và phong cách hàng đầu với các lựa chọn được tìm kiếm nhiều nhất' }}
+                        </p>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div v-if="loading" class="products-grid">
+                        <div v-for="n in 8" :key="n" class="product-card-skeleton">
+                            <div class="skeleton-image"></div>
+                            <div class="skeleton-content">
+                                <div class="skeleton-line skeleton-rating"></div>
+                                <div class="skeleton-line skeleton-title"></div>
+                                <div class="skeleton-line skeleton-price"></div>
+                                <div class="skeleton-button"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Products Grid -->
+                    <div v-else class="products-grid">
+                        <div v-for="(product, index) in filteredProducts" :key="product.id" @click="goToProductDetail(product)" class="product-card" :style="{ animationDelay: `${index * 0.1}s` }">
+                            <!-- Product Image Container -->
+                            <div class="product-image-container">
+                                <!-- Nếu có ảnh thì hiển thị ảnh -->
+                                <div v-if="product.imgUrl" class="product-image-wrapper">
+                                    <img :src="product.imgUrl" :alt="product.label" class="product-image" @error="handleImageError" />
+                                </div>
+
+                                <!-- Nếu không có ảnh thì hiển thị placeholder -->
+                                <div v-else class="product-placeholder">
+                                    <svg viewBox="0 0 120 80" class="placeholder-icon">
+                                        <defs>
+                                            <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                <stop offset="0%" stop-color="#e5e7eb" />
+                                                <stop offset="50%" stop-color="#f3f4f6" />
+                                                <stop offset="100%" stop-color="#e5e7eb" />
+                                            </linearGradient>
+                                        </defs>
+                                        <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)" />
+                                        <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db" />
+                                    </svg>
+                                </div>
+
+                                <!-- Product Badge -->
+                                <div class="product-badge">
+                                    <span>Mới</span>
+                                </div>
+
+                                <!-- Hover Overlay -->
+                                <div class="product-overlay">
+                                    <div class="quick-view-btn">
+                                        <svg viewBox="0 0 24 24" fill="currentColor">
+                                            <path
+                                                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+                                            />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Product Info -->
+                            <div class="product-info">
+                                <!-- Rating -->
+                                <div class="product-rating">
+                                    <div class="stars">
+                                        <span v-for="i in 5" :key="i" class="star" :class="{ filled: i <= Math.floor(product.rating) }"> ★ </span>
+                                    </div>
+                                    <span class="rating-value">({{ product.rating }})</span>
+                                </div>
+
+                                <!-- Product Name -->
+                                <h3 class="product-name">{{ product.label }}</h3>
+
+                                <!-- Product Price -->
+                                <div class="price-container">
+                                    <p class="product-price">₫{{ formatPrice(product.price) }}</p>
+                                    <p class="price-label">Giá tốt nhất</p>
+                                </div>
+
+                                <!-- Add to Cart Button -->
+                                <button class="add-to-cart-btn" @click.stop="addToCart(product)">
+                                    <span class="btn-content">
+                                        <svg class="cart-icon" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2z" />
+                                            <path
+                                                d="M1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"
+                                            />
+                                        </svg>
+                                        <span class="btn-text">Thêm vào giỏ</span>
+                                    </span>
+                                    <div class="btn-background"></div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div v-if="!loading && filteredProducts.length === 0" class="empty-state">
+                        <svg viewBox="0 0 24 24" class="empty-icon">
+                            <path fill="currentColor" d="M19,2H5A3,3 0 0,0 2,5V19A3,3 0 0,0 5,22H19A3,3 0 0,0 22,19V5A3,3 0 0,0 19,2M19,19H5V5H19V19M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z" />
+                        </svg>
+                        <p class="empty-text">Không có sản phẩm nào trong danh mục này</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <!-- Footer Component -->
+        <section id="#" class="padding-x padding-t bg-black pb-8">
+            <Footer />
+        </section>
+        <ScrollToggler />
+
+        <!-- ===== ĐÃ THÊM CHATBOT COMPONENT ===== -->
+        <ChatBot />
+    </div>
+</template>
+
+<style lang="scss" scoped>
+.nike-complete-layout {
     font-family: 'Helvetica Neue', Arial, sans-serif;
     background-color: #f5f5f5;
     min-height: 100vh;
-  }
+}
 
-  .main-container {
+.main-container {
     display: flex;
     max-width: 1600px;
     margin: 0 auto;
     gap: 2rem;
     padding: 2rem;
     position: relative;
-  }
+}
 
-  /* Categories Sidebar */
-  .categories-sidebar {
+/* Categories Sidebar */
+.categories-sidebar {
     width: 280px;
     background: white;
     border-radius: 20px;
@@ -515,31 +469,31 @@
     position: sticky;
     top: 2rem;
     transition: all 0.3s ease;
-  }
+}
 
-  .sidebar-header {
+.sidebar-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 2rem;
-  }
+}
 
-  .sidebar-title {
+.sidebar-title {
     font-size: 1.5rem;
     font-weight: 800;
     color: #1a202c;
     display: flex;
     align-items: center;
     gap: 0.75rem;
-  }
+}
 
-  .category-icon {
+.category-icon {
     width: 24px;
     height: 24px;
-    color: #FF6452;
-  }
+    color: #ff6452;
+}
 
-  .mobile-close-btn {
+.mobile-close-btn {
     display: none;
     background: none;
     border: none;
@@ -548,28 +502,28 @@
     color: #64748b;
 
     svg {
-      width: 24px;
-      height: 24px;
+        width: 24px;
+        height: 24px;
     }
-  }
+}
 
-  .categories-list {
+.categories-list {
     margin-bottom: 2rem;
-  }
+}
 
-  .category-skeleton {
+.category-skeleton {
     margin-bottom: 1rem;
 
     .skeleton-text {
-      height: 48px;
-      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-      background-size: 200% 100%;
-      animation: shimmer 2s infinite;
-      border-radius: 12px;
+        height: 48px;
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 2s infinite;
+        border-radius: 12px;
     }
-  }
+}
 
-  .category-item {
+.category-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -582,85 +536,85 @@
     overflow: hidden;
 
     &::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 4px;
-      height: 100%;
-      background: linear-gradient(135deg, #FF6452, #ff8a80);
-      transform: scaleY(0);
-      transition: transform 0.3s ease;
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(135deg, #ff6452, #ff8a80);
+        transform: scaleY(0);
+        transition: transform 0.3s ease;
     }
 
     &:hover {
-      background-color: #f8fafc;
-      transform: translateX(8px);
+        background-color: #f8fafc;
+        transform: translateX(8px);
 
-      .category-arrow {
-        transform: translateX(4px);
-      }
+        .category-arrow {
+            transform: translateX(4px);
+        }
     }
 
     &.active {
-      background: linear-gradient(135deg, #FF6452 0%, #ff8a80 100%);
-      color: white;
-      box-shadow: 0 8px 20px rgba(255, 100, 82, 0.3);
-
-      &::before {
-        transform: scaleY(1);
-        background: white;
-      }
-
-      .category-count {
-        background: rgba(255, 255, 255, 0.2);
+        background: linear-gradient(135deg, #ff6452 0%, #ff8a80 100%);
         color: white;
-      }
-    }
-  }
+        box-shadow: 0 8px 20px rgba(255, 100, 82, 0.3);
 
-  .category-name {
+        &::before {
+            transform: scaleY(1);
+            background: white;
+        }
+
+        .category-count {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+    }
+}
+
+.category-name {
     font-weight: 600;
     font-size: 1rem;
-  }
+}
 
-  .category-count {
+.category-count {
     background: #f1f5f9;
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
     font-size: 0.875rem;
     font-weight: 600;
     color: #64748b;
-  }
+}
 
-  .category-arrow {
+.category-arrow {
     display: flex;
     align-items: center;
     transition: transform 0.3s ease;
 
     svg {
-      width: 20px;
-      height: 20px;
+        width: 20px;
+        height: 20px;
     }
-  }
+}
 
-  .sidebar-footer {
+.sidebar-footer {
     border-top: 1px solid #e2e8f0;
     padding-top: 1.5rem;
-  }
+}
 
-  .filter-section {
+.filter-section {
     text-align: center;
-  }
+}
 
-  .filter-title {
+.filter-title {
     font-size: 0.875rem;
     color: #64748b;
     margin-bottom: 1rem;
     font-weight: 600;
-  }
+}
 
-  .filter-btn {
+.filter-btn {
     width: 100%;
     display: flex;
     align-items: center;
@@ -676,27 +630,27 @@
     transition: all 0.3s ease;
 
     svg {
-      width: 20px;
-      height: 20px;
+        width: 20px;
+        height: 20px;
     }
 
     &:hover {
-      background: #FF6452;
-      border-color: #FF6452;
-      color: white;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(255, 100, 82, 0.2);
+        background: #ff6452;
+        border-color: #ff6452;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(255, 100, 82, 0.2);
     }
-  }
+}
 
-  /* Mobile Menu Toggle */
-  .mobile-menu-toggle {
+/* Mobile Menu Toggle */
+.mobile-menu-toggle {
     display: none;
     position: fixed;
     bottom: 2rem;
     left: 2rem;
     z-index: 100;
-    background: linear-gradient(135deg, #FF6452, #ff8a80);
+    background: linear-gradient(135deg, #ff6452, #ff8a80);
     color: white;
     padding: 1rem 1.5rem;
     border-radius: 50px;
@@ -710,133 +664,187 @@
     transition: all 0.3s ease;
 
     svg {
-      width: 24px;
-      height: 24px;
+        width: 24px;
+        height: 24px;
     }
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 30px rgba(255, 100, 82, 0.5);
+        transform: translateY(-2px);
+        box-shadow: 0 12px 30px rgba(255, 100, 82, 0.5);
     }
-  }
+}
 
-  /* Products Container - Adjusted */
-  .products-container {
+/* Products Container - Adjusted */
+.products-container {
     flex: 1;
     position: relative;
     z-index: 1;
-  }
+}
 
-  .section-header {
+.section-header {
     text-align: center;
     margin-bottom: 4rem;
 
     .section-badge {
-      display: inline-block;
-      background: linear-gradient(135deg, #FF6452, #ff8a80);
-      color: white;
-      padding: 0.5rem 1.5rem;
-      border-radius: 25px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 4px 15px rgba(255, 100, 82, 0.3);
+        display: inline-block;
+        background: linear-gradient(135deg, #ff6452, #ff8a80);
+        color: white;
+        padding: 0.5rem 1.5rem;
+        border-radius: 25px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(255, 100, 82, 0.3);
     }
-  }
+}
+/* ===== ĐÃ THÊM CSS CHO CHATBOT ===== */
+/* Đảm bảo chatbot hiển thị trên cùng */
+:deep(.chatbot-container) {
+    z-index: 9999 !important;
+}
 
-  .section-title {
-    font-size: 3.5rem;
-    font-weight: 900;
-    margin-bottom: 1.5rem;
-    color: #1a202c;
-    line-height: 1.2;
+/* Đảm bảo không conflict với mobile-menu-toggle */
+.mobile-menu-toggle {
+    z-index: 9997; /* Thấp hơn chatbot */
+}
 
-    .highlight-gradient {
-      background: linear-gradient(135deg, #FF6452, #ff8a80, #ffd700);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+/* Đảm bảo ScrollToggler không conflict */
+:deep(.scroll-toggler) {
+    z-index: 9998;
+}
+
+/* Animations */
+@keyframes slideUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
-  }
+}
 
-  .section-description {
+.highlight-gradient {
+    background: linear-gradient(135deg, #ff6452, #ff8a80, #ffd700);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.mobile-close-btn {
+    display: block;
+}
+
+.mobile-menu-toggle {
+    display: flex;
+}
+
+.products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+}
+
+.section-title {
+    font-size: 2.5rem;
+}
+
+/* ===== RESPONSIVE CHATBOT ===== */
+:deep(.chatbot-container) {
+    bottom: 1rem;
+    right: 1rem;
+}
+
+:deep(.chat-window) {
+    width: calc(100vw - 2rem);
+    height: 70vh;
+}
+
+/* Điều chỉnh mobile-menu-toggle khi có chatbot */
+.mobile-menu-toggle {
+    bottom: 80px; /* Tránh chatbot */
+}
+.section-description {
     color: #64748b;
     font-size: 1.2rem;
     max-width: 700px;
     margin: 0 auto;
     line-height: 1.6;
     font-weight: 400;
-  }
+}
 
-  /* Empty State */
-  .empty-state {
+/* Empty State */
+.empty-state {
     text-align: center;
     padding: 4rem 2rem;
 
     .empty-icon {
-      width: 120px;
-      height: 120px;
-      margin: 0 auto 2rem;
-      color: #e2e8f0;
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 2rem;
+        color: #e2e8f0;
     }
 
     .empty-text {
-      font-size: 1.25rem;
-      color: #64748b;
-      font-weight: 500;
+        font-size: 1.25rem;
+        color: #64748b;
+        font-weight: 500;
     }
-  }
+}
 
-  /* Loading Skeleton */
-  .product-card-skeleton {
+/* Loading Skeleton */
+.product-card-skeleton {
     background: white;
     border-radius: 24px;
     overflow: hidden;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 
     .skeleton-image {
-      height: 280px;
-      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-      background-size: 200% 100%;
-      animation: shimmer 2s infinite;
+        height: 280px;
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 2s infinite;
     }
 
     .skeleton-content {
-      padding: 2rem;
+        padding: 2rem;
 
-      .skeleton-line {
-        height: 16px;
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: shimmer 2s infinite;
-        border-radius: 8px;
-        margin-bottom: 1rem;
+        .skeleton-line {
+            height: 16px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+            border-radius: 8px;
+            margin-bottom: 1rem;
 
-        &.skeleton-rating { width: 60%; }
-        &.skeleton-title { width: 80%; height: 20px; }
-        &.skeleton-price { width: 40%; height: 24px; }
-      }
+            &.skeleton-rating {
+                width: 60%;
+            }
+            &.skeleton-title {
+                width: 80%;
+                height: 20px;
+            }
+            &.skeleton-price {
+                width: 40%;
+                height: 24px;
+            }
+        }
 
-      .skeleton-button {
-        height: 48px;
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: shimmer 2s infinite;
-        border-radius: 12px;
-        margin-top: 1rem;
-      }
+        .skeleton-button {
+            height: 48px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+            border-radius: 12px;
+            margin-top: 1rem;
+        }
     }
-  }
+}
 
-  /* Products Grid - Adjusted for smaller width */
-  .products-grid {
+/* Products Grid - Adjusted for smaller width */
+.products-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 2rem;
     margin-top: 3rem;
-  }
+}
 
-  .product-card {
+.product-card {
     background: white;
     border-radius: 24px;
     overflow: hidden;
@@ -849,26 +857,26 @@
     transform: translateY(30px);
 
     &:hover {
-      transform: translateY(-12px) scale(1.02);
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        transform: translateY(-12px) scale(1.02);
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
 
-      .product-image {
-        transform: scale(1.05);
-      }
-
-      .product-overlay {
-        opacity: 1;
-      }
-
-      .add-to-cart-btn {
-        .btn-background {
-          transform: scaleX(1);
+        .product-image {
+            transform: scale(1.05);
         }
-      }
-    }
-  }
 
-  .product-image-container {
+        .product-overlay {
+            opacity: 1;
+        }
+
+        .add-to-cart-btn {
+            .btn-background {
+                transform: scaleX(1);
+            }
+        }
+    }
+}
+
+.product-image-container {
     position: relative;
     background: transparent;
     padding: 2.5rem;
@@ -877,41 +885,41 @@
     align-items: center;
     height: 280px;
     overflow: hidden;
-  }
+}
 
-  .product-image-wrapper {
+.product-image-wrapper {
     width: 100%;
     height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-  }
+}
 
-  .product-image {
+.product-image {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
     filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.1));
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
+}
 
-  .product-placeholder {
+.product-placeholder {
     display: flex;
     justify-content: center;
     align-items: center;
 
     .placeholder-icon {
-      width: 120px;
-      height: 80px;
-      opacity: 0.6;
+        width: 120px;
+        height: 80px;
+        opacity: 0.6;
     }
-  }
+}
 
-  .product-badge {
+.product-badge {
     position: absolute;
     top: 1.5rem;
     right: 1.5rem;
-    background: linear-gradient(135deg, #FF6452, #ff8a80);
+    background: linear-gradient(135deg, #ff6452, #ff8a80);
     color: white;
     padding: 0.4rem 1rem;
     border-radius: 20px;
@@ -919,9 +927,9 @@
     font-weight: 700;
     box-shadow: 0 4px 15px rgba(255, 100, 82, 0.4);
     z-index: 2;
-  }
+}
 
-  .product-overlay {
+.product-overlay {
     position: absolute;
     inset: 0;
     background: linear-gradient(135deg, rgba(255, 100, 82, 0.9), rgba(255, 138, 128, 0.9));
@@ -932,64 +940,42 @@
     transition: all 0.3s ease;
 
     .quick-view-btn {
-      background: white;
-      color: #FF6452;
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-      transform: scale(0.8);
-      transition: all 0.3s ease;
-      cursor: pointer;
+        background: white;
+        color: #ff6452;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        transform: scale(0.8);
+        transition: all 0.3s ease;
+        cursor: pointer;
 
-      svg {
-        width: 24px;
-        height: 24px;
-      }
-
-      &:hover {
-        transform: scale(1);
-      }
-    }
-  }
-
-  .product-info {
-    padding: 2rem;
-  }
-
-  .product-rating {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-
-    .stars {
-      display: flex;
-      gap: 0.2rem;
-
-      .star {
-        color: #e2e8f0;
-        font-size: 1.1rem;
-        transition: all 0.2s ease;
-
-        &.filled {
-          color: #fbbf24;
-          text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+        svg {
+            width: 24px;
+            height: 24px;
         }
-      }
-    }
 
-    .rating-value {
-      color: #64748b;
-      font-size: 0.9rem;
-      font-weight: 500;
+        &:hover {
+            transform: scale(1);
+        }
     }
-  }
+}
 
-  .product-name {
+.product-info {
+    padding: 2rem;
+}
+
+.mobile-menu-toggle {
+    bottom: 80px; /* Tránh chatbot */
+    left: 1rem;
+    padding: 0.875rem 1.25rem;
+    font-size: 0.9rem;
+}
+
+.product-name {
     font-size: 1.3rem;
     font-weight: 700;
     margin-bottom: 1rem;
@@ -999,36 +985,36 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-  }
+}
 
-  .price-container {
+.price-container {
     margin-bottom: 1.5rem;
 
     .product-price {
-      font-size: 1.8rem;
-      font-weight: 900;
-      background: linear-gradient(135deg, #FF6452, #ff8a80);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 0.25rem;
+        font-size: 1.8rem;
+        font-weight: 900;
+        background: linear-gradient(135deg, #ff6452, #ff8a80);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.25rem;
     }
 
     .price-label {
-      font-size: 0.8rem;
-      color: #10b981;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+        font-size: 0.8rem;
+        color: #10b981;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-  }
+}
 
-  .add-to-cart-btn {
+.add-to-cart-btn {
     position: relative;
     width: 100%;
     background: transparent;
-    border: 2px solid #FF6452;
-    color: #FF6452;
+    border: 2px solid #ff6452;
+    color: #ff6452;
     padding: 1rem;
     border-radius: 16px;
     font-weight: 700;
@@ -1037,162 +1023,166 @@
     transition: all 0.3s ease;
 
     .btn-content {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
-      z-index: 2;
-      transition: all 0.3s ease;
-
-      .cart-icon {
-        width: 18px;
-        height: 18px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        z-index: 2;
         transition: all 0.3s ease;
-      }
 
-      .btn-text {
-        font-size: 1rem;
-      }
+        .cart-icon {
+            width: 18px;
+            height: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-text {
+            font-size: 1rem;
+        }
     }
 
     .btn-background {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, #FF6452, #ff8a80);
-      transform: scaleX(0);
-      transform-origin: left;
-      transition: transform 0.3s ease;
-      z-index: 1;
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, #ff6452, #ff8a80);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.3s ease;
+        z-index: 1;
     }
 
     &:hover {
-      color: white;
-      border-color: #FF6452;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(255, 100, 82, 0.3);
+        color: white;
+        border-color: #ff6452;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255, 100, 82, 0.3);
 
-      .cart-icon {
-        transform: scale(1.1);
-      }
+        .cart-icon {
+            transform: scale(1.1);
+        }
     }
-  }
+}
 
-  /* Animations */
-  @keyframes slideUp {
+/* Animations */
+@keyframes slideUp {
     to {
-      opacity: 1;
-      transform: translateY(0);
+        opacity: 1;
+        transform: translateY(0);
     }
-  }
+}
 
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
 
-  /* Responsive Design */
-  @media (max-width: 1400px) {
+/* Responsive Design */
+@media (max-width: 1400px) {
     .products-grid {
-      grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, 1fr);
     }
-  }
+}
 
-  @media (max-width: 1024px) {
+@media (max-width: 1024px) {
     .main-container {
-      padding: 1rem;
+        padding: 1rem;
     }
 
     .categories-sidebar {
-      position: fixed;
-      left: -100%;
-      top: 0;
-      height: 100vh;
-      z-index: 1000;
-      border-radius: 0;
-      width: 300px;
-      max-width: 80vw;
-      padding: 2rem;
-      overflow-y: auto;
+        position: fixed;
+        left: -100%;
+        top: 0;
+        height: 100vh;
+        z-index: 1000;
+        border-radius: 0;
+        width: 300px;
+        max-width: 80vw;
+        padding: 2rem;
+        overflow-y: auto;
 
-      &.mobile-open {
-        left: 0;
-        box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
-      }
+        &.mobile-open {
+            left: 0;
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
+        }
     }
 
     .mobile-close-btn {
-      display: block;
+        display: block;
     }
 
     .mobile-menu-toggle {
-      display: flex;
+        display: flex;
     }
 
     .products-grid {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1.5rem;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
     }
 
     .section-title {
-      font-size: 2.5rem;
+        font-size: 2.5rem;
     }
-  }
+}
 
-  @media (max-width: 768px) {
+@media (max-width: 768px) {
     .nike-layout {
-      padding-top: 60px;
+        padding-top: 60px;
     }
 
     .products-grid {
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
     }
 
     .section-title {
-      font-size: 2.5rem;
+        font-size: 2.5rem;
     }
 
     .section-description {
-      font-size: 1rem;
+        font-size: 1rem;
     }
 
     .product-info {
-      padding: 1.5rem;
+        padding: 1.5rem;
     }
 
     .product-name {
-      font-size: 1.1rem;
+        font-size: 1.1rem;
     }
 
     .product-price {
-      font-size: 1.5rem;
+        font-size: 1.5rem;
     }
-  }
+}
 
-  @media (max-width: 480px) {
+@media (max-width: 480px) {
     .main-container {
-      padding: 0.5rem;
+        padding: 0.5rem;
     }
 
     .section-title {
-      font-size: 2rem;
+        font-size: 2rem;
     }
 
     .products-grid {
-      grid-template-columns: 1fr;
-      gap: 1.5rem;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
     }
 
     .product-info {
-      padding: 1.5rem;
+        padding: 1.5rem;
     }
 
     .mobile-menu-toggle {
-      bottom: 1rem;
-      left: 1rem;
-      padding: 0.875rem 1.25rem;
-      font-size: 0.9rem;
+        bottom: 1rem;
+        left: 1rem;
+        padding: 0.875rem 1.25rem;
+        font-size: 0.9rem;
     }
-  }
-  </style>
+}
+</style>

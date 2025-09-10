@@ -107,7 +107,7 @@
                             severity="secondary" 
                             size="small" 
                             @click="changeStatus(slotProps.data)" 
-                            :title="slotProps.data.trangThai === 1 ? 'Vô hiệu hóa' : 'Kích hoạt'"
+                            :title="slotProps.data.trangThai === 1 ? 'Hoạt động ' : 'Không hoạt động'"
                         />
                     </div>
                 </template>
@@ -124,51 +124,153 @@
         <!-- Add/Edit Promotion Dialog -->
         <Dialog v-model:visible="khuyenMaiDialog" :style="{ width: '500px' }" :header="khuyenMai.id ? 'Cập nhật khuyến mãi' : 'Thêm khuyến mãi'" :modal="true">
             <div class="flex flex-col gap-6">
+                <!-- Tên Khuyến Mãi -->
                 <div>
-                    <label for="tenKhuyenMai" class="mb-3 block font-bold">Tên Khuyến Mãi</label>
-                    <InputText id="tenKhuyenMai" v-model.trim="khuyenMai.tenKhuyenMai" required="true" autofocus :invalid="submitted && !khuyenMai.tenKhuyenMai" fluid />
-                    <small v-if="submitted && !khuyenMai.tenKhuyenMai" class="text-red-500">Tên khuyến mãi là bắt buộc.</small>
+                    <label for="tenKhuyenMai" class="mb-3 block font-bold">
+                        Tên Khuyến Mãi <span class="text-red-500">*</span>
+                    </label>
+                    <InputText 
+                        id="tenKhuyenMai" 
+                        v-model.trim="khuyenMai.tenKhuyenMai" 
+                        required="true" 
+                        autofocus 
+                        :invalid="submitted && (!khuyenMai.tenKhuyenMai || duplicateErrors.tenKhuyenMai)" 
+                        fluid 
+                        @blur="validateField('tenKhuyenMai')"
+                        @input="() => { if (submitted) validateField('tenKhuyenMai') }"
+                        placeholder="Nhập tên khuyến mãi..."
+                    />
+                    <small v-if="submitted && !khuyenMai.tenKhuyenMai" class="text-red-500">
+                        Tên khuyến mãi là bắt buộc.
+                    </small>
+                    <small v-else-if="submitted && duplicateErrors.tenKhuyenMai" class="text-red-500">
+                        {{ duplicateErrors.tenKhuyenMai }}
+                    </small>
                 </div>
+
+                <!-- Mã Khuyến Mãi -->
                 <div>
                     <label for="maKhuyenMai" class="mb-3 block font-bold">Mã Khuyến Mãi</label>
-                    <InputText id="maKhuyenMai" v-model="khuyenMai.maKhuyenMai" fluid readonly="true" />
+                    <InputText 
+                        id="maKhuyenMai" 
+                        v-model="khuyenMai.maKhuyenMai" 
+                        fluid 
+                        readonly="true" 
+                        class="bg-gray-50" 
+                    />
+                    
                 </div>
+
+                <!-- Giá Trị Giảm -->
                 <div>
-                    <label for="giaTri" class="mb-3 block font-bold">Giá Trị Giảm (%)</label>
-                    <InputNumber 
+                    <label for="giaTri" class="mb-3 block font-bold">
+                        Giá Trị Giảm (%) <span class="text-red-500">*</span>
+                    </label>
+                    <InputText 
                         id="giaTri" 
                         v-model="khuyenMai.giaTri" 
-                        :min="0" 
+                        :min="0.1" 
                         :max="100" 
                         suffix="%" 
                         fluid 
-                        :invalid="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)"
+                        :invalid="submitted && (!khuyenMai.giaTri || khuyenMai.giaTri <= 0 || khuyenMai.giaTri > 100)"
                         :minFractionDigits="0"
                         :maxFractionDigits="2"
+                        placeholder="Nhập % giảm giá..."
+                        @blur="validateField('giaTri')"
+                        @input="validateField('giaTri')"
+                        mode="decimal"
+                        :useGrouping="false"
                     />
-                    <small v-if="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" class="text-red-500">Giá trị giảm phải lớn hơn 0.</small>
-                    <!-- <small class="text-gray-500">Nhập số từ 1-100 (ví dụ: 15 = 15%)</small> -->
+                    <small v-if="submitted && (khuyenMai.giaTri == null || khuyenMai.giaTri <= 0)" class="text-red-500">
+                        Giá trị giảm phải lớn hơn 0.
+                    </small>
+                    <small v-else-if="submitted && khuyenMai.giaTri > 100" class="text-red-500">
+                        Giá trị giảm không được vượt quá 100%.
+                    </small>
+                    <small v-else-if="submitted && isNaN(khuyenMai.giaTri)" class="text-red-500">
+                        Giá trị giảm phải là số hợp lệ.
+                    </small>
                 </div>
+
+                <!-- Ngày Bắt Đầu -->
                 <div>
-                    <label for="ngayBatDau" class="mb-3 block font-bold">Ngày Bắt Đầu</label>
-                    <Calendar id="ngayBatDau" v-model="khuyenMai.ngayBatDau" dateFormat="dd/mm/yy" showTime hourFormat="24" fluid :invalid="submitted && !khuyenMai.ngayBatDau" />
-                    <small v-if="submitted && !khuyenMai.ngayBatDau" class="text-red-500">Ngày bắt đầu là bắt buộc.</small>
+                    <label for="ngayBatDau" class="mb-3 block font-bold">
+                        Ngày Bắt Đầu <span class="text-red-500">*</span>
+                    </label>
+                    <Calendar 
+                        id="ngayBatDau" 
+                        v-model="khuyenMai.ngayBatDau" 
+                        dateFormat="dd/mm/yy" 
+                        showTime 
+                        hourFormat="24" 
+                        fluid 
+                        :invalid="submitted && !khuyenMai.ngayBatDau"
+                        placeholder="Chọn ngày bắt đầu..."
+                        @date-select="validateField('ngayBatDau')"
+                    />
+                    <small v-if="submitted && !khuyenMai.ngayBatDau" class="text-red-500">
+                        Ngày bắt đầu là bắt buộc.
+                    </small>
                 </div>
+
+                <!-- Ngày Kết Thúc -->
                 <div>
-                    <label for="ngayKetThuc" class="mb-3 block font-bold">Ngày Kết Thúc</label>
-                    <Calendar id="ngayKetThuc" v-model="khuyenMai.ngayKetThuc" dateFormat="dd/mm/yy" showTime hourFormat="24" fluid :invalid="submitted && (!khuyenMai.ngayKetThuc || isEndDateBeforeStartDate)" />
-                    <small v-if="submitted && !khuyenMai.ngayKetThuc" class="text-red-500">Ngày kết thúc là bắt buộc.</small>
-                    <small v-if="submitted && isEndDateBeforeStartDate" class="text-red-500">Ngày kết thúc phải sau ngày bắt đầu.</small>
+                    <label for="ngayKetThuc" class="mb-3 block font-bold">
+                        Ngày Kết Thúc <span class="text-red-500">*</span>
+                    </label>
+                    <Calendar 
+                        id="ngayKetThuc" 
+                        v-model="khuyenMai.ngayKetThuc" 
+                        dateFormat="dd/mm/yy" 
+                        showTime 
+                        hourFormat="24" 
+                        fluid 
+                        :invalid="submitted && (!khuyenMai.ngayKetThuc || isEndDateBeforeStartDate)"
+                        placeholder="Chọn ngày kết thúc..."
+                        @date-select="validateField('ngayKetThuc')"
+                    />
+                    <small v-if="submitted && !khuyenMai.ngayKetThuc" class="text-red-500">
+                        Ngày kết thúc là bắt buộc.
+                    </small>
+                    <small v-else-if="submitted && isEndDateBeforeStartDate" class="text-red-500">
+                        Ngày kết thúc phải sau ngày bắt đầu.
+                    </small>
                 </div>
+
+                <!-- Trạng Thái -->
                 <div>
-                    <label for="trangThai" class="mb-3 block font-bold">Trạng Thái Hoạt Động</label>
-                    <Select id="trangThai" v-model="khuyenMai.trangThai" :options="statusOptionsForForm" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
-                    <small class="text-gray-500">Trạng thái này chỉ là bật/tắt khuyến mãi, không phụ thuộc vào thời gian</small>
+                    <label for="trangThai" class="mb-3 block font-bold">
+                        Trạng Thái Hoạt Động <span class="text-red-500">*</span>
+                    </label>
+                    <Select 
+                        id="trangThai" 
+                        v-model="khuyenMai.trangThai" 
+                        :options="statusOptionsForForm" 
+                        optionLabel="label" 
+                        optionValue="value" 
+                        placeholder="Chọn trạng thái..." 
+                        fluid 
+                        :invalid="submitted && khuyenMai.trangThai == null"
+                    />
+                    <small v-if="submitted && khuyenMai.trangThai == null" class="text-red-500">
+                        Trạng thái hoạt động là bắt buộc.
+                    </small>
+                    <small v-else class="text-gray-500">
+                        Trạng thái này chỉ là bật/tắt khuyến mãi, không phụ thuộc vào thời gian
+                    </small>
                 </div>
             </div>
+            
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveKhuyenMai" :loading="isSaving" />
+                <Button 
+                    label="Lưu" 
+                    icon="pi pi-check" 
+                    @click="saveKhuyenMai" 
+                    :loading="isSaving"
+                    :disabled="isSaving"
+                />
             </template>
         </Dialog>
 
@@ -474,7 +576,6 @@
                         Bạn có chắc chắn muốn xóa khuyến mãi <strong>{{ khuyenMai.tenKhuyenMai }}</strong
                         >?
                     </span>
-                    <div class="mt-3 rounded bg-red-50 p-3 text-red-700"><strong>Lưu ý:</strong> Tất cả sản phẩm được áp dụng khuyến mãi này sẽ được khôi phục về giá gốc.</div>
                 </div>
             </div>
             <template #footer>
@@ -531,6 +632,11 @@ const submitted = ref(false);
 const isLoading = ref(false);
 const isSaving = ref(false);
 
+// Thêm ref để lưu trữ lỗi trùng lặp
+const duplicateErrors = ref({
+    tenKhuyenMai: ''
+});
+
 // Apply products dialog
 const availableProducts = ref([]);
 const selectedProductsForApply = ref([]);
@@ -553,17 +659,52 @@ const statusOptions = ref([
     { label: 'Chưa diễn ra', value: 'pending' },
     { label: 'Đang diễn ra', value: 'active' },
     { label: 'Đã hết hạn', value: 'expired' },
-    { label: 'Đã vô hiệu hóa', value: 'disabled' }
+    { label: 'Không hoạt động', value: 'disabled' }
 ]);
 
 const statusOptionsForForm = ref([
     { label: 'Hoạt động', value: 1 },
-    { label: 'Vô hiệu hóa', value: 0 }
+    { label: 'Không hoạt động', value: 0 }
 ]);
 
 onMounted(() => {
     fetchData();
 });
+
+// ===== DUPLICATE CHECK FUNCTIONS =====
+// Hàm kiểm tra trùng lặp
+function checkDuplicate() {
+    // Reset lỗi trước khi kiểm tra
+    duplicateErrors.value = {
+        tenKhuyenMai: ''
+    };
+
+    if (!khuyenMai.value.tenKhuyenMai) {
+        return;
+    }
+
+    // Chỉ kiểm tra trùng tên khuyến mãi
+    if (khuyenMai.value.tenKhuyenMai) {
+        const existingTen = khuyenMais.value.find(item => 
+            item.tenKhuyenMai.toLowerCase().trim() === khuyenMai.value.tenKhuyenMai.toLowerCase().trim() && 
+            item.id !== khuyenMai.value.id
+        );
+        if (existingTen) {
+            duplicateErrors.value.tenKhuyenMai = 'Tên khuyến mãi đã tồn tại';
+        }
+    }
+}
+
+// Hàm kiểm tra validation trước khi lưu
+function validateKhuyenMaiDuplicates() {
+    // Kiểm tra trùng lặp
+    checkDuplicate();
+    
+    // Kiểm tra có lỗi trùng lặp không
+    const hasDuplicateError = duplicateErrors.value.tenKhuyenMai;
+    
+    return !hasDuplicateError;
+}
 
 // Helper functions for formatting and calculations
 function formatPercentage(value) {
@@ -613,7 +754,7 @@ function getPromotionStatusText(promotion) {
         case 'expired':
             return 'Đã hết hạn';
         case 'disabled':
-            return 'Đã vô hiệu hóa';
+            return 'Không hoạt động';
         default:
             return 'Không xác định';
     }
@@ -722,7 +863,7 @@ async function openApplyProductsDialog(promotion) {
                 message = 'Khuyến mãi đã hết hạn, không thể áp dụng cho sản phẩm';
                 break;
             case 'disabled':
-                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng cho sản phẩm';
+                message = 'Khuyến mãi không hoạt động, không thể áp dụng cho sản phẩm';
                 break;
             default:
                 message = 'Khuyến mãi không khả dụng, không thể áp dụng cho sản phẩm';
@@ -831,7 +972,7 @@ async function applyPromotionToProducts() {
                 message = 'Khuyến mãi đã hết hạn, không thể áp dụng cho sản phẩm';
                 break;
             case 'disabled':
-                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng cho sản phẩm';
+                message = 'Khuyến mãi không hoạt động, không thể áp dụng cho sản phẩm';
                 break;
             default:
                 message = 'Khuyến mãi không khả dụng, không thể áp dụng cho sản phẩm';
@@ -984,7 +1125,7 @@ function openApplyProductsFromView() {
                 message = 'Khuyến mãi đã hết hạn, không thể áp dụng thêm sản phẩm';
                 break;
             case 'disabled':
-                message = 'Khuyến mãi đã bị vô hiệu hóa, không thể áp dụng thêm sản phẩm';
+                message = 'Khuyến mãi không hoạt động, không thể áp dụng thêm sản phẩm';
                 break;
             default:
                 message = 'Khuyến mãi không khả dụng, không thể áp dụng thêm sản phẩm';
@@ -1048,65 +1189,163 @@ function openNew() {
         trangThai: 1
     };
     submitted.value = false;
+    // Reset lỗi trùng lặp
+    duplicateErrors.value = {
+        tenKhuyenMai: ''
+    };
     khuyenMaiDialog.value = true;
 }
 
 function hideDialog() {
     khuyenMaiDialog.value = false;
     submitted.value = false;
+    // Reset lỗi trùng lặp
+    duplicateErrors.value = {
+        tenKhuyenMai: ''
+    };
 }
 
+// Thêm hàm validation chi tiết
+function validateKhuyenMaiForm() {
+    const errors = [];
+    
+    // Kiểm tra tên khuyến mãi
+    if (!khuyenMai.value.tenKhuyenMai || !khuyenMai.value.tenKhuyenMai.trim()) {
+        errors.push('Tên khuyến mãi là bắt buộc');
+    }
+    
+    // Kiểm tra giá trị giảm - cập nhật validation
+    if (khuyenMai.value.giaTri == null || khuyenMai.value.giaTri === '') {
+        errors.push('Giá trị giảm là bắt buộc');
+    } else if (isNaN(khuyenMai.value.giaTri)) {
+        errors.push('Giá trị giảm phải là số hợp lệ');
+    } else if (Number(khuyenMai.value.giaTri) <= 0) {
+        errors.push('Giá trị giảm phải lớn hơn 0');
+    } else if (Number(khuyenMai.value.giaTri) > 100) {
+        errors.push('Giá trị giảm không được vượt quá 100%');
+    }
+    
+    // Kiểm tra ngày bắt đầu
+    if (!khuyenMai.value.ngayBatDau) {
+        errors.push('Ngày bắt đầu là bắt buộc');
+    }
+    
+    // Kiểm tra ngày kết thúc
+    if (!khuyenMai.value.ngayKetThuc) {
+        errors.push('Ngày kết thúc là bắt buộc');
+    }
+    
+    // Kiểm tra ngày kết thúc phải sau ngày bắt đầu
+    if (khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc && isEndDateBeforeStartDate.value) {
+        errors.push('Ngày kết thúc phải sau ngày bắt đầu');
+    }
+    
+    // Kiểm tra trạng thái
+    if (khuyenMai.value.trangThai == null) {
+        errors.push('Trạng thái hoạt động là bắt buộc');
+    }
+    
+    return errors;
+}
+
+// Cập nhật hàm saveKhuyenMai
 async function saveKhuyenMai() {
     submitted.value = true;
 
-    if (khuyenMai.value.tenKhuyenMai?.trim() && khuyenMai.value.giaTri != null && khuyenMai.value.giaTri > 0 && khuyenMai.value.ngayBatDau && khuyenMai.value.ngayKetThuc && !isEndDateBeforeStartDate.value) {
-        isSaving.value = true;
-        try {
-            const requestData = {
-                ...khuyenMai.value,
-                ngayBatDau: formatDateForBackend(khuyenMai.value.ngayBatDau),
-                ngayKetThuc: formatDateForBackend(khuyenMai.value.ngayKetThuc)
-            };
+    // Kiểm tra validation form
+    const formErrors = validateKhuyenMaiForm();
+    
+    // Kiểm tra trùng lặp
+    if (!validateKhuyenMaiDuplicates()) {
+        formErrors.push('Tên khuyến mãi đã tồn tại');
+    }
 
-            if (khuyenMai.value.id) {
-                await axios.put(`http://localhost:8080/khuyen-mai/${khuyenMai.value.id}`, requestData);
-                toast.add({
-                    severity: 'success',
-                    summary: 'Thành công',
-                    detail: 'Cập nhật khuyến mãi thành công. Giá sản phẩm đã được tính lại tự động.',
-                    life: 3000
-                });
-            } else {
-                requestData.maKhuyenMai = requestData.maKhuyenMai || createId();
-                await axios.post('http://localhost:8080/khuyen-mai', requestData);
-                toast.add({
-                    severity: 'success',
-                    summary: 'Thành công',
-                    detail: 'Thêm khuyến mãi thành công',
-                    life: 3000
-                });
-            }
-            await fetchData();
-            khuyenMaiDialog.value = false;
-            khuyenMai.value = {};
-        } catch (error) {
-            console.error('Error saving promotion:', error.response?.data || error.message);
+    // Nếu có lỗi, hiển thị thông báo chi tiết
+    if (formErrors.length > 0) {
+        const errorMessage = formErrors.length === 1 
+            ? formErrors[0] 
+            : `Vui lòng kiểm tra lại:\n• ${formErrors.join('\n• ')}`;
+            
+        toast.add({
+            severity: 'warn',
+            summary: 'Vui lòng kiểm tra thông tin',
+            detail: errorMessage,
+            life: 5000
+        });
+        return;
+    }
+
+    // Nếu không có lỗi, tiến hành lưu
+    isSaving.value = true;
+    try {
+        const requestData = {
+            ...khuyenMai.value,
+            maKhuyenMai: khuyenMai.value.maKhuyenMai || createId(),
+            ngayBatDau: formatDateForBackend(khuyenMai.value.ngayBatDau),
+            ngayKetThuc: formatDateForBackend(khuyenMai.value.ngayKetThuc)
+        };
+
+        if (khuyenMai.value.id) {
+            await axios.put(`http://localhost:8080/khuyen-mai/${khuyenMai.value.id}`, requestData);
             toast.add({
-                severity: 'error',
-                summary: 'Lỗi',
-                detail: error.response?.data?.message || 'Có lỗi xảy ra khi lưu khuyến mãi',
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Cập nhật khuyến mãi thành công. Giá sản phẩm đã được tính lại tự động.',
                 life: 3000
             });
-        } finally {
-            isSaving.value = false;
+        } else {
+            await axios.post('http://localhost:8080/khuyen-mai', requestData);
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Thêm khuyến mãi thành công',
+                life: 3000
+            });
         }
-    } else {
+        await fetchData();
+        khuyenMaiDialog.value = false;
+        khuyenMai.value = {};
+    } catch (error) {
+        console.error('Error saving promotion:', error.response?.data || error.message);
+        
+        let errorMessage = 'Có lỗi xảy ra khi lưu khuyến mãi';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.response?.status === 409) {
+            errorMessage = 'Dữ liệu bị trùng lặp';
+        }
+        
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc và kiểm tra tính hợp lệ',
+            detail: errorMessage,
             life: 3000
         });
+    } finally {
+        isSaving.value = false;
+    }
+}
+
+// Thêm validation real-time cho các trường input
+function validateField(fieldName) {
+    switch (fieldName) {
+        case 'tenKhuyenMai':
+            if (khuyenMai.value.tenKhuyenMai && khuyenMai.value.tenKhuyenMai.trim()) {
+                checkDuplicate();
+            }
+            break;
+        case 'giaTri':
+            // Validation được xử lý real-time bởi InputNumber
+            // Có thể thêm validation custom nếu cần
+            if (submitted.value) {
+                // Force re-validate khi user đang trong trạng thái đã submit
+                const errors = validateKhuyenMaiForm();
+            }
+            break;
+        case 'ngayBatDau':
+        case 'ngayKetThuc':
+            // Validation cho ngày sẽ được xử lý trong computed property
+            break;
     }
 }
 
@@ -1119,6 +1358,12 @@ function editKhuyenMai(km) {
     if (khuyenMai.value.ngayKetThuc) {
         khuyenMai.value.ngayKetThuc = new Date(khuyenMai.value.ngayKetThuc);
     }
+    
+    // Reset lỗi trùng lặp khi edit
+    duplicateErrors.value = {
+        tenKhuyenMai: ''
+    };
+    
     khuyenMaiDialog.value = true;
 }
 
@@ -1136,7 +1381,7 @@ async function deleteKhuyenMai() {
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: 'Xóa khuyến mãi thành công. Tất cả sản phẩm đã được khôi phục về giá gốc.',
+            detail: 'Xóa khuyến mãi thành công.',
             life: 3000
         });
     } catch (error) {
@@ -1157,7 +1402,7 @@ async function changeStatus(km) {
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: `Đã ${km.trangThai === 1 ? 'vô hiệu hóa' : 'kích hoạt'} khuyến mãi`,
+            detail: `Đã ${km.trangThai === 1 ? 'kích hoạt' : 'ngừng hoạt động'} khuyến mãi`,
             life: 3000
         });
     } catch (error) {
@@ -1186,7 +1431,7 @@ async function deleteSelectedKhuyenMais() {
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: 'Xóa các khuyến mãi thành công. Tất cả sản phẩm đã được khôi phục về giá gốc.',
+            detail: 'Xóa các khuyến mãi thành công.',
             life: 3000
         });
     } catch (error) {

@@ -55,7 +55,7 @@
             </Column>
         </DataTable>
 
-        <Dialog v-model:visible="mauSacDialog" :style="{ width: '450px' }" header="Chi tiết Màu Sắc" :modal="true">
+        <Dialog v-model:visible="mauSacDialog" :style="{ width: '450px' }" header="Chi Tiết Màu Sắc" :modal="true">
             <div class="flex flex-col gap-6">
                 <div>
                     <label for="maMauSac" class="block font-bold mb-3">Mã Màu Sắc</label>
@@ -64,7 +64,7 @@
                 </div>
                 <div>
                     <label for="tenMauSac" class="block font-bold mb-3">Tên Màu Sắc</label>
-                    <InputText id="tenMauSac" v-model.trim="mauSac.tenMauSac" required="true" :invalid="submitted && !mauSac.tenMauSac" fluid />
+                    <InputText id="tenMauSac" v-model.trim="mauSac.tenMauSac" required="true" :invalid="submitted && (!mauSac.tenMauSac || isDuplicateName)" fluid />
                     <small v-if="submitted && !mauSac.tenMauSac" class="text-red-500">Tên Màu Sắc là bắt buộc.</small>
                 </div>
                 <div>
@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
@@ -128,6 +128,21 @@ const statuses = ref([
     { label: 'Ngừng hoạt động', value: 0 }
 ]);
 
+// Computed property to check for duplicate names
+const isDuplicateName = computed(() => {
+    if (!mauSac.value.tenMauSac) return false;
+    
+    const trimmedName = mauSac.value.tenMauSac.trim().toLowerCase();
+    
+    return ListMauSac.value.some(item => {
+        // Skip checking against itself when editing
+        if (mauSac.value.id && item.id === mauSac.value.id) {
+            return false;
+        }
+        return item.tenMauSac && item.tenMauSac.trim().toLowerCase() === trimmedName;
+    });
+});
+
 onMounted(() => {
     fetchData();
 });
@@ -148,13 +163,13 @@ async function fetchData() {
 }
 
 function createId() {
-        let id = '';
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 8; i++) {
-            id += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return 'MS' + id;
+    let id = '';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+    return 'MS' + id;
+}
 
 function openNew() {
     mauSac.value = { 
@@ -174,7 +189,8 @@ function hideDialog() {
 async function saveMauSac() {
     submitted.value = true;
 
-    if (mauSac.value.maMauSac?.trim() && mauSac.value.tenMauSac?.trim()) {
+    // Check if required fields are filled and name is not duplicate
+    if (mauSac.value.maMauSac?.trim() && mauSac.value.tenMauSac?.trim() && !isDuplicateName.value) {
         try {
             if (mauSac.value.id) {
                 await axios.put(`http://localhost:8080/mau-sac/${mauSac.value.id}`, mauSac.value);
@@ -207,12 +223,21 @@ async function saveMauSac() {
             });
         }
     } else {
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
-            life: 3000
-        });
+        if (isDuplicateName.value) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Tên Màu Sắc đã tồn tại, vui lòng chọn tên khác',
+                life: 3000
+            });
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Vui lòng nhập đầy đủ thông tin bắt buộc',
+                life: 3000
+            });
+        }
     }
 }
 
@@ -304,9 +329,6 @@ function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
 }
 
-// function exportCSV() {
-//     dt.value.exportCSV();
-// }
 function exportCSV() {
     try {
         // If no data, show warning
