@@ -3,6 +3,8 @@ import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref , watch } from 'vue';
+import { useConfirm } from 'primevue/useconfirm';
+
 
 // Cấu hình API base URL
 const API_BASE_URL = 'http://localhost:8080';
@@ -23,6 +25,8 @@ const loadingDetails = ref({});
 const detailDialog = ref(false);
 const deleteDetailDialog = ref(false);
 const detail = ref({});
+// Thêm vào phần khai báo ref
+const confirm = useConfirm();
 
 // QR Code dialogs
 const qrDialog = ref(false);
@@ -52,8 +56,41 @@ const filters = ref({
 
 const statuses = ref([
     { label: 'ĐANG HOẠT ĐỘNG', value: 1 },
-    { label: 'Không HOẠT ĐỘNG', value: 0 }
+    { label: 'KHÔNG HOẠT ĐỘNG', value: 0 }
 ]);
+
+
+// THÊM: Bộ lọc chi tiết cho chi tiết sản phẩm  
+const detailFilters = ref({
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS },
+    'maChiTiet': { value: null, matchMode: FilterMatchMode.CONTAINS },
+    'color': { value: null, matchMode: FilterMatchMode.CONTAINS },
+    'size': { value: null, matchMode: FilterMatchMode.CONTAINS },
+    'trangThai': { value: null, matchMode: FilterMatchMode.EQUALS }
+});
+
+// THÊM: Computed cho options của bộ lọc
+const categoryOptions = computed(() => {
+    const categories = [...new Set(products.value.map(p => p.category).filter(c => c))];
+    return categories.map(cat => ({ label: cat, value: cat }));
+});
+
+const brandOptions = computed(() => {
+    const brands = [...new Set(products.value.map(p => p.brand).filter(b => b))];
+    return brands.map(brand => ({ label: brand, value: brand }));
+});
+
+const materialOptions = computed(() => {
+    const materials = [...new Set(products.value.map(p => p.material).filter(m => m))];
+    return materials.map(material => ({ label: material, value: material }));
+});
+
+const soleOptions = computed(() => {
+    const soles = [...new Set(products.value.map(p => p.sole).filter(s => s))];
+    return soles.map(sole => ({ label: sole, value: sole }));
+});
+
+
 
 // Quick Add Dialogs
 const quickAddDialog = ref(false);
@@ -617,19 +654,20 @@ const availableImages = computed(() => {
 });
 
 // Thêm các hàm xử lý
-function handleImageError(event) {  
-    // Tránh loop vô hạn
-    if (event.target.src.includes('placeholder.png')) {
-        console.log('⚠️ Already using placeholder, stopping');
-        return;
+function handleImageError(event) {
+    console.log('Image error:', event.target.src);
+    
+    // Ẩn hình ảnh thay vì show placeholder bị lỗi
+    event.target.style.display = 'none';
+    
+    // Hoặc thay thế bằng icon
+    const parent = event.target.parentElement;
+    if (parent && !parent.querySelector('.error-icon')) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-icon w-16 h-16 bg-gray-100 rounded border flex items-center justify-center';
+        errorDiv.innerHTML = '<i class="pi pi-image text-gray-400"></i>';
+        parent.appendChild(errorDiv);
     }
-    
-    // Thử fallback một lần
-    const originalSrc = event.target.src;
-    event.target.onerror = null; // Ngăn loop
-    
-    // Set placeholder
-    event.target.src = '/images/placeholder.png';
 }
 
 function openImageDetail(image) {
@@ -720,8 +758,9 @@ async function loadProducts() {
     try {
         loading.value = true;
         const response = await axios.get(`${API_BASE_URL}/api/san-pham`);
-        products.value = response.data.map((item) => ({
+        products.value = response.data.map((item, index) => ({
             ...item,
+            stt: index + 1, // THÊM: Số thứ tự
             inventoryStatus: item.trangThai === 1 ? 'ACTIVE' : 'INACTIVE',
             name: item.tenSanPham,
             code: item.maSanPham,
@@ -857,30 +896,53 @@ async function loadProductDetails(productId, showLoading = true) {
             createdAt: detail.ngayTao ? new Date(detail.ngayTao).toLocaleDateString('vi-VN') : 'N/A'
         }));
         
-        // SỬA PHẦN LOAD HÌNH ẢNH
+        // SỬA: Load hình ảnh bằng cách khác
         for (const detail of productDetails.value[productId]) {
             try {
+                // Thay vì dùng API chi-tiet-san-pham, dùng API lấy hình ảnh bằng ID
                 const imgResponse = await axios.get(`${API_BASE_URL}/hinh-anh/chi-tiet-san-pham/${detail.id}`);
                 
-                console.log(`Images for detail ${detail.id}:`, imgResponse.data); // Debug
+                console.log(`Images for detail ${detail.id}:`, imgResponse.data);
                 
-                detail.images = imgResponse.data.map((img) => {
-                    const imageUrl = createImageUrl(img.duongDan);
-                    
-                    console.log(`Detail ${detail.id} - Image ${img.id}:`, {
-                        tenHinhAnh: img.tenHinhAnh,
-                        duongDan: img.duongDan,
-                        generatedUrl: imageUrl
+                // Nếu API chỉ trả về array ID, cần load từng hình ảnh
+                if (imgResponse.data && imgResponse.data.length > 0) {
+                    const imagePromises = imgResponse.data.map(async (imgRef) => {
+                        try {
+                            // Nếu imgRef chỉ có id, load chi tiết hình ảnh
+                            if (imgRef.id && !imgRef.duongDan) {
+                                const fullImgResponse = await axios.get(`${API_BASE_URL}/hinh-anh/${imgRef.id}`);
+                                return fullImgResponse.data;
+                            }
+                            return imgRef;
+                        } catch (error) {
+                            console.error(`Error loading image ${imgRef.id}:`, error);
+                            return null;
+                        }
                     });
                     
-                    return {
-                        id: img.id,
-                        maHinhAnh: img.maHinhAnh,
-                        tenHinhAnh: img.tenHinhAnh,
-                        trangThai: img.trangThai,
-                        url: imageUrl
-                    };
-                });
+                    const fullImages = await Promise.all(imagePromises);
+                    
+                    detail.images = fullImages.filter(img => img).map((img) => {
+                        const imageUrl = createImageUrl(img.duongDan);
+                        
+                        console.log(`Detail ${detail.id} - Image ${img.id}:`, {
+                            tenHinhAnh: img.tenHinhAnh,
+                            duongDan: img.duongDan,
+                            generatedUrl: imageUrl
+                        });
+                        
+                        return {
+                            id: img.id,
+                            maHinhAnh: img.maHinhAnh,
+                            tenHinhAnh: img.tenHinhAnh,
+                            trangThai: img.trangThai,
+                            url: imageUrl,
+                            duongDan: img.duongDan
+                        };
+                    });
+                } else {
+                    detail.images = [];
+                }
             } catch (imgError) {
                 console.error(`Lỗi khi tải hình ảnh cho chi tiết ${detail.maChiTiet}:`, imgError);
                 detail.images = [];
@@ -889,7 +951,12 @@ async function loadProductDetails(productId, showLoading = true) {
     } catch (error) {
         console.error('Lỗi khi tải chi tiết sản phẩm:', error.response?.status, error.response?.data);
         if (showLoading) {
-            toast.add({ severity: 'error', summary: 'Lỗi', detail: `Không thể tải chi tiết sản phẩm: ${error.response?.data?.message || error.message}`, life: 3000 });
+            toast.add({ 
+                severity: 'error', 
+                summary: 'Lỗi', 
+                detail: `Không thể tải chi tiết sản phẩm: ${error.response?.data?.message || error.message}`, 
+                life: 3000 
+            });
         }
     } finally {
         if (showLoading) {
@@ -937,18 +1004,28 @@ function createProductId() {
 
 // Dialog functions for Product
 function openNew() {
-    product.value = {
-        tenSanPham: '',
-        maSanPham: createProductId(),
-        soLuong: 0,
-        trangThai: 1,
-        danhMuc: null,
-        thuongHieu: null,
-        chatLieu: null,
-        deGiay: null
-    };
-    submitted.value = false;
-    productDialog.value = true;
+    confirm.require({
+        message: 'Bạn có muốn thêm sản phẩm mới không?',
+        header: 'Xác nhận thêm mới',
+        icon: 'pi pi-question-circle',
+        rejectClass: 'p-button-secondary p-button-outlined',
+        rejectLabel: 'Hủy',
+        acceptLabel: 'Có',
+        accept: () => {
+            product.value = {
+                tenSanPham: '',
+                maSanPham: createProductId(),
+                soLuong: 0,
+                trangThai: 1,
+                danhMuc: null,
+                thuongHieu: null,
+                chatLieu: null,
+                deGiay: null
+            };
+            submitted.value = false;
+            productDialog.value = true;
+        }
+    });
 }
 
 function hideDialog() {
@@ -1094,25 +1171,35 @@ async function deleteSelectedProducts() {
 // Dialog functions for Product Details - Updated for multi-select with images
 // 1. HÀM MỞ DIALOG THÊM MỚI - CHO PHÉP NHIỀU MÀU VÀ SIZE
 function openNewDetail(productId) {
-    detail.value = {
-        maChiTiet: createId(),
-        soLuong: 0,
-        giaGoc: null,
-        giaBan: null,
-        trangThai: 1,
-        mauSacs: [], // NHIỀU MÀU SẮC
-        kichCos: [], // NHIỀU KÍCH CỠ
-        variantImages: {}, // THAY ĐỔI: Object chứa hình ảnh cho từng biến thể
-        sanPham: { id: productId },
-        isEditing: false
-    };
-    
-    selectedMauSac.value = null;
-    selectedKichCo.value = null;
-    selectedImage.value = null;
-    
-    submitted.value = false;
-    detailDialog.value = true;
+    confirm.require({
+        message: 'Bạn có muốn thêm chi tiết sản phẩm mới không?',
+        header: 'Xác nhận thêm chi tiết',
+        icon: 'pi pi-question-circle',
+        rejectClass: 'p-button-secondary p-button-outlined',
+        rejectLabel: 'Hủy',
+        acceptLabel: 'Có',
+        accept: () => {
+            detail.value = {
+                maChiTiet: createId(),
+                soLuong: 0,
+                giaGoc: null,
+                giaBan: null,
+                trangThai: 1,
+                mauSacs: [],
+                kichCos: [],
+                variantImages: {},
+                sanPham: { id: productId },
+                isEditing: false
+            };
+            
+            selectedMauSac.value = null;
+            selectedKichCo.value = null;
+            selectedImage.value = null;
+            
+            submitted.value = false;
+            detailDialog.value = true;
+        }
+    });
 }
 
 // Hàm tạo key cho biến thể
@@ -1269,24 +1356,28 @@ function editDetail(detailData, productId) {
 }
 
 function createImageUrl(duongDan) {
-    if (!duongDan) return '/images/placeholder.png';
+    if (!duongDan) return null; // Trả về null thay vì placeholder
     
-    // Debug log
     console.log('Original duongDan:', duongDan);
     
-    // Clean path - loại bỏ tất cả prefix
-    let cleanPath = duongDan;
-    if (cleanPath.startsWith('/hinh-anh/images/')) {
-        cleanPath = cleanPath.replace('/hinh-anh/images/', '');
-    } else if (cleanPath.startsWith('/images/')) {
-        cleanPath = cleanPath.replace('/images/', '');
+    // Nếu đã là URL đầy đủ
+    if (duongDan.startsWith('http://') || duongDan.startsWith('https://')) {
+        return duongDan;
     }
     
-    // Tạo URL đầy đủ
-    const fullUrl = `${API_BASE_URL}/hinh-anh/images/${cleanPath}`;
-    console.log('Generated URL:', fullUrl);
+    // Xử lý đường dẫn
+    let cleanPath = duongDan;
     
-    return fullUrl;
+    // Loại bỏ prefix nếu có
+    if (cleanPath.startsWith('/')) {
+        cleanPath = cleanPath.substring(1);
+    }
+    
+    // Backend của bạn serve hình ảnh tại đâu? Thử các pattern:
+    const imageUrl = `${API_BASE_URL}/${cleanPath}`;
+    
+    console.log('Generated URL:', imageUrl);
+    return imageUrl;
 }
 
 // THÊM HÀM MỚI: Load hình ảnh hiện có
@@ -1297,8 +1388,18 @@ async function loadCurrentImages(detailId) {
         console.log(`Current images for detail ${detailId}:`, response.data);
         
         if (response.data && response.data.length > 0) {
-            // Chỉ lấy hình ảnh đầu tiên
-            const img = response.data[0];
+            // Lấy hình ảnh đầu tiên
+            const imgRef = response.data[0];
+            
+            let img;
+            if (imgRef.id && !imgRef.duongDan) {
+                // Load chi tiết hình ảnh nếu chỉ có ID
+                const fullImgResponse = await axios.get(`${API_BASE_URL}/hinh-anh/${imgRef.id}`);
+                img = fullImgResponse.data;
+            } else {
+                img = imgRef;
+            }
+            
             const imageUrl = createImageUrl(img.duongDan);
             
             console.log(`Current image ${img.id}:`, {
@@ -1313,7 +1414,8 @@ async function loadCurrentImages(detailId) {
                 tenHinhAnh: img.tenHinhAnh,
                 trangThai: img.trangThai,
                 url: imageUrl,
-                preview: imageUrl
+                preview: imageUrl,
+                duongDan: img.duongDan
             };
         } else {
             detail.value.selectedImage = null;
@@ -1848,6 +1950,7 @@ function collapseAll() {
 
                 <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
                 <Column expander style="width: 3rem"></Column>
+                <Column field="stt" header="STT" style="width: 5rem" sortable></Column>
                 <Column field="maSanPham" header="Mã SP" sortable style="min-width: 10rem"></Column>
                 <Column field="tenSanPham" header="Tên sản phẩm" sortable style="min-width: 16rem"></Column>
                 <Column header="Số lượng" sortable style="min-width: 8rem">
@@ -1903,11 +2006,16 @@ function collapseAll() {
                     <div v-else-if="productDetails[slotProps.data.id] && productDetails[slotProps.data.id].length" class="p-4">
                         <div class="flex justify-between items-center mb-4">
                             <div>
-                                <h5>Thêm sản phẩm: {{ slotProps.data.tenSanPham }}</h5>
+                                <h5>Chi tiết sản phẩm: {{ slotProps.data.tenSanPham }}</h5>
                             </div>
                             <Button label="Thêm chi tiết" icon="pi pi-plus" severity="secondary" @click="openNewDetail(slotProps.data.id)" :loading="loading" />
                         </div>
                         <DataTable :value="productDetails[slotProps.data.id]" tableStyle="min-width: 50rem">
+                            <Column header="STT" style="width: 5rem">
+                                <template #body="detailProps">
+                                    {{ detailProps.index + 1 }}
+                                </template>
+                            </Column>
                             <Column field="maChiTiet" header="Mã chi tiết" sortable style="min-width: 10rem"></Column>
                             <Column field="size" header="Kích cỡ" sortable style="min-width: 8rem"></Column>
                             <Column field="color" header="Màu sắc" sortable style="min-width: 8rem"></Column>
@@ -1934,19 +2042,23 @@ function collapseAll() {
                                             :key="img.id" 
                                             class="relative"
                                         >
+                                            <!-- Chỉ hiển thị img nếu có URL hợp lệ -->
                                             <img 
+                                                v-if="img.url && !img.url.includes('placeholder')"
                                                 :src="img.url" 
                                                 :alt="img.tenHinhAnh"
                                                 class="w-16 h-16 object-cover rounded border cursor-pointer hover:scale-105 transition-transform shadow-sm"
                                                 @click="openImageDetail(img)"
                                                 @error="handleImageError($event)"
                                             />
-                                            <Badge 
-                                                v-if="img.trangThai === 0" 
-                                                value="Đang tải" 
-                                                severity="warning" 
-                                                class="absolute -top-2 -right-2 text-xs"
-                                            />
+                                            <!-- Fallback khi không có hình ảnh -->
+                                            <div 
+                                                v-else
+                                                class="w-16 h-16 bg-gray-100 rounded border flex items-center justify-center"
+                                            >
+                                                <i class="pi pi-image text-gray-400"></i>
+                                            </div>
+
                                         </div>
                                         <div 
                                             v-if="detailProps.data.images.length > 3"
@@ -2295,12 +2407,25 @@ function collapseAll() {
                     <div v-if="detail.selectedImage" class="p-3 border border-gray-200 rounded">
                         <div class="flex flex-col items-center">
                             <div class="relative group">
+                                <!-- Chỉ hiển thị nếu có URL hợp lệ -->
                                 <img 
+                                    v-if="detail.selectedImage.url && !detail.selectedImage.url.includes('placeholder')"
                                     :src="detail.selectedImage.url || detail.selectedImage.preview" 
                                     :alt="detail.selectedImage.tenHinhAnh"
                                     class="w-64 h-64 object-cover rounded border shadow-sm"
                                     @error="handleImageError($event)"
                                 />
+                                <!-- Fallback -->
+                                <div 
+                                    v-else
+                                    class="w-64 h-64 bg-gray-100 rounded border flex items-center justify-center"
+                                >
+                                    <div class="text-center">
+                                        <i class="pi pi-image text-gray-400 text-4xl mb-2"></i>
+                                        <div class="text-gray-500">Không thể tải hình ảnh</div>
+                                    </div>
+                                </div>
+                                
                                 <Button 
                                     icon="pi pi-times" 
                                     class="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -2311,7 +2436,6 @@ function collapseAll() {
                                 />
                             </div>
                             <div class="flex-1 text-center">
-                                <!-- <div class="font-medium text-gray-900">{{ detail.selectedImage.maHinhAnh }}</div> -->
                                 <div class="text-xl font-bold text-black-900">{{ detail.selectedImage.tenHinhAnh }}</div>
                                 <div class="text-xs text-black-500 mt-1">{{ detail.selectedImage.duongDan }}</div>
                             </div>
@@ -2507,15 +2631,25 @@ function collapseAll() {
                     class="max-h-96"
                 >
                     <Column selectionMode="single" style="width: 3rem"></Column>
-                    <Column header="Hình ảnh" style="width: 120px">
+                   <Column header="Hình ảnh" style="width: 120px">
                         <template #body="slotProps">
+                            <!-- Chỉ hiển thị nếu có URL hợp lệ -->
                             <img 
+                                v-if="slotProps.data.preview && !slotProps.data.preview.includes('placeholder')"
                                 :src="slotProps.data.preview" 
                                 :alt="slotProps.data.tenHinhAnh"
                                 class="w-16 h-16 object-cover rounded border shadow-sm cursor-pointer hover:scale-105 transition-transform"
                                 @error="handleImageError($event)"
                                 @click="selectedImage = slotProps.data"
                             />
+                            <!-- Fallback -->
+                            <div 
+                                v-else
+                                class="w-16 h-16 bg-gray-100 rounded border flex items-center justify-center cursor-pointer"
+                                @click="selectedImage = slotProps.data"
+                            >
+                                <i class="pi pi-image text-gray-400"></i>
+                            </div>
                         </template>
                     </Column>
                     <Column field="maHinhAnh" header="Mã hình ảnh" sortable style="min-width: 12rem">
