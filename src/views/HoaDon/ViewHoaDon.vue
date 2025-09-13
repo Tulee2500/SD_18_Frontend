@@ -1,661 +1,3 @@
-<template>
-    <div class="invoice-management">
-        <!-- Toast Component -->
-        <Toast />
-
-        <!-- Header Section -->
-        <div class="header-section bg-gradient-primary mb-4 rounded p-4 text-white">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <h2 class="h3 fw-bold mb-2">Quản Lý Hóa Đơn</h2>
-                    <p class="text-white-50 mb-0">Hệ thống quản lý hóa đơn POS & Online</p>
-                </div>
-                <div class="d-flex gap-2">
-                    <button @click="refreshAllData" :disabled="isLoading" class="btn btn-outline-light btn-sm">
-                        <i :class="isLoading ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'" class="me-1"></i>
-                        {{ isLoading ? 'Đang tải...' : 'Làm mới' }}
-                    </button>
-                    <button @click="exportData" class="btn btn-success btn-sm">
-                        <i class="pi pi-download me-1"></i>
-                        Xuất dữ liệu
-                    </button>
-                </div>
-            </div>
-
-            <!-- Tab Navigation -->
-            <ul class="nav nav-pills">
-                <li class="nav-item" v-for="tab in tabs" :key="tab.id">
-                    <button @click="activeTab = tab.id" :class="['nav-link', { active: activeTab === tab.id }]" class="text-white">
-                        <i :class="tab.icon" class="me-1"></i>
-                        {{ tab.label }}
-                        <span v-if="tab.count !== undefined" class="badge bg-light text-dark ms-1">
-                            {{ tab.count }}
-                        </span>
-                    </button>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Statistics Cards -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-6 col-lg-3">
-                <div class="card border-start border-3 bg-light border-primary">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1 text-primary">Tổng hóa đơn</h6>
-                                <h3 class="mb-2 text-primary">{{ hoaDons.length }}</h3>
-                                <div class="d-flex gap-2">
-                                    <span class="badge bg-info">POS: {{ posInvoices.length }}</span>
-                                    <span class="badge bg-success">Online: {{ onlineInvoices.length }}</span>
-                                </div>
-                            </div>
-                            <i class="pi pi-file-text text-primary" style="font-size: 2rem"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="card border-start border-success border-3 bg-light">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-success mb-1">Tổng doanh thu</h6>
-                                <h3 class="text-success mb-2">{{ formatCurrency(totalRevenue) }}</h3>
-                                <div class="d-flex gap-2">
-                                    <span class="badge bg-warning">POS: {{ formatCurrency(posRevenue) }}</span>
-                                    <span class="badge bg-info">Online: {{ formatCurrency(onlineRevenue) }}</span>
-                                </div>
-                            </div>
-                            <i class="pi pi-money-bill text-success" style="font-size: 2rem"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="card border-start border-info border-3 bg-light">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-info mb-1">Hoàn thành</h6>
-                                <h3 class="text-info mb-2">{{ completedInvoices }}</h3>
-                                <span class="badge bg-secondary">Tỷ lệ: {{ completionRate }}%</span>
-                            </div>
-                            <i class="pi pi-check-circle text-info" style="font-size: 2rem"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="card border-start border-warning border-3 bg-light">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-warning mb-1">Cần xử lý</h6>
-                                <h3 class="text-warning mb-2">{{ pendingInvoices }}</h3>
-                                <span class="badge bg-danger">Khẩn cấp: {{ urgentInvoices }}</span>
-                            </div>
-                            <i class="pi pi-clock text-warning" style="font-size: 2rem"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Search and Filter -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label">Tìm kiếm</label>
-                        <div class="input-group">
-                            <span class="input-group-text">
-                                <i class="pi pi-search"></i>
-                            </span>
-                            <input v-model="searchKeyword" @input="onSearch" class="form-control" placeholder="Tìm kiếm hóa đơn, khách hàng..." />
-                        </div>
-                    </div>
-
-                    <div class="col-md-2">
-                        <label class="form-label">Loại hóa đơn</label>
-                        <select v-model="typeFilter" @change="applyFilters" class="form-select">
-                            <option value="">Tất cả loại</option>
-                            <option value="OFFLINE">POS (Tại quầy)</option>
-                            <option value="ONLINE">Online</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2">
-                        <label class="form-label">Trạng thái</label>
-                        <select v-model="statusFilter" @change="applyFilters" class="form-select">
-                            <option value="">Tất cả trạng thái</option>
-                            <option value="DRAFT">Đang tạo</option>
-                            <option value="PENDING">Chờ xác nhận</option>
-                            <option value="CONFIRMED">Đã xác nhận</option>
-                            <option value="COMPLETED">Hoàn thành</option>
-                            <option value="CANCELLED">Đã hủy</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2">
-                        <label class="form-label">Ngày tạo</label>
-                        <Calendar v-model="dateFilter" @date-select="applyFilters" placeholder="Chọn ngày" dateFormat="dd/mm/yy" class="form-control" />
-                    </div>
-
-                    <div class="col-md-2">
-                        <button @click="showAdvancedFilter = !showAdvancedFilter" class="btn btn-outline-secondary w-100">
-                            <i class="pi pi-filter me-1"></i>
-                            Lọc nâng cao
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Advanced Filters -->
-                <div v-if="showAdvancedFilter" class="border-top mt-3 pt-3">
-                    <h6 class="mb-3">Bộ lọc nâng cao</h6>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Khoảng tiền</label>
-                            <div class="row g-2">
-                                <div class="col">
-                                    <InputNumber v-model="minAmount" placeholder="Từ" mode="currency" currency="VND" locale="vi-VN" class="form-control" />
-                                </div>
-                                <div class="col">
-                                    <InputNumber v-model="maxAmount" placeholder="Đến" mode="currency" currency="VND" locale="vi-VN" class="form-control" />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Nhân viên xử lý</label>
-                            <select v-model="staffFilter" class="form-select">
-                                <option value="">Tất cả nhân viên</option>
-                                <option v-for="staff in staffList" :key="staff.id" :value="staff.id">
-                                    {{ staff.name }}
-                                </option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Phương thức thanh toán</label>
-                            <select v-model="paymentMethodFilter" class="form-select">
-                                <option value="">Tất cả</option>
-                                <option value="CASH">Tiền mặt</option>
-                                <option value="CARD">Thẻ</option>
-                                <option value="BANK_TRANSFER">Chuyển khoản</option>
-                                <option value="E_WALLET">Ví điện tử</option>
-                                <option value="COD">COD</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <button @click="applyAdvancedFilters" class="btn btn-primary me-2">Áp dụng</button>
-                        <button @click="clearAllFilters" class="btn btn-secondary">Xóa bộ lọc</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Loading State -->
-        <div v-if="isLoading" class="py-5 text-center">
-            <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" />
-            <p class="h5 text-muted mt-3">Đang tải dữ liệu từ API...</p>
-            <p class="text-muted">{{ loadingMessage }}</p>
-        </div>
-
-        <!-- Error State -->
-        <div v-else-if="hasError" class="py-5 text-center">
-            <i class="pi pi-exclamation-triangle text-danger display-1 mb-3"></i>
-            <h4 class="text-danger mb-2">Lỗi kết nối API</h4>
-            <p class="text-muted mb-3">{{ errorMessage }}</p>
-            <div class="d-flex justify-content-center gap-2">
-                <button @click="retryConnection" class="btn btn-danger">
-                    <i class="pi pi-refresh me-1"></i>
-                    Thử lại
-                </button>
-                <button @click="goToLogin" class="btn btn-outline-primary" v-if="errorMessage.includes('xác thực')">
-                    <i class="pi pi-sign-in me-1"></i>
-                    Đăng nhập lại
-                </button>
-            </div>
-        </div>
-
-        <!-- Data Table -->
-        <div v-else class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Danh sách hóa đơn</h5>
-            </div>
-            <div class="card-body p-0">
-                <DataTable
-                    ref="dt"
-                    :value="filteredHoaDons"
-                    dataKey="id"
-                    :paginator="true"
-                    :rows="itemsPerPage"
-                    :totalRecords="filteredHoaDons.length"
-                    :loading="isLoading"
-                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-                    :rowsPerPageOptions="[5, 10, 25, 50]"
-                    currentPageReportTemplate="Hiển thị {first} đến {last} trong tổng số {totalRecords} hóa đơn"
-                    tableStyle="min-width: 60rem"
-                    sortMode="single"
-                    @sort="onSort"
-                    class="table-responsive"
-                >
-                    <Column field="id" header="ID" sortable style="min-width: 8rem">
-                        <template #body="slotProps">
-                            <span class="fw-bold text-primary">#{{ slotProps.data.id }}</span>
-                        </template>
-                    </Column>
-
-                    <Column field="maHoaDon" header="Mã HĐ" sortable style="min-width: 10rem">
-                        <template #body="slotProps">
-                            <span class="badge bg-secondary">{{ slotProps.data.maHoaDon }}</span>
-                        </template>
-                    </Column>
-
-                    <Column field="loaiHoaDon" header="Loại" style="min-width: 8rem">
-                        <template #body="slotProps">
-                            <span :class="['badge', slotProps.data.loaiHoaDon === 'OFFLINE' ? 'bg-warning' : 'bg-success']">
-                                <i :class="slotProps.data.loaiHoaDon === 'OFFLINE' ? 'pi pi-desktop' : 'pi pi-globe'" class="me-1"></i>
-                                {{ slotProps.data.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online' }}
-                            </span>
-                        </template>
-                    </Column>
-
-                    <Column field="ngayTao" header="Ngày tạo" sortable style="min-width: 12rem">
-                        <template #body="slotProps">
-                            <div class="d-flex align-items-center">
-                                <i class="pi pi-calendar text-muted me-2"></i>
-                                <small>{{ formatDate(slotProps.data.ngayTao) }}</small>
-                            </div>
-                        </template>
-                    </Column>
-
-                    <Column field="tenKhachHang" header="Khách hàng" style="min-width: 16rem">
-                        <template #body="slotProps">
-                            <div class="d-flex align-items-center">
-                                <div class="avatar rounded-circle d-flex align-items-center justify-content-center me-2 bg-primary text-white" style="width: 32px; height: 32px; font-size: 12px">
-                                    {{ getInitials(getCustomerName(slotProps.data)) }}
-                                </div>
-                                <div>
-                                    <div class="fw-semibold">{{ getCustomerName(slotProps.data) }}</div>
-                                    <small v-if="slotProps.data.sdt" class="text-muted"> <i class="pi pi-phone me-1"></i>{{ slotProps.data.sdt }} </small>
-                                </div>
-                            </div>
-                        </template>
-                    </Column>
-
-                    <Column field="tongTien" header="Tổng tiền" sortable style="min-width: 12rem">
-                        <template #body="slotProps">
-                            <div class="d-flex align-items-center">
-                                <i class="pi pi-money-bill text-success me-2"></i>
-                                <span class="fw-bold text-success">{{ formatCurrency(slotProps.data.tongTien) }}</span>
-                            </div>
-                        </template>
-                    </Column>
-
-                    <Column field="trangThaiHoaDon" header="Trạng thái" style="min-width: 12rem">
-                        <template #body="slotProps">
-                            <span :class="['badge', 'bg-' + getStatusColor(slotProps.data.trangThaiHoaDon)]">
-                                <i :class="getStatusIcon(slotProps.data.trangThaiHoaDon)" class="me-1"></i>
-                                {{ getStatusLabel(slotProps.data.trangThaiHoaDon) }}
-                            </span>
-                        </template>
-                    </Column>
-
-                    <Column header="Workflow" style="min-width: 20rem">
-                        <template #body="slotProps">
-                            <div class="d-flex align-items-center">
-                                <div v-for="(step, index) in getWorkflowSteps(slotProps.data.loaiHoaDon)" :key="step" class="d-flex align-items-center">
-                                    <div :class="['workflow-step', 'rounded', 'px-2', 'py-1', getStepBootstrapClass(slotProps.data, step)]" :title="getStepLabel(step)">
-                                        <i :class="getStepIcon(step)" style="font-size: 10px"></i>
-                                    </div>
-                                    <div v-if="index < getWorkflowSteps(slotProps.data.loaiHoaDon).length - 1" class="workflow-arrow mx-1"></div>
-                                </div>
-                            </div>
-                        </template>
-                    </Column>
-
-                    <Column header="Thao tác" style="min-width: 12rem">
-                        <template #body="slotProps">
-                            <div class="d-flex gap-1">
-                                <button @click="viewChiTiet(slotProps.data)" class="btn btn-outline-primary btn-sm" title="Xem chi tiết">
-                                    <i class="pi pi-eye"></i>
-                                </button>
-                                <button v-if="canUpdateStatus(slotProps.data)" @click="updateInvoiceStatus(slotProps.data)" class="btn btn-outline-success btn-sm" title="Cập nhật trạng thái">
-                                    <i class="pi pi-arrow-right"></i>
-                                </button>
-                            </div>
-                        </template>
-                    </Column>
-                </DataTable>
-
-                <!-- Empty State -->
-                <div v-if="filteredHoaDons.length === 0 && !isLoading" class="py-5 text-center">
-                    <i class="pi pi-file-o text-muted display-1 mb-3"></i>
-                    <h5 class="text-muted mb-2">Không tìm thấy hóa đơn</h5>
-                    <p class="text-muted">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal chi tiết hóa đơn -->
-        <div class="modal fade" id="detailModal" tabindex="-1" ref="detailModal">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="pi pi-file-text me-2"></i>
-                            Chi tiết hóa đơn {{ selectedHoaDon?.maHoaDon }}
-                        </h5>
-                        <button type="button" class="btn-close" @click="closeChiTietDialog"></button>
-                    </div>
-                    <div class="modal-body" v-if="selectedHoaDon">
-                        <!-- Workflow Progress -->
-                        <div class="card mb-3">
-                            <div class="card-header">
-                                <h6 class="card-title mb-0">Tiến trình xử lý</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div v-for="(step, index) in getWorkflowSteps(selectedHoaDon.loaiHoaDon)" :key="step" class="d-flex flex-fill align-items-center">
-                                        <div class="d-flex flex-column align-items-center flex-fill">
-                                            <div :class="['workflow-step-detail', 'rounded-circle', 'd-flex', 'align-items-center', 'justify-content-center', 'border', 'border-2', getDetailStepBootstrapClass(selectedHoaDon, step)]">
-                                                <i :class="getStepIcon(step)" style="font-size: 14px"></i>
-                                            </div>
-                                            <small class="fw-medium mt-2 text-center">{{ getStepLabel(step) }}</small>
-                                            <small v-if="isStepActive(selectedHoaDon, step)" class="text-primary">Đang thực hiện</small>
-                                            <small v-else-if="isStepCompleted(selectedHoaDon, step)" class="text-success">Hoàn thành</small>
-                                        </div>
-                                        <div
-                                            v-if="index < getWorkflowSteps(selectedHoaDon.loaiHoaDon).length - 1"
-                                            :class="['workflow-connector', isStepCompleted(selectedHoaDon, step) || isStepActive(selectedHoaDon, step) ? 'completed' : 'pending']"
-                                        ></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Actions Bar -->
-                        <div class="d-flex justify-content-end bg-light mb-3 gap-2 rounded p-3">
-                            <button v-if="canProcessNextStep(selectedHoaDon)" @click="processNextStepWithRefresh(selectedHoaDon)" class="btn btn-success btn-sm">
-                                <i class="pi pi-arrow-right me-1"></i>
-                                {{ getNextStepAction(selectedHoaDon) }}
-                            </button>
-                            <button v-if="canCancelInvoice(selectedHoaDon)" @click="cancelInvoice(selectedHoaDon)" class="btn btn-danger btn-sm">
-                                <i class="pi pi-times me-1"></i>
-                                Hủy đơn
-                            </button>
-                            <button v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE'" @click="printInvoice(selectedHoaDon)" class="btn btn-info btn-sm">
-                                <i class="pi pi-print me-1"></i>
-                                In hóa đơn
-                            </button>
-                            <button v-if="selectedHoaDon.loaiHoaDon === 'ONLINE'" @click="trackingInfo(selectedHoaDon)" class="btn btn-warning btn-sm">
-                                <i class="pi pi-map-marker me-1"></i>
-                                Tracking
-                            </button>
-                        </div>
-
-                        <!-- Thông tin chi tiết -->
-                        <div class="row g-3 mb-4">
-                            <!-- Thông tin hóa đơn -->
-                            <div class="col-lg-4">
-                                <div class="card h-100">
-                                    <div class="card-header">
-                                        <h6 class="card-title mb-0">Thông tin hóa đơn</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row g-2">
-                                            <div class="col-6"><strong>Mã HĐ:</strong></div>
-                                            <div class="col-6">
-                                                <span class="badge bg-secondary">{{ selectedHoaDon.maHoaDon }}</span>
-                                            </div>
-                                            <div class="col-6"><strong>Loại:</strong></div>
-                                            <div class="col-6">
-                                                <span :class="['badge', selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'bg-warning' : 'bg-success']">
-                                                    {{ selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online' }}
-                                                </span>
-                                            </div>
-                                            <div class="col-6"><strong>Ngày tạo:</strong></div>
-                                            <div class="col-6">{{ formatDate(selectedHoaDon.ngayTao) }}</div>
-                                            <div class="col-6"><strong>Tổng tiền:</strong></div>
-                                            <div class="col-6">
-                                                <span class="fw-bold text-success">{{ formatCurrency(selectedHoaDon.tongTien) }}</span>
-                                            </div>
-                                            <div class="col-6"><strong>Trạng thái:</strong></div>
-                                            <div class="col-6">
-                                                <span :class="['badge', 'bg-' + getStatusColor(selectedHoaDon.trangThaiHoaDon)]">
-                                                    {{ getStatusLabel(selectedHoaDon.trangThaiHoaDon) }}
-                                                </span>
-                                            </div>
-                                            <div v-if="selectedHoaDon.tenNhanVien" class="col-6"><strong>Nhân viên:</strong></div>
-                                            <div v-if="selectedHoaDon.tenNhanVien" class="col-6">{{ selectedHoaDon.tenNhanVien }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Thông tin khách hàng -->
-                            <div class="col-lg-4">
-                                <div class="card h-100">
-                                    <div class="card-header">
-                                        <h6 class="card-title mb-0">Thông tin khách hàng</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row g-2">
-                                            <div class="col-4"><strong>Tên:</strong></div>
-                                            <div class="col-8">{{ getCustomerName(selectedHoaDon) }}</div>
-                                            <div v-if="selectedHoaDon.sdt" class="col-4"><strong>SĐT:</strong></div>
-                                            <div v-if="selectedHoaDon.sdt" class="col-8">{{ selectedHoaDon.sdt }}</div>
-                                            <div v-if="selectedHoaDon.email" class="col-4"><strong>Email:</strong></div>
-                                            <div v-if="selectedHoaDon.email" class="col-8">{{ selectedHoaDon.email }}</div>
-                                            <div v-if="selectedHoaDon.diaChi" class="col-4"><strong>Địa chỉ:</strong></div>
-                                            <div v-if="selectedHoaDon.diaChi" class="col-8">{{ selectedHoaDon.diaChi }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Thông tin thanh toán -->
-                            <div class="col-lg-4">
-                                <div class="card h-100">
-                                    <div class="card-header">
-                                        <h6 class="card-title mb-0">Thanh toán</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row g-2">
-                                            <div class="col-6"><strong>Phương thức:</strong></div>
-                                            <div class="col-6">{{ selectedHoaDon.phuongThucThanhToan || 'Chưa xác định' }}</div>
-                                            <div v-if="selectedHoaDon.ngayXacNhan" class="col-6"><strong>Ngày xác nhận:</strong></div>
-                                            <div v-if="selectedHoaDon.ngayXacNhan" class="col-6">{{ formatDate(selectedHoaDon.ngayXacNhan) }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Chi tiết sản phẩm -->
-                        <div class="card">
-                            <div class="card-header">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6 class="card-title mb-0">
-                                        <i class="pi pi-list me-2"></i>
-                                        Chi tiết sản phẩm ({{ hoaDonChiTiets.length }} mặt hàng)
-                                    </h6>
-                                    <div class="d-flex gap-2">
-                                        <div class="input-group input-group-sm" style="width: 200px">
-                                            <span class="input-group-text">
-                                                <i class="pi pi-search"></i>
-                                            </span>
-                                            <input v-model="searchChiTietKeyword" class="form-control" placeholder="Tìm kiếm sản phẩm..." />
-                                        </div>
-                                        <button v-if="canEditItems(selectedHoaDon)" @click="editPOSItems(selectedHoaDon)" class="btn btn-outline-primary btn-sm">
-                                            <i class="pi pi-pencil me-1"></i>
-                                            Sửa
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <!-- Loading Chi Tiết -->
-                                <div v-if="isLoadingChiTiet" class="py-4 text-center">
-                                    <ProgressSpinner style="width: 30px; height: 30px" strokeWidth="8" />
-                                    <p class="text-muted mt-2">Đang tải chi tiết hóa đơn...</p>
-                                </div>
-
-                                <!-- Chi Tiết Table -->
-                                <div v-else class="table-responsive">
-                                    <table class="table-hover table">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>STT</th>
-                                                <th>Tên sản phẩm</th>
-                                                <th>Thuộc tính</th>
-                                                <th>Giá bán</th>
-                                                <th>Số lượng</th>
-                                                <th>Thành tiền</th>
-                                                <!-- <th v-if="canEditItems(selectedHoaDon)">Thao tác</th> -->
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="(item, index) in filteredChiTiets" :key="item.id">
-                                                <td>
-                                                    <span class="badge bg-secondary">{{ index + 1 }}</span>
-                                                </td>
-                                                <td>
-                                                    <div>
-                                                        <div class="fw-medium">{{ item.tenSanPham || 'N/A' }}</div>
-                                                        <small v-if="item.maSanPham" class="text-muted">Mã: {{ item.maSanPham }}</small>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="d-flex gap-1">
-                                                        <span v-if="item.mauSac" class="badge bg-info">{{ item.mauSac }}</span>
-                                                        <span v-if="item.kichThuoc" class="badge bg-success">{{ item.kichThuoc }}</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span class="fw-bold text-success">{{ formatCurrency(item.giaBan) }}</span>
-                                                </td>
-                                                <td>
-                                                    <div v-if="isEditingItem(item.id)" class="d-flex align-items-center gap-1">
-                                                        <InputNumber v-model="editQuantity" :min="1" class="form-control form-control-sm" style="width: 80px" />
-                                                        <button @click="saveQuantity(item.id)" class="btn btn-success btn-sm">
-                                                            <i class="pi pi-check"></i>
-                                                        </button>
-                                                        <button @click="cancelEdit()" class="btn btn-secondary btn-sm">
-                                                            <i class="pi pi-times"></i>
-                                                        </button>
-                                                    </div>
-                                                    <span v-else class="badge bg-primary">{{ item.soLuong }}</span>
-                                                </td>
-                                                <td>
-                                                    <span class="fw-bold text-primary">{{ formatCurrency(item.giaBan * item.soLuong) }}</span>
-                                                </td>
-                                                <td v-if="canEditItems(selectedHoaDon)">
-                                                    <div class="d-flex gap-1">
-                                                        <button v-if="!isEditingItem(item.id)" @click="editItem(item)" class="btn btn-outline-primary btn-sm" title="Sửa số lượng">
-                                                            <i class="pi pi-pencil"></i>
-                                                        </button>
-                                                        <button @click="removeItem(item.id)" class="btn btn-outline-danger btn-sm" title="Xóa sản phẩm">
-                                                            <i class="pi pi-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-
-                                    <!-- Empty State for Chi Tiet -->
-                                    <div v-if="filteredChiTiets.length === 0" class="py-4 text-center">
-                                        <i class="pi pi-info-circle text-muted display-4 mb-3"></i>
-                                        <h6 class="text-muted mb-2">Không có chi tiết nào</h6>
-                                        <p class="text-muted">Hóa đơn này chưa có chi tiết sản phẩm.</p>
-                                    </div>
-                                </div>
-
-                                <!-- Tổng kết -->
-                                <div class="row g-3 border-top mt-3 pt-3">
-                                    <div class="col-md-3 text-center">
-                                        <div class="h4 mb-1 text-primary">{{ hoaDonChiTiets.length }}</div>
-                                        <div class="text-muted">Số mặt hàng</div>
-                                    </div>
-                                    <div class="col-md-3 text-center">
-                                        <div class="h4 text-info mb-1">{{ getTotalQuantity() }}</div>
-                                        <div class="text-muted">Tổng số lượng</div>
-                                    </div>
-                                    <div class="col-md-3 text-center">
-                                        <div class="h4 text-success mb-1">{{ formatCurrency(getTotalAmount()) }}</div>
-                                        <div class="text-muted">Tổng tiền hàng</div>
-                                    </div>
-                                    <div class="col-md-3 text-center">
-                                        <div class="h4 text-warning mb-1">{{ formatCurrency(selectedHoaDon.tongTien) }}</div>
-                                        <div class="text-muted">Thành tiền</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button @click="closeChiTietDialog" class="btn btn-secondary">
-                            <i class="pi pi-times me-1"></i>
-                            Đóng
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal cập nhật trạng thái -->
-        <div class="modal fade" id="statusModal" tabindex="-1" ref="statusModal">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Cập nhật trạng thái</h5>
-                        <button type="button" class="btn-close" @click="closeStatusUpdateDialog"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Trạng thái hiện tại:</label>
-                            <div>
-                                <span :class="['badge', 'bg-' + getStatusColor(selectedInvoiceForUpdate?.trangThaiHoaDon)]">
-                                    {{ getStatusLabel(selectedInvoiceForUpdate?.trangThaiHoaDon) }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Trạng thái mới:</label>
-                            <select v-model="newStatus" class="form-select">
-                                <option value="">Chọn trạng thái mới</option>
-                                <option v-for="status in getAvailableStatuses(selectedInvoiceForUpdate)" :key="status.value" :value="status.value">
-                                    {{ status.label }}
-                                </option>
-                            </select>
-                        </div>
-                        <div v-if="needsNote(newStatus)" class="mb-3">
-                            <label class="form-label">Ghi chú:</label>
-                            <textarea v-model="statusNote" class="form-control" rows="3" placeholder="Nhập ghi chú..."></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button @click="confirmStatusUpdate" class="btn btn-primary">
-                            <i class="pi pi-check me-1"></i>
-                            Cập nhật
-                        </button>
-                        <button @click="closeStatusUpdateDialog" class="btn btn-secondary">
-                            <i class="pi pi-times me-1"></i>
-                            Hủy
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
-
 <script setup>
 import { useToast } from 'primevue/usetoast';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
@@ -2138,6 +1480,664 @@ onMounted(() => {
     fetchAllData();
 });
 </script>
+
+<template>
+    <div class="invoice-management">
+        <!-- Toast Component -->
+        <Toast />
+
+        <!-- Header Section -->
+        <div class="header-section bg-gradient-primary mb-4 rounded p-4 text-white">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="h3 fw-bold mb-2">Quản Lý Hóa Đơn</h2>
+                    <p class="text-white-50 mb-0">Hệ thống quản lý hóa đơn POS & Online</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button @click="refreshAllData" :disabled="isLoading" class="btn btn-outline-light btn-sm">
+                        <i :class="isLoading ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'" class="me-1"></i>
+                        {{ isLoading ? 'Đang tải...' : 'Làm mới' }}
+                    </button>
+                    <button @click="exportData" class="btn btn-success btn-sm">
+                        <i class="pi pi-download me-1"></i>
+                        Xuất dữ liệu
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <ul class="nav nav-pills">
+                <li class="nav-item" v-for="tab in tabs" :key="tab.id">
+                    <button @click="activeTab = tab.id" :class="['nav-link', { active: activeTab === tab.id }]" class="text-white">
+                        <i :class="tab.icon" class="me-1"></i>
+                        {{ tab.label }}
+                        <span v-if="tab.count !== undefined" class="badge bg-light text-dark ms-1">
+                            {{ tab.count }}
+                        </span>
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="card border-start border-3 bg-light border-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1 text-primary">Tổng hóa đơn</h6>
+                                <h3 class="mb-2 text-primary">{{ hoaDons.length }}</h3>
+                                <div class="d-flex gap-2">
+                                    <span class="badge bg-info">POS: {{ posInvoices.length }}</span>
+                                    <span class="badge bg-success">Online: {{ onlineInvoices.length }}</span>
+                                </div>
+                            </div>
+                            <i class="pi pi-file-text text-primary" style="font-size: 2rem"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card border-start border-success border-3 bg-light">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-success mb-1">Tổng doanh thu</h6>
+                                <h3 class="text-success mb-2">{{ formatCurrency(totalRevenue) }}</h3>
+                                <div class="d-flex gap-2">
+                                    <span class="badge bg-warning">POS: {{ formatCurrency(posRevenue) }}</span>
+                                    <span class="badge bg-info">Online: {{ formatCurrency(onlineRevenue) }}</span>
+                                </div>
+                            </div>
+                            <i class="pi pi-money-bill text-success" style="font-size: 2rem"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card border-start border-info border-3 bg-light">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-info mb-1">Hoàn thành</h6>
+                                <h3 class="text-info mb-2">{{ completedInvoices }}</h3>
+                                <span class="badge bg-secondary">Tỷ lệ: {{ completionRate }}%</span>
+                            </div>
+                            <i class="pi pi-check-circle text-info" style="font-size: 2rem"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="card border-start border-warning border-3 bg-light">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-warning mb-1">Cần xử lý</h6>
+                                <h3 class="text-warning mb-2">{{ pendingInvoices }}</h3>
+                                <span class="badge bg-danger">Khẩn cấp: {{ urgentInvoices }}</span>
+                            </div>
+                            <i class="pi pi-clock text-warning" style="font-size: 2rem"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filter -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Tìm kiếm</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="pi pi-search"></i>
+                            </span>
+                            <input v-model="searchKeyword" @input="onSearch" class="form-control" placeholder="Tìm kiếm hóa đơn, khách hàng..." />
+                        </div>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Loại hóa đơn</label>
+                        <select v-model="typeFilter" @change="applyFilters" class="form-select">
+                            <option value="">Tất cả loại</option>
+                            <option value="OFFLINE">POS (Tại quầy)</option>
+                            <option value="ONLINE">Online</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Trạng thái</label>
+                        <select v-model="statusFilter" @change="applyFilters" class="form-select">
+                            <option value="">Tất cả trạng thái</option>
+                            <option value="DRAFT">Đang tạo</option>
+                            <option value="PENDING">Chờ xác nhận</option>
+                            <option value="CONFIRMED">Đã xác nhận</option>
+                            <option value="COMPLETED">Hoàn thành</option>
+                            <option value="CANCELLED">Đã hủy</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Ngày tạo</label>
+                        <Calendar v-model="dateFilter" @date-select="applyFilters" placeholder="Chọn ngày" dateFormat="dd/mm/yy" class="form-control" />
+                    </div>
+
+                    <div class="col-md-2">
+                        <button @click="showAdvancedFilter = !showAdvancedFilter" class="btn btn-outline-secondary w-100">
+                            <i class="pi pi-filter me-1"></i>
+                            Lọc nâng cao
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Advanced Filters -->
+                <div v-if="showAdvancedFilter" class="border-top mt-3 pt-3">
+                    <h6 class="mb-3">Bộ lọc nâng cao</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Khoảng tiền</label>
+                            <div class="row g-2">
+                                <div class="col">
+                                    <InputNumber v-model="minAmount" placeholder="Từ" mode="currency" currency="VND" locale="vi-VN" class="form-control" />
+                                </div>
+                                <div class="col">
+                                    <InputNumber v-model="maxAmount" placeholder="Đến" mode="currency" currency="VND" locale="vi-VN" class="form-control" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Nhân viên xử lý</label>
+                            <select v-model="staffFilter" class="form-select">
+                                <option value="">Tất cả nhân viên</option>
+                                <option v-for="staff in staffList" :key="staff.id" :value="staff.id">
+                                    {{ staff.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Phương thức thanh toán</label>
+                            <select v-model="paymentMethodFilter" class="form-select">
+                                <option value="">Tất cả</option>
+                                <option value="CASH">Tiền mặt</option>
+                                <option value="CARD">Thẻ</option>
+                                <option value="BANK_TRANSFER">Chuyển khoản</option>
+                                <option value="E_WALLET">Ví điện tử</option>
+                                <option value="COD">COD</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button @click="applyAdvancedFilters" class="btn btn-primary me-2">Áp dụng</button>
+                        <button @click="clearAllFilters" class="btn btn-secondary">Xóa bộ lọc</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="isLoading" class="py-5 text-center">
+            <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" />
+            <p class="h5 text-muted mt-3">Đang tải dữ liệu từ API...</p>
+            <p class="text-muted">{{ loadingMessage }}</p>
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="hasError" class="py-5 text-center">
+            <i class="pi pi-exclamation-triangle text-danger display-1 mb-3"></i>
+            <h4 class="text-danger mb-2">Lỗi kết nối API</h4>
+            <p class="text-muted mb-3">{{ errorMessage }}</p>
+            <div class="d-flex justify-content-center gap-2">
+                <button @click="retryConnection" class="btn btn-danger">
+                    <i class="pi pi-refresh me-1"></i>
+                    Thử lại
+                </button>
+                <button @click="goToLogin" class="btn btn-outline-primary" v-if="errorMessage.includes('xác thực')">
+                    <i class="pi pi-sign-in me-1"></i>
+                    Đăng nhập lại
+                </button>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div v-else class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Danh sách hóa đơn</h5>
+            </div>
+            <div class="card-body p-0">
+                <DataTable
+                    ref="dt"
+                    :value="filteredHoaDons"
+                    dataKey="id"
+                    :paginator="true"
+                    :rows="itemsPerPage"
+                    :totalRecords="filteredHoaDons.length"
+                    :loading="isLoading"
+                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                    :rowsPerPageOptions="[5, 10, 25, 50]"
+                    currentPageReportTemplate="Hiển thị {first} đến {last} trong tổng số {totalRecords} hóa đơn"
+                    tableStyle="min-width: 60rem"
+                    sortMode="single"
+                    @sort="onSort"
+                    class="table-responsive"
+                >
+                    <Column field="id" header="ID" sortable style="min-width: 8rem">
+                        <template #body="slotProps">
+                            <span class="fw-bold text-primary">#{{ slotProps.data.id }}</span>
+                        </template>
+                    </Column>
+
+                    <Column field="maHoaDon" header="Mã HĐ" sortable style="min-width: 10rem">
+                        <template #body="slotProps">
+                            <span class="badge bg-secondary">{{ slotProps.data.maHoaDon }}</span>
+                        </template>
+                    </Column>
+
+                    <Column field="loaiHoaDon" header="Loại" style="min-width: 8rem">
+                        <template #body="slotProps">
+                            <span :class="['badge', slotProps.data.loaiHoaDon === 'OFFLINE' ? 'bg-warning' : 'bg-success']">
+                                <i :class="slotProps.data.loaiHoaDon === 'OFFLINE' ? 'pi pi-desktop' : 'pi pi-globe'" class="me-1"></i>
+                                {{ slotProps.data.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online' }}
+                            </span>
+                        </template>
+                    </Column>
+
+                    <Column field="ngayTao" header="Ngày tạo" sortable style="min-width: 12rem">
+                        <template #body="slotProps">
+                            <div class="d-flex align-items-center">
+                                <i class="pi pi-calendar text-muted me-2"></i>
+                                <small>{{ formatDate(slotProps.data.ngayTao) }}</small>
+                            </div>
+                        </template>
+                    </Column>
+
+                    <Column field="tenKhachHang" header="Khách hàng" style="min-width: 16rem">
+                        <template #body="slotProps">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar rounded-circle d-flex align-items-center justify-content-center me-2 bg-primary text-white" style="width: 32px; height: 32px; font-size: 12px">
+                                    {{ getInitials(getCustomerName(slotProps.data)) }}
+                                </div>
+                                <div>
+                                    <div class="fw-semibold">{{ getCustomerName(slotProps.data) }}</div>
+                                    <small v-if="slotProps.data.sdt" class="text-muted"> <i class="pi pi-phone me-1"></i>{{ slotProps.data.sdt }} </small>
+                                </div>
+                            </div>
+                        </template>
+                    </Column>
+
+                    <Column field="tongTien" header="Tổng tiền" sortable style="min-width: 12rem">
+                        <template #body="slotProps">
+                            <div class="d-flex align-items-center">
+                                <i class="pi pi-money-bill text-success me-2"></i>
+                                <span class="fw-bold text-success">{{ formatCurrency(slotProps.data.tongTien) }}</span>
+                            </div>
+                        </template>
+                    </Column>
+
+                    <Column field="trangThaiHoaDon" header="Trạng thái" style="min-width: 12rem">
+                        <template #body="slotProps">
+                            <span :class="['badge', 'bg-' + getStatusColor(slotProps.data.trangThaiHoaDon)]">
+                                <i :class="getStatusIcon(slotProps.data.trangThaiHoaDon)" class="me-1"></i>
+                                {{ getStatusLabel(slotProps.data.trangThaiHoaDon) }}
+                            </span>
+                        </template>
+                    </Column>
+
+                    <!-- <Column header="Workflow" style="min-width: 20rem">
+                        <template #body="slotProps">
+                            <div class="d-flex align-items-center">
+                                <div v-for="(step, index) in getWorkflowSteps(slotProps.data.loaiHoaDon)" :key="step" class="d-flex align-items-center">
+                                    <div :class="['workflow-step', 'rounded', 'px-2', 'py-1', getStepBootstrapClass(slotProps.data, step)]" :title="getStepLabel(step)">
+                                        <i :class="getStepIcon(step)" style="font-size: 10px"></i>
+                                    </div>
+                                    <div v-if="index < getWorkflowSteps(slotProps.data.loaiHoaDon).length - 1" class="workflow-arrow mx-1"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </Column> -->
+
+                    <Column header="Thao tác" style="min-width: 12rem">
+                        <template #body="slotProps">
+                            <div class="d-flex gap-1">
+                                <button @click="viewChiTiet(slotProps.data)" class="btn btn-outline-primary btn-sm" title="Xem chi tiết">
+                                    <i class="pi pi-eye"></i>
+                                </button>
+                                <button v-if="canUpdateStatus(slotProps.data)" @click="updateInvoiceStatus(slotProps.data)" class="btn btn-outline-success btn-sm" title="Cập nhật trạng thái">
+                                    <i class="pi pi-arrow-right"></i>
+                                </button>
+                            </div>
+                        </template>
+                    </Column>
+                </DataTable>
+
+                <!-- Empty State -->
+                <div v-if="filteredHoaDons.length === 0 && !isLoading" class="py-5 text-center">
+                    <i class="pi pi-file-o text-muted display-1 mb-3"></i>
+                    <h5 class="text-muted mb-2">Không tìm thấy hóa đơn</h5>
+                    <p class="text-muted">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal chi tiết hóa đơn -->
+        <div class="modal fade" id="detailModal" tabindex="-1" ref="detailModal">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="pi pi-file-text me-2"></i>
+                            Chi tiết hóa đơn {{ selectedHoaDon?.maHoaDon }}
+                        </h5>
+                        <button type="button" class="btn-close" @click="closeChiTietDialog"></button>
+                    </div>
+                    <div class="modal-body" v-if="selectedHoaDon">
+                        <!-- Workflow Progress -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">Tiến trình xử lý</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div v-for="(step, index) in getWorkflowSteps(selectedHoaDon.loaiHoaDon)" :key="step" class="d-flex flex-fill align-items-center">
+                                        <div class="d-flex flex-column align-items-center flex-fill">
+                                            <div :class="['workflow-step-detail', 'rounded-circle', 'd-flex', 'align-items-center', 'justify-content-center', 'border', 'border-2', getDetailStepBootstrapClass(selectedHoaDon, step)]">
+                                                <i :class="getStepIcon(step)" style="font-size: 14px"></i>
+                                            </div>
+                                            <small class="fw-medium mt-2 text-center">{{ getStepLabel(step) }}</small>
+                                            <small v-if="isStepActive(selectedHoaDon, step)" class="text-primary">Đang thực hiện</small>
+                                            <small v-else-if="isStepCompleted(selectedHoaDon, step)" class="text-success">Hoàn thành</small>
+                                        </div>
+                                        <div
+                                            v-if="index < getWorkflowSteps(selectedHoaDon.loaiHoaDon).length - 1"
+                                            :class="['workflow-connector', isStepCompleted(selectedHoaDon, step) || isStepActive(selectedHoaDon, step) ? 'completed' : 'pending']"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions Bar -->
+                        <div class="d-flex justify-content-end bg-light mb-3 gap-2 rounded p-3">
+                            <button v-if="canProcessNextStep(selectedHoaDon)" @click="processNextStepWithRefresh(selectedHoaDon)" class="btn btn-success btn-sm">
+                                <i class="pi pi-arrow-right me-1"></i>
+                                {{ getNextStepAction(selectedHoaDon) }}
+                            </button>
+                            <button v-if="canCancelInvoice(selectedHoaDon)" @click="cancelInvoice(selectedHoaDon)" class="btn btn-danger btn-sm">
+                                <i class="pi pi-times me-1"></i>
+                                Hủy đơn
+                            </button>
+                            <button v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE'" @click="printInvoice(selectedHoaDon)" class="btn btn-info btn-sm">
+                                <i class="pi pi-print me-1"></i>
+                                In hóa đơn
+                            </button>
+                            <button v-if="selectedHoaDon.loaiHoaDon === 'ONLINE'" @click="trackingInfo(selectedHoaDon)" class="btn btn-warning btn-sm">
+                                <i class="pi pi-map-marker me-1"></i>
+                                Tracking
+                            </button>
+                        </div>
+
+                        <!-- Thông tin chi tiết -->
+                        <div class="row g-3 mb-4">
+                            <!-- Thông tin hóa đơn -->
+                            <div class="col-lg-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">Thông tin hóa đơn</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-2">
+                                            <div class="col-6"><strong>Mã HĐ:</strong></div>
+                                            <div class="col-6">
+                                                <span class="badge bg-secondary">{{ selectedHoaDon.maHoaDon }}</span>
+                                            </div>
+                                            <div class="col-6"><strong>Loại:</strong></div>
+                                            <div class="col-6">
+                                                <span :class="['badge', selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'bg-warning' : 'bg-success']">
+                                                    {{ selectedHoaDon.loaiHoaDon === 'OFFLINE' ? 'POS' : 'Online' }}
+                                                </span>
+                                            </div>
+                                            <div class="col-6"><strong>Ngày tạo:</strong></div>
+                                            <div class="col-6">{{ formatDate(selectedHoaDon.ngayTao) }}</div>
+                                            <div class="col-6"><strong>Tổng tiền:</strong></div>
+                                            <div class="col-6">
+                                                <span class="fw-bold text-success">{{ formatCurrency(selectedHoaDon.tongTien) }}</span>
+                                            </div>
+                                            <div class="col-6"><strong>Trạng thái:</strong></div>
+                                            <div class="col-6">
+                                                <span :class="['badge', 'bg-' + getStatusColor(selectedHoaDon.trangThaiHoaDon)]">
+                                                    {{ getStatusLabel(selectedHoaDon.trangThaiHoaDon) }}
+                                                </span>
+                                            </div>
+                                            <div v-if="selectedHoaDon.tenNhanVien" class="col-6"><strong>Nhân viên:</strong></div>
+                                            <div v-if="selectedHoaDon.tenNhanVien" class="col-6">{{ selectedHoaDon.tenNhanVien }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Thông tin khách hàng -->
+                            <div class="col-lg-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">Thông tin khách hàng</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-2">
+                                            <div class="col-4"><strong>Tên:</strong></div>
+                                            <div class="col-8">{{ getCustomerName(selectedHoaDon) }}</div>
+                                            <div v-if="selectedHoaDon.sdt" class="col-4"><strong>SĐT:</strong></div>
+                                            <div v-if="selectedHoaDon.sdt" class="col-8">{{ selectedHoaDon.sdt }}</div>
+                                            <div v-if="selectedHoaDon.email" class="col-4"><strong>Email:</strong></div>
+                                            <div v-if="selectedHoaDon.email" class="col-8">{{ selectedHoaDon.email }}</div>
+                                            <div v-if="selectedHoaDon.diaChi" class="col-4"><strong>Địa chỉ:</strong></div>
+                                            <div v-if="selectedHoaDon.diaChi" class="col-8">{{ selectedHoaDon.diaChi }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Thông tin thanh toán -->
+                            <div class="col-lg-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">Thanh toán</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-2">
+                                            <div class="col-6"><strong>Phương thức:</strong></div>
+                                            <div class="col-6">{{ selectedHoaDon.phuongThucThanhToan || 'Chưa xác định' }}</div>
+                                            <div v-if="selectedHoaDon.ngayXacNhan" class="col-6"><strong>Ngày xác nhận:</strong></div>
+                                            <div v-if="selectedHoaDon.ngayXacNhan" class="col-6">{{ formatDate(selectedHoaDon.ngayXacNhan) }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chi tiết sản phẩm -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="card-title mb-0">
+                                        <i class="pi pi-list me-2"></i>
+                                        Chi tiết sản phẩm ({{ hoaDonChiTiets.length }} mặt hàng)
+                                    </h6>
+                                    <div class="d-flex gap-2">
+                                        <div class="input-group input-group-sm" style="width: 200px">
+                                            <span class="input-group-text">
+                                                <i class="pi pi-search"></i>
+                                            </span>
+                                            <input v-model="searchChiTietKeyword" class="form-control" placeholder="Tìm kiếm sản phẩm..." />
+                                        </div>
+                                        <button v-if="canEditItems(selectedHoaDon)" @click="editPOSItems(selectedHoaDon)" class="btn btn-outline-primary btn-sm">
+                                            <i class="pi pi-pencil me-1"></i>
+                                            Sửa
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Loading Chi Tiết -->
+                                <div v-if="isLoadingChiTiet" class="py-4 text-center">
+                                    <ProgressSpinner style="width: 30px; height: 30px" strokeWidth="8" />
+                                    <p class="text-muted mt-2">Đang tải chi tiết hóa đơn...</p>
+                                </div>
+
+                                <!-- Chi Tiết Table -->
+                                <div v-else class="table-responsive">
+                                    <table class="table-hover table">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>STT</th>
+                                                <th>Tên sản phẩm</th>
+                                                <th>Thuộc tính</th>
+                                                <th>Giá bán</th>
+                                                <th>Số lượng</th>
+                                                <th>Thành tiền</th>
+                                                <!-- <th v-if="canEditItems(selectedHoaDon)">Thao tác</th> -->
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="(item, index) in filteredChiTiets" :key="item.id">
+                                                <td>
+                                                    <span class="badge bg-secondary">{{ index + 1 }}</span>
+                                                </td>
+                                                <td>
+                                                    <div>
+                                                        <div class="fw-medium">{{ item.tenSanPham || 'N/A' }}</div>
+                                                        <small v-if="item.maSanPham" class="text-muted">Mã: {{ item.maSanPham }}</small>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="d-flex gap-1">
+                                                        <span v-if="item.mauSac" class="badge bg-info">{{ item.mauSac }}</span>
+                                                        <span v-if="item.kichThuoc" class="badge bg-success">{{ item.kichThuoc }}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="fw-bold text-success">{{ formatCurrency(item.giaBan) }}</span>
+                                                </td>
+                                                <td>
+                                                    <div v-if="isEditingItem(item.id)" class="d-flex align-items-center gap-1">
+                                                        <InputNumber v-model="editQuantity" :min="1" class="form-control form-control-sm" style="width: 80px" />
+                                                        <button @click="saveQuantity(item.id)" class="btn btn-success btn-sm">
+                                                            <i class="pi pi-check"></i>
+                                                        </button>
+                                                        <button @click="cancelEdit()" class="btn btn-secondary btn-sm">
+                                                            <i class="pi pi-times"></i>
+                                                        </button>
+                                                    </div>
+                                                    <span v-else class="badge bg-primary">{{ item.soLuong }}</span>
+                                                </td>
+                                                <td>
+                                                    <span class="fw-bold text-primary">{{ formatCurrency(item.giaBan * item.soLuong) }}</span>
+                                                </td>
+                                                <td v-if="canEditItems(selectedHoaDon)">
+                                                    <div class="d-flex gap-1">
+                                                        <button v-if="!isEditingItem(item.id)" @click="editItem(item)" class="btn btn-outline-primary btn-sm" title="Sửa số lượng">
+                                                            <i class="pi pi-pencil"></i>
+                                                        </button>
+                                                        <button @click="removeItem(item.id)" class="btn btn-outline-danger btn-sm" title="Xóa sản phẩm">
+                                                            <i class="pi pi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    <!-- Empty State for Chi Tiet -->
+                                    <div v-if="filteredChiTiets.length === 0" class="py-4 text-center">
+                                        <i class="pi pi-info-circle text-muted display-4 mb-3"></i>
+                                        <h6 class="text-muted mb-2">Không có chi tiết nào</h6>
+                                        <p class="text-muted">Hóa đơn này chưa có chi tiết sản phẩm.</p>
+                                    </div>
+                                </div>
+
+                                <!-- Tổng kết -->
+                                <div class="row g-3 border-top mt-3 pt-3">
+                                    <div class="col-md-3 text-center">
+                                        <div class="h4 mb-1 text-primary">{{ hoaDonChiTiets.length }}</div>
+                                        <div class="text-muted">Số mặt hàng</div>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <div class="h4 text-info mb-1">{{ getTotalQuantity() }}</div>
+                                        <div class="text-muted">Tổng số lượng</div>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <div class="h4 text-success mb-1">{{ formatCurrency(getTotalAmount()) }}</div>
+                                        <div class="text-muted">Tổng tiền hàng</div>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <div class="h4 text-warning mb-1">{{ formatCurrency(selectedHoaDon.tongTien) }}</div>
+                                        <div class="text-muted">Thành tiền</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="closeChiTietDialog" class="btn btn-secondary">
+                            <i class="pi pi-times me-1"></i>
+                            Đóng
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal cập nhật trạng thái -->
+        <div class="modal fade" id="statusModal" tabindex="-1" ref="statusModal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Cập nhật trạng thái</h5>
+                        <button type="button" class="btn-close" @click="closeStatusUpdateDialog"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Trạng thái hiện tại:</label>
+                            <div>
+                                <span :class="['badge', 'bg-' + getStatusColor(selectedInvoiceForUpdate?.trangThaiHoaDon)]">
+                                    {{ getStatusLabel(selectedInvoiceForUpdate?.trangThaiHoaDon) }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Trạng thái mới:</label>
+                            <select v-model="newStatus" class="form-select">
+                                <option value="">Chọn trạng thái mới</option>
+                                <option v-for="status in getAvailableStatuses(selectedInvoiceForUpdate)" :key="status.value" :value="status.value">
+                                    {{ status.label }}
+                                </option>
+                            </select>
+                        </div>
+                        <div v-if="needsNote(newStatus)" class="mb-3">
+                            <label class="form-label">Ghi chú:</label>
+                            <textarea v-model="statusNote" class="form-control" rows="3" placeholder="Nhập ghi chú..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="confirmStatusUpdate" class="btn btn-primary">
+                            <i class="pi pi-check me-1"></i>
+                            Cập nhật
+                        </button>
+                        <button @click="closeStatusUpdateDialog" class="btn btn-secondary">
+                            <i class="pi pi-times me-1"></i>
+                            Hủy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
 
 <style scoped>
 .invoice-management {
