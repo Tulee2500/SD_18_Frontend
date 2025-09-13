@@ -1,10 +1,8 @@
 <script setup>
-import { FilterMatchMode } from '@primevue/core/api';
+import { FilterMatchMode , FilterOperator  } from '@primevue/core/api';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref , watch } from 'vue';
-import { useConfirm } from 'primevue/useconfirm';
-
 
 // Cấu hình API base URL
 const API_BASE_URL = 'http://localhost:8080';
@@ -25,8 +23,6 @@ const loadingDetails = ref({});
 const detailDialog = ref(false);
 const deleteDetailDialog = ref(false);
 const detail = ref({});
-// Thêm vào phần khai báo ref
-const confirm = useConfirm();
 
 // QR Code dialogs
 const qrDialog = ref(false);
@@ -50,47 +46,70 @@ const imageFilters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS }
 });
 
+// ===== FILTERS CHO SẢN PHẨM CHÍNH =====
 const filters = ref({
-    global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS },
+    tenSanPham: { value: null, matchMode: FilterMatchMode.CONTAINS },
+    maSanPham: { value: null, matchMode: FilterMatchMode.CONTAINS },
+    category: { value: null, matchMode: FilterMatchMode.EQUALS },
+    brand: { value: null, matchMode: FilterMatchMode.EQUALS },
+    material: { value: null, matchMode: FilterMatchMode.EQUALS },
+    sole: { value: null, matchMode: FilterMatchMode.EQUALS },
+    trangThai: { value: null, matchMode: FilterMatchMode.EQUALS },
+    displayQuantity: { 
+        operator: FilterOperator.AND, 
+        constraints: [
+            { value: null, matchMode: FilterMatchMode.GREATER_THAN_OR_EQUAL_TO },
+            { value: null, matchMode: FilterMatchMode.LESS_THAN_OR_EQUAL_TO }
+        ] 
+    },
+    createdAt: { 
+        operator: FilterOperator.AND, 
+        constraints: [
+            { value: null, matchMode: FilterMatchMode.DATE_AFTER },
+            { value: null, matchMode: FilterMatchMode.DATE_BEFORE }
+        ] 
+    }
 });
+
+// ===== FILTERS CHO CHI TIẾT SẢN PHẨM =====
+const detailFilters = ref({
+    global: { value: null, matchMode: FilterMatchMode.CONTAINS },
+    maChiTiet: { value: null, matchMode: FilterMatchMode.CONTAINS },
+    color: { value: null, matchMode: FilterMatchMode.EQUALS },
+    size: { value: null, matchMode: FilterMatchMode.EQUALS },
+    soLuong: { 
+        operator: FilterOperator.AND, 
+        constraints: [
+            { value: null, matchMode: FilterMatchMode.GREATER_THAN_OR_EQUAL_TO },
+            { value: null, matchMode: FilterMatchMode.LESS_THAN_OR_EQUAL_TO }
+        ] 
+    },
+    giaGoc: { 
+        operator: FilterOperator.AND, 
+        constraints: [
+            { value: null, matchMode: FilterMatchMode.GREATER_THAN_OR_EQUAL_TO },
+            { value: null, matchMode: FilterMatchMode.LESS_THAN_OR_EQUAL_TO }
+        ] 
+    },
+    giaBan: { 
+        operator: FilterOperator.AND, 
+        constraints: [
+            { value: null, matchMode: FilterMatchMode.GREATER_THAN_OR_EQUAL_TO },
+            { value: null, matchMode: FilterMatchMode.LESS_THAN_OR_EQUAL_TO }
+        ] 
+    },
+    trangThai: { value: null, matchMode: FilterMatchMode.EQUALS }
+});
+
+// ===== STATE MANAGEMENT =====
+const showAdvancedFilters = ref(false);
+const showDetailFilters = ref({}); // Track từng sản phẩm có hiển thị filter detail không
 
 const statuses = ref([
     { label: 'ĐANG HOẠT ĐỘNG', value: 1 },
     { label: 'KHÔNG HOẠT ĐỘNG', value: 0 }
 ]);
-
-
-// THÊM: Bộ lọc chi tiết cho chi tiết sản phẩm  
-const detailFilters = ref({
-    global: { value: null, matchMode: FilterMatchMode.CONTAINS },
-    'maChiTiet': { value: null, matchMode: FilterMatchMode.CONTAINS },
-    'color': { value: null, matchMode: FilterMatchMode.CONTAINS },
-    'size': { value: null, matchMode: FilterMatchMode.CONTAINS },
-    'trangThai': { value: null, matchMode: FilterMatchMode.EQUALS }
-});
-
-// THÊM: Computed cho options của bộ lọc
-const categoryOptions = computed(() => {
-    const categories = [...new Set(products.value.map(p => p.category).filter(c => c))];
-    return categories.map(cat => ({ label: cat, value: cat }));
-});
-
-const brandOptions = computed(() => {
-    const brands = [...new Set(products.value.map(p => p.brand).filter(b => b))];
-    return brands.map(brand => ({ label: brand, value: brand }));
-});
-
-const materialOptions = computed(() => {
-    const materials = [...new Set(products.value.map(p => p.material).filter(m => m))];
-    return materials.map(material => ({ label: material, value: material }));
-});
-
-const soleOptions = computed(() => {
-    const soles = [...new Set(products.value.map(p => p.sole).filter(s => s))];
-    return soles.map(sole => ({ label: sole, value: sole }));
-});
-
-
 
 // Quick Add Dialogs
 const quickAddDialog = ref(false);
@@ -99,6 +118,40 @@ const quickAddItem = ref({});
 const quickAddSubmitted = ref(false);
 const quickAddLoading = ref(false);
 
+
+// ===== OPTIONS CHO DROPDOWN FILTERS - SẢN PHẨM =====
+const categoryOptions = computed(() => {
+    const uniqueCategories = [...new Set(products.value.map(p => p.category).filter(Boolean))];
+    return uniqueCategories.map(cat => ({ label: cat, value: cat }));
+});
+
+const brandOptions = computed(() => {
+    const uniqueBrands = [...new Set(products.value.map(p => p.brand).filter(Boolean))];
+    return uniqueBrands.map(brand => ({ label: brand, value: brand }));
+});
+
+const materialOptions = computed(() => {
+    const uniqueMaterials = [...new Set(products.value.map(p => p.material).filter(Boolean))];
+    return uniqueMaterials.map(material => ({ label: material, value: material }));
+});
+
+const soleOptions = computed(() => {
+    const uniqueSoles = [...new Set(products.value.map(p => p.sole).filter(Boolean))];
+    return uniqueSoles.map(sole => ({ label: sole, value: sole }));
+});
+
+// ===== OPTIONS CHO DROPDOWN FILTERS - CHI TIẾT SẢN PHẨM =====
+const getColorOptionsForProduct = (productId) => {
+    if (!productDetails.value[productId]) return [];
+    const uniqueColors = [...new Set(productDetails.value[productId].map(d => d.color).filter(Boolean))];
+    return uniqueColors.map(color => ({ label: color, value: color }));
+};
+
+const getSizeOptionsForProduct = (productId) => {
+    if (!productDetails.value[productId]) return [];
+    const uniqueSizes = [...new Set(productDetails.value[productId].map(d => d.size).filter(Boolean))];
+    return uniqueSizes.map(size => ({ label: size, value: size }));
+};
 // Quick Add Types
 const quickAddTypes = {
     'mauSac': {
@@ -495,9 +548,8 @@ function generateQRCode(data) {
 }
 
 function showDetailQR(detailData, productName) {
-    const qrData = JSON.stringify({
-        maQR : detailData.maQR,
-    });
+    // const qrData = JSON.stringify(detailData.maQR);
+    const qrData = detailData.maQR;
     
     currentQRData.value = generateQRCode(qrData);
     currentQRTitle.value = `QR Code - Chi tiết: ${detailData.maChiTiet}`;
@@ -639,6 +691,140 @@ const getProductTotalQuantity = (productId) => {
     }, 0);
 };
 
+// ===== COMPUTED ĐỂ LỌC CHI TIẾT SẢN PHẨM =====
+const getFilteredProductDetails = (productId) => {
+    if (!productDetails.value[productId]) return [];
+    
+    let filteredDetails = [...productDetails.value[productId]];
+    
+    // Global filter cho chi tiết
+    if (detailFilters.value.global.value) {
+        const globalValue = detailFilters.value.global.value.toLowerCase();
+        filteredDetails = filteredDetails.filter(detail => 
+            detail.maChiTiet?.toLowerCase().includes(globalValue) ||
+            detail.color?.toLowerCase().includes(globalValue) ||
+            detail.size?.toLowerCase().includes(globalValue)
+        );
+    }
+    
+    // Filter theo mã chi tiết
+    if (detailFilters.value.maChiTiet.value) {
+        const codeValue = detailFilters.value.maChiTiet.value.toLowerCase();
+        filteredDetails = filteredDetails.filter(detail => 
+            detail.maChiTiet?.toLowerCase().includes(codeValue)
+        );
+    }
+    
+    // Filter theo màu sắc
+    if (detailFilters.value.color.value) {
+        filteredDetails = filteredDetails.filter(detail => 
+            detail.color === detailFilters.value.color.value
+        );
+    }
+    
+    // Filter theo kích cỡ
+    if (detailFilters.value.size.value) {
+        filteredDetails = filteredDetails.filter(detail => 
+            detail.size === detailFilters.value.size.value
+        );
+    }
+    
+    // Filter theo số lượng
+    const minQty = detailFilters.value.soLuong.constraints[0].value;
+    const maxQty = detailFilters.value.soLuong.constraints[1].value;
+    if (minQty !== null || maxQty !== null) {
+        filteredDetails = filteredDetails.filter(detail => {
+            const qty = detail.soLuong || 0;
+            const passMin = minQty === null || qty >= minQty;
+            const passMax = maxQty === null || qty <= maxQty;
+            return passMin && passMax;
+        });
+    }
+    
+    // Filter theo giá gốc
+    const minGiaGoc = detailFilters.value.giaGoc.constraints[0].value;
+    const maxGiaGoc = detailFilters.value.giaGoc.constraints[1].value;
+    if (minGiaGoc !== null || maxGiaGoc !== null) {
+        filteredDetails = filteredDetails.filter(detail => {
+            const price = detail.giaGoc || 0;
+            const passMin = minGiaGoc === null || price >= minGiaGoc;
+            const passMax = maxGiaGoc === null || price <= maxGiaGoc;
+            return passMin && passMax;
+        });
+    }
+    
+    // Filter theo giá bán
+    const minGiaBan = detailFilters.value.giaBan.constraints[0].value;
+    const maxGiaBan = detailFilters.value.giaBan.constraints[1].value;
+    if (minGiaBan !== null || maxGiaBan !== null) {
+        filteredDetails = filteredDetails.filter(detail => {
+            const price = detail.giaBan || 0;
+            const passMin = minGiaBan === null || price >= minGiaBan;
+            const passMax = maxGiaBan === null || price <= maxGiaBan;
+            return passMin && passMax;
+        });
+    }
+    
+    // Filter theo trạng thái
+    if (detailFilters.value.trangThai.value !== null && detailFilters.value.trangThai.value !== undefined) {
+        filteredDetails = filteredDetails.filter(detail => 
+            detail.trangThai === detailFilters.value.trangThai.value
+        );
+    }
+    
+    return filteredDetails;
+};
+
+// ===== FUNCTIONS XỬ LÝ FILTER =====
+
+// Đếm số filter active cho sản phẩm chính
+const activeFiltersCount = computed(() => {
+    let count = 0;
+    
+    if (filters.value.global.value) count++;
+    
+    Object.keys(filters.value).forEach(key => {
+        if (key !== 'global') {
+            if (filters.value[key].operator) {
+                const activeConstraints = filters.value[key].constraints.filter(c => 
+                    c.value !== null && c.value !== undefined && c.value !== ''
+                );
+                count += activeConstraints.length;
+            } else {
+                if (filters.value[key].value !== null && filters.value[key].value !== undefined && filters.value[key].value !== '') {
+                    count++;
+                }
+            }
+        }
+    });
+    
+    return count;
+});
+
+// Đếm số filter active cho chi tiết sản phẩm
+const activeDetailFiltersCount = computed(() => {
+    let count = 0;
+    
+    if (detailFilters.value.global.value) count++;
+    
+    Object.keys(detailFilters.value).forEach(key => {
+        if (key !== 'global') {
+            if (detailFilters.value[key].operator) {
+                const activeConstraints = detailFilters.value[key].constraints.filter(c => 
+                    c.value !== null && c.value !== undefined && c.value !== ''
+                );
+                count += activeConstraints.length;
+            } else {
+                if (detailFilters.value[key].value !== null && detailFilters.value[key].value !== undefined && detailFilters.value[key].value !== '') {
+                    count++;
+                }
+            }
+        }
+    });
+    
+    return count;
+});
+
 // Computed để cập nhật products với tổng số lượng thực tế
 const productsWithTotalQuantity = computed(() => {
     return products.value.map(product => ({
@@ -753,14 +939,79 @@ watch(() => detail.value.giaGoc, (newGiaGoc) => {
     }
 }, { immediate: false, deep: true });
 
+// Hàm tính toán số thứ tự với pagination
+function getRowIndex(index) {
+    // Lấy thông tin pagination từ DataTable
+    const currentPage = dt.value ? dt.value.d_first / dt.value.d_rows : 0;
+    const rowsPerPage = dt.value ? dt.value.d_rows : 10;
+    return currentPage * rowsPerPage + index + 1;
+}
+// Hàm đếm số thứ tự 
+function getRowNumber(data, index) {
+    return index + 1;
+}
+
+// Reset tất cả filter sản phẩm
+function clearAllFilters() {
+    filters.value.global.value = null;
+    
+    Object.keys(filters.value).forEach(key => {
+        if (key !== 'global') {
+            if (filters.value[key].operator) {
+                filters.value[key].constraints.forEach(constraint => {
+                    constraint.value = null;
+                });
+            } else {
+                filters.value[key].value = null;
+            }
+        }
+    });
+    
+    toast.add({
+        severity: 'info',
+        summary: 'Đã xóa bộ lọc sản phẩm',
+        detail: 'Tất cả bộ lọc sản phẩm đã được xóa',
+        life: 2000
+    });
+}
+
+// Reset tất cả filter chi tiết sản phẩm
+function clearAllDetailFilters() {
+    detailFilters.value.global.value = null;
+    
+    Object.keys(detailFilters.value).forEach(key => {
+        if (key !== 'global') {
+            if (detailFilters.value[key].operator) {
+                detailFilters.value[key].constraints.forEach(constraint => {
+                    constraint.value = null;
+                });
+            } else {
+                detailFilters.value[key].value = null;
+            }
+        }
+    });
+    
+    toast.add({
+        severity: 'info',
+        summary: 'Đã xóa bộ lọc chi tiết',
+        detail: 'Tất cả bộ lọc chi tiết sản phẩm đã được xóa',
+        life: 2000
+    });
+}
+
+// Toggle hiển thị filter cho chi tiết của sản phẩm cụ thể
+function toggleDetailFilter(productId) {
+    showDetailFilters.value[productId] = !showDetailFilters.value[productId];
+}
+
 // API calls
 async function loadProducts() {
     try {
         loading.value = true;
         const response = await axios.get(`${API_BASE_URL}/api/san-pham`);
-        products.value = response.data.map((item, index) => ({
+        products.value = response.data.map((item) => ({
             ...item,
-            stt: index + 1, // THÊM: Số thứ tự
+            // index: index + 1,
             inventoryStatus: item.trangThai === 1 ? 'ACTIVE' : 'INACTIVE',
             name: item.tenSanPham,
             code: item.maSanPham,
@@ -1004,28 +1255,18 @@ function createProductId() {
 
 // Dialog functions for Product
 function openNew() {
-    confirm.require({
-        message: 'Bạn có muốn thêm sản phẩm mới không?',
-        header: 'Xác nhận thêm mới',
-        icon: 'pi pi-question-circle',
-        rejectClass: 'p-button-secondary p-button-outlined',
-        rejectLabel: 'Hủy',
-        acceptLabel: 'Có',
-        accept: () => {
-            product.value = {
-                tenSanPham: '',
-                maSanPham: createProductId(),
-                soLuong: 0,
-                trangThai: 1,
-                danhMuc: null,
-                thuongHieu: null,
-                chatLieu: null,
-                deGiay: null
-            };
-            submitted.value = false;
-            productDialog.value = true;
-        }
-    });
+    product.value = {
+        tenSanPham: '',
+        maSanPham: createProductId(),
+        soLuong: 0,
+        trangThai: 1,
+        danhMuc: null,
+        thuongHieu: null,
+        chatLieu: null,
+        deGiay: null
+    };
+    submitted.value = false;
+    productDialog.value = true;
 }
 
 function hideDialog() {
@@ -1171,35 +1412,25 @@ async function deleteSelectedProducts() {
 // Dialog functions for Product Details - Updated for multi-select with images
 // 1. HÀM MỞ DIALOG THÊM MỚI - CHO PHÉP NHIỀU MÀU VÀ SIZE
 function openNewDetail(productId) {
-    confirm.require({
-        message: 'Bạn có muốn thêm chi tiết sản phẩm mới không?',
-        header: 'Xác nhận thêm chi tiết',
-        icon: 'pi pi-question-circle',
-        rejectClass: 'p-button-secondary p-button-outlined',
-        rejectLabel: 'Hủy',
-        acceptLabel: 'Có',
-        accept: () => {
-            detail.value = {
-                maChiTiet: createId(),
-                soLuong: 0,
-                giaGoc: null,
-                giaBan: null,
-                trangThai: 1,
-                mauSacs: [],
-                kichCos: [],
-                variantImages: {},
-                sanPham: { id: productId },
-                isEditing: false
-            };
-            
-            selectedMauSac.value = null;
-            selectedKichCo.value = null;
-            selectedImage.value = null;
-            
-            submitted.value = false;
-            detailDialog.value = true;
-        }
-    });
+    detail.value = {
+        maChiTiet: createId(),
+        soLuong: 0,
+        giaGoc: null,
+        giaBan: null,
+        trangThai: 1,
+        mauSacs: [], // NHIỀU MÀU SẮC
+        kichCos: [], // NHIỀU KÍCH CỠ
+        variantImages: {}, // THAY ĐỔI: Object chứa hình ảnh cho từng biến thể
+        sanPham: { id: productId },
+        isEditing: false
+    };
+    
+    selectedMauSac.value = null;
+    selectedKichCo.value = null;
+    selectedImage.value = null;
+    
+    submitted.value = false;
+    detailDialog.value = true;
 }
 
 // Hàm tạo key cho biến thể
@@ -1481,11 +1712,11 @@ async function saveDetail() {
     }
 
     if (detail.value.giaGoc == null || detail.value.giaGoc === '' || detail.value.giaGoc <= 0) {
-        requiredFields.push('Giá gốc phải > 0');
+        requiredFields.push('Giá bán phải > 0');
     } else if (detail.value.giaGoc > 100000000) {
-        requiredFields.push('Giá gốc tối đa = 100.000.000');
+        requiredFields.push('Giá bán tối đa = 100.000.000');
     } else if (isNaN(detail.value.giaGoc)) {
-        requiredFields.push('Giá gốc phải là số');
+        requiredFields.push('Giá bán phải là số');
     }
 
     if (!detail.value.mauSacs || detail.value.mauSacs.length === 0) {
@@ -1816,11 +2047,11 @@ function exportCSV() {
             return;
         }
 
-        const headers = ['ID', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
+        const headers = ['STT', 'Mã Sản Phẩm', 'Tên Sản Phẩm','Số Lượng','Danh Mục','Thương Hiệu','Chất Liệu' ,'Đế Giày',  'Trạng Thái', 'Ngày Tạo'];
 
-        const csvData = productsWithTotalQuantity.value.map(item => {
+        const csvData = productsWithTotalQuantity.value.map((item, index) => {
             return [
-                item.id || '',
+                index + 1,
                 item.maSanPham || '',
                 item.tenSanPham || '',
                 item.displayQuantity || 0,
@@ -1916,41 +2147,166 @@ function collapseAll() {
                 </template>
             </Toolbar>
 
-            <DataTable
-                ref="dt"
-                v-model:expandedRows="expandedRows"
-                v-model:selection="selectedProducts"
-                :value="productsWithTotalQuantity"
-                dataKey="id"
-                :paginator="true"
-                :rows="10"
-                :filters="filters"
-                :loading="loading"
-                @row-expand="onRowExpand"
-                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-                :rowsPerPageOptions="[5, 10, 25]"
-                currentPageReportTemplate="Hiển thị {first} đến {last} trong tổng số {totalRecords} sản phẩm"
-                tableStyle="min-width: 60rem"
-            >
-                <template #header>
-                    <div class="flex flex-wrap gap-2 items-center justify-between">
-                        <div class="flex gap-2">
-                            <h4 class="m-0">Quản lý Sản phẩm</h4>
-                            <Button text icon="pi pi-plus" label="Mở rộng tất cả" @click="expandAll" size="small" />
-                            <Button text icon="pi pi-minus" label="Thu gọn tất cả" @click="collapseAll" size="small" />
+           <DataTable
+                    ref="dt"
+                    v-model:expandedRows="expandedRows"
+                    v-model:selection="selectedProducts"
+                    :value="productsWithTotalQuantity"
+                    dataKey="id"
+                    :paginator="true"
+                    :rows="10"
+                    :filters="filters"
+                    :loading="loading"
+                    @row-expand="onRowExpand"
+                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                    :rowsPerPageOptions="[5, 10, 25, 50]"
+                    currentPageReportTemplate="Hiển thị {first} đến {last} trong tổng số {totalRecords} sản phẩm"
+                    tableStyle="min-width: 60rem"
+                    :globalFilterFields="['tenSanPham', 'maSanPham', 'category', 'brand', 'material', 'sole']"
+                    sortMode="multiple"
+                    resizableColumns
+                    columnResizeMode="fit"
+                    showGridlines
+                    stripedRows
+                >
+               <template #header>
+                    <div class="flex flex-col gap-4">
+                        <!-- Hàng đầu tiên: Tiêu đề và tìm kiếm -->
+                        <div class="flex flex-wrap gap-2 items-center justify-between">
+                            <div class="flex gap-2 items-center">
+                                <h4 class="m-0">Quản lý Sản phẩm</h4>
+                                <Button text icon="pi pi-plus" label="Mở rộng tất cả" @click="expandAll" size="small" />
+                                <Button text icon="pi pi-minus" label="Thu gọn tất cả" @click="collapseAll" size="small" />
+                            </div>
+                            <div class="flex gap-2 items-center">
+                                <!-- Nút bộ lọc nâng cao -->
+                                <Button 
+                                    :icon="showAdvancedFilters ? 'pi pi-filter-slash' : 'pi pi-filter'" 
+                                    :label="showAdvancedFilters ? 'Ẩn bộ lọc' : 'Bộ lọc nâng cao'"
+                                    @click="showAdvancedFilters = !showAdvancedFilters"
+                                    :severity="activeFiltersCount > 0 ? 'primary' : 'secondary'"
+                                    size="small"
+                                    outlined
+                                />                                
+                                <!-- Tìm kiếm global -->
+                                <IconField>
+                                    <InputIcon>
+                                        <i class="pi pi-search" />
+                                    </InputIcon>
+                                    <InputText 
+                                        v-model="filters['global'].value" 
+                                        placeholder="Tìm kiếm sản phẩm..." 
+                                        class="w-80"
+                                    />
+                                </IconField>
+                            </div>
                         </div>
-                        <IconField>
-                            <InputIcon>
-                                <i class="pi pi-search" />
-                            </InputIcon>
-                            <InputText v-model="filters['global'].value" placeholder="Tìm kiếm sản phẩm..." />
-                        </IconField>
+
+                        <!-- Bộ lọc nâng cao -->
+                        <div v-show="showAdvancedFilters" class="border rounded p-4 bg-gray-50">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <!-- Lọc theo danh mục -->
+                                <div class="flex flex-col">
+                                    <label class="text-sm font-medium mb-2">Danh mục</label>
+                                    <Select
+                                        v-model="filters['category'].value"
+                                        :options="categoryOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Tất cả danh mục"
+                                        showClear
+                                        class="w-full"
+                                    />
+                                </div>
+
+                                <!-- Lọc theo thương hiệu -->
+                                <div class="flex flex-col">
+                                    <label class="text-sm font-medium mb-2">Thương hiệu</label>
+                                    <Select
+                                        v-model="filters['brand'].value"
+                                        :options="brandOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Tất cả thương hiệu"
+                                        showClear
+                                        class="w-full"
+                                    />
+                                </div>
+
+                                <!-- Lọc theo chất liệu -->
+                                <div class="flex flex-col">
+                                    <label class="text-sm font-medium mb-2">Chất liệu</label>
+                                    <Select
+                                        v-model="filters['material'].value"
+                                        :options="materialOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Tất cả chất liệu"
+                                        showClear
+                                        class="w-full"
+                                    />
+                                </div>
+
+                                <!-- Lọc theo trạng thái -->
+                                <div class="flex flex-col">
+                                    <label class="text-sm font-medium mb-2">Trạng thái</label>
+                                    <Select
+                                        v-model="filters['trangThai'].value"
+                                        :options="[
+                                            { label: 'Hoạt động', value: 1 },
+                                            { label: 'Không hoạt động', value: 0 }
+                                        ]"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Tất cả trạng thái"
+                                        showClear
+                                        class="w-full"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hiển thị bộ lọc đang active -->
+                        <div v-if="activeFiltersCount > 0 && !showAdvancedFilters" class="flex flex-wrap gap-2 items-center">
+                            <span class="text-sm font-medium">Bộ lọc đang áp dụng:</span>
+                            
+                            <Tag v-if="filters.category.value" severity="info" class="cursor-pointer" @click="filters.category.value = null">
+                                <i class="pi pi-tag mr-1"></i>
+                                Danh mục: {{ filters.category.value }}
+                                <i class="pi pi-times ml-1"></i>
+                            </Tag>
+                            
+                            <Tag v-if="filters.brand.value" severity="info" class="cursor-pointer" @click="filters.brand.value = null">
+                                <i class="pi pi-bookmark mr-1"></i>
+                                Thương hiệu: {{ filters.brand.value }}
+                                <i class="pi pi-times ml-1"></i>
+                            </Tag>
+                            
+                            <Tag v-if="filters.trangThai.value !== null && filters.trangThai.value !== undefined" severity="info" class="cursor-pointer" @click="filters.trangThai.value = null">
+                                <i class="pi pi-circle mr-1"></i>
+                                {{ filters.trangThai.value === 1 ? 'Hoạt động' : 'Không hoạt động' }}
+                                <i class="pi pi-times ml-1"></i>
+                            </Tag>
+
+                            <Button 
+                                icon="pi pi-times" 
+                                label="Xóa tất cả"
+                                @click="clearAllFilters"
+                                size="small"
+                                text
+                                class="ml-2"
+                            />
+                        </div>
                     </div>
                 </template>
 
                 <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
                 <Column expander style="width: 3rem"></Column>
-                <Column field="stt" header="STT" style="width: 5rem" sortable></Column>
+                <Column field="STT" header="STT" sortable style="min-width: 8rem">
+                    <template #body="slotProps">
+                        {{ getRowNumber(slotProps.data, slotProps.index) }}
+                    </template>
+                </Column>
                 <Column field="maSanPham" header="Mã SP" sortable style="min-width: 10rem"></Column>
                 <Column field="tenSanPham" header="Tên sản phẩm" sortable style="min-width: 16rem"></Column>
                 <Column header="Số lượng" sortable style="min-width: 8rem">
@@ -2001,19 +2357,97 @@ function collapseAll() {
                 </Column>
 
                 <!-- Expanded row for product details -->
-                <template #expansion="slotProps">
-                    <div v-if="loadingDetails[slotProps.data.id]" class="p-4 text-center"><i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i> Đang tải...</div>
+               <template #expansion="slotProps">
+                    <div v-if="loadingDetails[slotProps.data.id]" class="p-4 text-center">
+                        <i class="pi pi-spin pi-spinner" style="font-size: 2rem"></i> 
+                    </div>
                     <div v-else-if="productDetails[slotProps.data.id] && productDetails[slotProps.data.id].length" class="p-4">
                         <div class="flex justify-between items-center mb-4">
-                            <div>
+                            <div class="flex items-center gap-4">
                                 <h5>Chi tiết sản phẩm: {{ slotProps.data.tenSanPham }}</h5>
+                                <!-- Nút toggle filter cho chi tiết -->
+                                <Button 
+                                    :icon="showDetailFilters[slotProps.data.id] ? 'pi pi-filter-slash' : 'pi pi-filter'" 
+                                    :label="showDetailFilters[slotProps.data.id] ? 'Ẩn bộ lọc' : 'Lọc chi tiết'"
+                                    @click="toggleDetailFilter(slotProps.data.id)"
+                                    :severity="activeDetailFiltersCount > 0 ? 'primary' : 'secondary'"
+                                    size="small"
+                                    outlined
+                                />
                             </div>
                             <Button label="Thêm chi tiết" icon="pi pi-plus" severity="secondary" @click="openNewDetail(slotProps.data.id)" :loading="loading" />
                         </div>
-                        <DataTable :value="productDetails[slotProps.data.id]" tableStyle="min-width: 50rem">
-                            <Column header="STT" style="width: 5rem">
+
+                        <!-- BỘ LỌC CHO CHI TIẾT SẢN PHẨM -->
+                        <div v-show="showDetailFilters[slotProps.data.id]" class="mb-4 border rounded p-3 bg-blue-50">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <!-- Tìm kiếm chi tiết -->
+                                <div class="flex flex-col">
+                                    <label class="text-sm font-medium mb-2">Tìm kiếm chi tiết</label>
+                                    <IconField>
+                                        <InputIcon>
+                                            <i class="pi pi-search" />
+                                        </InputIcon>
+                                        <InputText 
+                                            v-model="detailFilters.global.value" 
+                                            placeholder="Mã, màu, size..."
+                                            class="w-full"
+                                        />
+                                    </IconField>
+                                </div>
+
+                                <!-- Lọc theo màu sắc -->
+                                <div class="flex flex-col">
+                                    <label class="text-sm font-medium mb-2">Màu sắc</label>
+                                    <Select
+                                        v-model="detailFilters.color.value"
+                                        :options="getColorOptionsForProduct(slotProps.data.id)"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Tất cả màu"
+                                        showClear
+                                        class="w-full"
+                                    />
+                                </div>
+
+                                <!-- Lọc theo kích cỡ -->
+                                <div class="flex flex-col">
+                                    <label class="text-sm font-medium mb-2">Kích cỡ</label>
+                                    <Select
+                                        v-model="detailFilters.size.value"
+                                        :options="getSizeOptionsForProduct(slotProps.data.id)"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Tất cả size"
+                                        showClear
+                                        class="w-full"
+                                    />
+                                </div>
+
+                                <!-- Lọc theo trạng thái chi tiết -->
+                                <div class="flex flex-col">
+                                    <label class="text-sm font-medium mb-2">Trạng thái</label>
+                                    <Select
+                                        v-model="detailFilters.trangThai.value"
+                                        :options="[
+                                            { label: 'Hoạt động', value: 1 },
+                                            { label: 'Không hoạt động', value: 0 }
+                                        ]"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        placeholder="Tất cả trạng thái"
+                                        showClear
+                                        class="w-full"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DATATABLE CHI TIẾT VỚI FILTER -->
+                        <DataTable :value="getFilteredProductDetails(slotProps.data.id)" tableStyle="min-width: 50rem">
+                            <Column field="STT" header="STT" sortable style="min-width: 8rem">
                                 <template #body="detailProps">
-                                    {{ detailProps.index + 1 }}
+                                    {{ getRowNumber(detailProps.data, detailProps.index) }}
                                 </template>
                             </Column>
                             <Column field="maChiTiet" header="Mã chi tiết" sortable style="min-width: 10rem"></Column>
@@ -2024,12 +2458,12 @@ function collapseAll() {
                                     <Badge :value="detailProps.data.soLuong" :severity="getDetailQuantitySeverity(detailProps.data.soLuong)" />
                                 </template>
                             </Column>
-                            <Column field="giaGoc" header="Giá gốc" sortable style="min-width: 10rem">
+                            <Column field="giaGoc" header="Giá bán" sortable style="min-width: 10rem">
                                 <template #body="detailProps">
                                     {{ formatCurrency(detailProps.data.giaGoc) }}
                                 </template>
                             </Column>
-                             <Column field="giaBan" header="Giá bán" sortable style="min-width: 10rem">
+                            <Column field="giaBan" header="Giá sau KM" sortable style="min-width: 10rem">
                                 <template #body="detailProps">
                                     {{ formatCurrency(detailProps.data.giaBan) }}
                                 </template>
@@ -2058,7 +2492,8 @@ function collapseAll() {
                                             >
                                                 <i class="pi pi-image text-gray-400"></i>
                                             </div>
-
+                                            
+                                           
                                         </div>
                                         <div 
                                             v-if="detailProps.data.images.length > 3"
@@ -2264,10 +2699,10 @@ function collapseAll() {
 
                 <div class="grid grid-cols-12 gap-4">
                     <div class="col-span-6">
-                        <label for="giaGoc" class="block font-bold mb-3">Giá gốc </label>
+                        <label for="giaGoc" class="block font-bold mb-3">Giá bán </label>
                         <InputText id="giaGoc" v-model.number="detail.giaGoc" mode="currency" currency="VND" locale="vi-VN" fluid placeholder="0 ₫" :min="0" :invalid="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" />
-                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" class="text-red-500">Giá gốc phải lớn hơn 0.</small>
-                        <small v-else-if="submitted && isNaN(detail.giaGoc)" class="text-red-500">Giá gốc phải là số.</small>
+                        <small v-if="submitted && (detail.giaGoc == null || detail.giaGoc <= 0)" class="text-red-500">Giá bán phải lớn hơn 0.</small>
+                        <small v-else-if="submitted && isNaN(detail.giaGoc)" class="text-red-500">Giá bán phải là số.</small>
 
                     </div>
                     <!-- <div class="col-span-6">
@@ -2772,13 +3207,6 @@ function collapseAll() {
                         class="w-full h-32 object-cover rounded border shadow-sm"
                         @error="handleImageError($event)"
                     />
-                    <div class="mt-2 text-sm">
-                        <div class="font-medium">{{ img.maHinhAnh }}</div>
-                        <Badge 
-                            :value="img.trangThai === 1 ? 'Đã tải' : 'Đang tải'" 
-                            :severity="img.trangThai === 1 ? 'success' : 'warning'" 
-                        />
-                    </div>
                 </div>
             </div>
             <div v-else class="text-center">
@@ -2964,5 +3392,35 @@ function collapseAll() {
     margin-bottom: 1rem;
 }
 
+/* Style cho các tag filter */
+:deep(.p-tag) {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
 
+:deep(.p-tag:hover) {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Style cho bộ lọc nâng cao */
+.advanced-filters {
+    background: var(--surface-100);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+/* Responsive cho mobile */
+@media (max-width: 768px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .flex-wrap {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+}
 </style>

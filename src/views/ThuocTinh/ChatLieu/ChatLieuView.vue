@@ -36,7 +36,12 @@
             </template>
 
             <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
-            <Column field="id" header="ID" sortable style="min-width: 8rem"></Column>
+            <!-- Cột STT với template để tính toán số thứ tự -->
+            <Column field="STT" header="STT" sortable style="min-width: 8rem">
+                <template #body="slotProps">
+                    {{ getRowIndex(slotProps.index) }}
+                </template>
+            </Column>
             <Column field="maChatLieu" header="Mã Chất Liệu" sortable style="min-width: 12rem"></Column>
             <Column field="tenChatLieu" header="Tên Chất Liệu" sortable style="min-width: 16rem"></Column>
             <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
@@ -146,6 +151,14 @@ const isDuplicateName = computed(() => {
 onMounted(() => {
     fetchData();
 });
+
+// Hàm tính toán số thứ tự với pagination
+function getRowIndex(index) {
+    // Lấy thông tin pagination từ DataTable
+    const currentPage = dt.value ? dt.value.d_first / dt.value.d_rows : 0;
+    const rowsPerPage = dt.value ? dt.value.d_rows : 10;
+    return currentPage * rowsPerPage + index + 1;
+}
 
 async function fetchData() {
     try {
@@ -343,12 +356,13 @@ function exportCSV() {
         }
 
         // Create CSV headers with Vietnamese labels
-        const headers = ['ID', 'Mã Chất Liệu', 'Tên Chất Liệu', 'Trạng Thái'];
+        const headers = ['STT', 'Mã Chất Liệu', 'Tên Chất Liệu', 'Trạng Thái'];
         
-        // Convert data to CSV format
-        const csvData = ListChatLieu.value.map(item => {
+        // Convert data to CSV format with STT
+        const csvData = ListChatLieu.value.map((item, index) => {
             return [
-                item.id || '',
+                index + 1, // STT
+                // item.id || '',
                 item.maChatLieu || '',
                 item.tenChatLieu || '',
                 item.trangThai === 1 ? 'Hoạt động' : 'Ngừng hoạt động'
