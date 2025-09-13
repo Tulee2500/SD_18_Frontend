@@ -171,7 +171,14 @@ export default {
                 return sum + gia * soLuong;
             }, 0);
 
-            const tongTienVoucher = voucher.value ? Number(voucher.value.giaTriGiam) || 0 : 0;
+            let tongTienVoucher = 0;
+            if (voucher.value) {
+                if (voucher.value.loaiGiamGia === 'PHAN_TRAM') {
+                    tongTienVoucher = Math.round((tongTienKhuyenMai * (Number(voucher.value.giaTriGiam) || 0)) / 100);
+                } else {
+                    tongTienVoucher = Number(voucher.value.giaTriGiam) || 0;
+                }
+            }
             const tongTienThanhToan = Math.max(0, tongTienKhuyenMai - tongTienVoucher);
 
             return {
@@ -925,6 +932,17 @@ export default {
                     ghiChu: String(thongTinThanhToan.value.ghiChu || '').trim()
                 };
 
+                // Xác định phương thức thanh toán
+                if (thongTinThanhToan.value.tienMat > 0 && thongTinThanhToan.value.chuyenKhoan > 0) {
+                    requestData.phuong_thuc_thanh_toan = 'TIEN_MAT_CHUYEN_KHOAN';
+                } else if (thongTinThanhToan.value.tienMat > 0) {
+                    requestData.phuong_thuc_thanh_toan = 'TIEN_MAT';
+                } else if (thongTinThanhToan.value.chuyenKhoan > 0) {
+                    requestData.phuong_thuc_thanh_toan = 'CHUYEN_KHOAN';
+                } else {
+                    requestData.phuong_thuc_thanh_toan = 'KHONG_XAC_DINH';
+                }
+
                 if (khachHang.value?.id) {
                     requestData.khachHangId = Number(khachHang.value.id);
                 }
@@ -1477,7 +1495,6 @@ export default {
                 </div>
             </div>
 
-            <!-- 1. HÓA ĐƠN CHỜ - Tabs ở trên cùng -->
             <div class="invoice-tabs-section border-bottom bg-white">
                 <div class="container-fluid py-2">
                     <div class="d-flex justify-content-between align-items-center">
@@ -1486,7 +1503,7 @@ export default {
                                 v-for="(hoaDon, index) in hoaDonCho"
                                 :key="hoaDon.id"
                                 @click="chonHoaDon(hoaDon)"
-                                class="btn btn-sm position-relative invoice-tab"
+                                class="btn btn-sm invoice-tab"
                                 :class="hoaDonDangChon?.id === hoaDon.id ? 'btn-primary' : 'btn-outline-primary'"
                                 :disabled="loadingDelete === hoaDon.id"
                             >
@@ -1494,14 +1511,8 @@ export default {
                                 <i v-else class="bi bi-file-text me-1"></i>
                                 Hóa đơn {{ index + 1 }}
 
-                                <!-- Nút xóa -->
-                                <button
-                                    v-if="hoaDonCho.length > 1"
-                                    @click.stop="confirmDeleteHoaDon(hoaDon)"
-                                    :disabled="loadingDelete === hoaDon.id"
-                                    class="btn btn-danger btn-xs position-absolute translate-middle rounded-circle end-0 top-0"
-                                    style="width: 18px; height: 18px; font-size: 10px; padding: 0"
-                                >
+                                <!-- Nút xóa - đã sửa lại vị trí -->
+                                <button v-if="hoaDonCho.length > 1" @click.stop="confirmDeleteHoaDon(hoaDon)" :disabled="loadingDelete === hoaDon.id" class="btn btn-danger btn-xs-delete">
                                     <i class="bi bi-x"></i>
                                 </button>
                             </button>
@@ -2357,8 +2368,9 @@ export default {
 
 .main-content {
     flex: 1;
-    overflow: hidden;
     padding: 1rem 0;
+    min-height: 0;
+    display: flex;
 }
 
 /* =================== HEADER STYLES =================== */
@@ -2389,6 +2401,7 @@ export default {
     border-radius: 8px !important;
     font-weight: 500;
     font-size: 0.875rem;
+    padding-right: 35px !important; /* Thêm padding để có chỗ cho nút xóa */
 }
 
 .invoice-tab:hover:not(:disabled) {
@@ -2407,21 +2420,68 @@ export default {
     box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
 }
 
+.btn-xs-delete {
+    font-size: 0.7rem;
+    line-height: 1;
+    padding: 0;
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: #dc3545;
+    border: 1px solid #dc3545;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.btn-xs-delete:hover {
+    background: #c82333;
+    border-color: #bd2130;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.btn-xs-delete i {
+    font-size: 12px;
+}
+
 .btn-xs {
-    font-size: 0.6rem;
+    font-size: 0.7rem;
     line-height: 1;
     padding: 2px;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 10;
+    background: #fff;
+    border-radius: 50%;
+    border: 1px solid #e53e3e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* =================== PANEL STYLES =================== */
-.left-panel,
-.right-panel {
-    height: calc(100vh - 160px);
-    overflow: hidden;
-}
 
 .left-panel {
     border-right: 1px solid #dee2e6;
+}
+
+.right-panel {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .left-panel .card,
