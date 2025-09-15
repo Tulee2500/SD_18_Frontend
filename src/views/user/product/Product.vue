@@ -479,13 +479,12 @@
 </template>
 
 <script>
+import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
+import ReviewProducts from '@/components/ChatBotAndReview/ReviewProducts.vue';
 import Nav from '@/components/user/Nav.vue';
 import Footer from '@/views/user/Footer.vue';
 import axios from 'axios';
 import Hero from '../Hero.vue';
-// ===== ĐÃ THÊM IMPORT =====
-import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
-import ReviewProducts from '@/components/ChatBotAndReview/ReviewProducts.vue';
 
 export default {
   name: 'Product',
@@ -493,22 +492,20 @@ export default {
     Nav,
     Footer,
     Hero,
-    // ===== ĐÃ THÊM COMPONENTS =====
     ChatBot,
     ReviewProducts
   },
   data() {
     return {
       product: null,
-      currentProduct: null, // Chi tiết hiện tại được chọn
-      allProductDetails: [], // Tất cả chi tiết của sản phẩm
+      currentProduct: null,
+      allProductDetails: [],
       productImages: [],
       selectedImageIndex: 0,
       quantity: 1,
       loading: true,
       similarProducts: [],
       
-      // Lựa chọn màu sắc và kích cỡ
       availableColors: [],
       availableSizes: [],
       selectedColor: null,
@@ -559,18 +556,12 @@ export default {
     }
   },
   methods: {
-    // ===== ĐÃ THÊM METHOD XỬ LÝ REVIEW =====
     handleReviewSubmitted(review) {
       console.log('New review submitted:', review);
-      // Có thể call API để lưu review
-      // await this.saveReviewToAPI(review);
-      
-      // Hiển thị thông báo thành công
       this.$toast?.success('Cảm ơn bạn đã đánh giá sản phẩm!') || 
       alert('Cảm ơn bạn đã đánh giá sản phẩm!');
     },
 
-    // Method để save review lên server (optional)
     async saveReviewToAPI(review) {
       try {
         const payload = {
@@ -580,10 +571,6 @@ export default {
           tieu_de: review.title,
           noi_dung: review.content
         };
-        
-        // Uncomment when you have API endpoint
-        // const response = await axios.post('http://localhost:8080/api/danh-gia', payload);
-        // console.log('Review saved:', response.data);
       } catch (error) {
         console.error('Error saving review:', error);
       }
@@ -652,25 +639,21 @@ export default {
     },
     
     openZoom() {
-      // Implement zoom functionality
       console.log('Open zoom modal');
     },
 
-    // Chọn màu sắc
     selectColor(colorId) {
       this.selectedColor = colorId;
       this.updateCurrentProduct();
       this.updateImages();
     },
 
-    // Chọn kích cỡ
     selectSize(sizeId) {
       if (!this.isVariantAvailable(this.selectedColor, sizeId)) return;
       this.selectedSize = sizeId;
       this.updateCurrentProduct();
     },
 
-    // Kiểm tra variant có sẵn không
     isVariantAvailable(colorId, sizeId) {
       return this.allProductDetails.some(detail => 
         detail.mauSac?.id === colorId && 
@@ -679,7 +662,6 @@ export default {
       );
     },
 
-    // Cập nhật sản phẩm hiện tại dựa trên lựa chọn
     updateCurrentProduct() {
       if (!this.selectedColor || !this.selectedSize) return;
       
@@ -693,65 +675,108 @@ export default {
       }
     },
 
-    // Cập nhật hình ảnh dựa trên màu sắc được chọn
-    updateImages() {
+    // XỬ LÝ HÌNH ẢNH ĐÃ SỬA CHO ENTITY MỚI - SỬA HOÀN TOÀN
+    async updateImages() {
       if (!this.selectedColor) return;
       
-      // Lấy hình ảnh của màu được chọn
-      const colorVariants = this.allProductDetails.filter(detail => 
-        detail.mauSac?.id === this.selectedColor
-      );
-      
-      const newImages = [];
-      
-      colorVariants.forEach(detail => {
-        if (detail.hinhAnh) {
-          let imageUrl = '';
-          if (typeof detail.hinhAnh === 'object') {
-            imageUrl = detail.hinhAnh.duongDan || detail.hinhAnh.url || detail.hinhAnh.path || '';
-          } else if (typeof detail.hinhAnh === 'string') {
-            imageUrl = detail.hinhAnh;
+      try {
+        // Lấy danh sách hình ảnh từ API
+        const imagesResponse = await axios.get('http://localhost:8080/hinh-anh');
+        const imageMap = new Map();
+        imagesResponse.data.forEach(image => {
+          imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
+        });
+        
+        const colorVariants = this.allProductDetails.filter(detail => 
+          detail.mauSac?.id === this.selectedColor
+        );
+        
+        const newImages = [];
+        
+        colorVariants.forEach(detail => {
+          if (detail.hinhAnh) {
+            let imageUrl = '';
+            
+            if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
+              // Trường hợp API trả về object với id
+              if (detail.hinhAnh.id) {
+                imageUrl = imageMap.get(detail.hinhAnh.id);
+                console.log(`Found image by ID ${detail.hinhAnh.id}:`, imageUrl);
+              }
+              // Trường hợp API trả về object đầy đủ
+              else if (detail.hinhAnh.fullUrl) {
+                imageUrl = detail.hinhAnh.fullUrl;
+              } else if (detail.hinhAnh.duongDan) {
+                const duongDan = detail.hinhAnh.duongDan;
+                if (duongDan.startsWith('http')) {
+                  imageUrl = duongDan;
+                } else if (duongDan.startsWith('/hinh-anh/')) {
+                  imageUrl = 'http://localhost:8080' + duongDan;
+                } else {
+                  imageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
+                }
+              }
+            } else if (typeof detail.hinhAnh === 'number') {
+              // Trường hợp API trả về ID number trực tiếp
+              imageUrl = imageMap.get(detail.hinhAnh);
+              console.log(`Found image by number ID ${detail.hinhAnh}:`, imageUrl);
+            }
+            
+            if (imageUrl && imageUrl.trim() !== '') {
+              newImages.push(imageUrl);
+            }
           }
-          
-          if (imageUrl && !imageUrl.startsWith('http')) {
-            imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-          }
-          
-          if (imageUrl) {
-            newImages.push(imageUrl);
-          }
+        });
+        
+        if (newImages.length > 0) {
+          this.productImages = [...new Set(newImages)]; // Remove duplicates
+          this.selectedImageIndex = 0;
+        } else {
+          // Fallback sang SVG placeholder
+          this.productImages = ['data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4='];
         }
-      });
-      
-      if (newImages.length > 0) {
-        this.productImages = [...new Set(newImages)]; // Loại bỏ duplicate
-        this.selectedImageIndex = 0;
+      } catch (error) {
+        console.error('Error updating images:', error);
+        this.productImages = ['data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4='];
       }
     },
     
+    // FETCHPRODUCT ĐÃ SỬA HOÀN TOÀN
     async fetchProduct() {
       try {
         this.loading = true;
+        console.log('Fetching product with ID:', this.productId);
         
-        // Lấy chi tiết sản phẩm hiện tại
-        const detailResponse = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${this.productId}`);
+        // Lấy thông tin sản phẩm chi tiết và hình ảnh
+        const [detailResponse, imagesResponse] = await Promise.all([
+          axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${this.productId}`),
+          axios.get('http://localhost:8080/hinh-anh')
+        ]);
         
         if (!detailResponse.data) {
           throw new Error('Không tìm thấy sản phẩm');
         }
         
         const currentDetail = detailResponse.data;
+        console.log('Current detail:', currentDetail);
         
-        // Lấy tất cả chi tiết của cùng sản phẩm
+        // Tạo map hình ảnh theo ID
+        const imageMap = new Map();
+        imagesResponse.data.forEach(image => {
+          imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
+        });
+        
         const allDetailsResponse = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
         const relatedDetails = allDetailsResponse.data.filter(d => 
           d.sanPham?.id === currentDetail.sanPham?.id
         );
         
+        console.log('Related details:', relatedDetails.length);
+        
         this.product = currentDetail;
         this.allProductDetails = relatedDetails;
         
-        // Lấy danh sách màu sắc và kích cỡ có sẵn
+        // Extract available colors and sizes
         this.availableColors = [...new Map(relatedDetails
           .filter(d => d.mauSac)
           .map(d => [d.mauSac.id, {
@@ -768,20 +793,57 @@ export default {
           }])
         ).values()];
         
-        // Set mặc định
+        // Set initial selections
         this.selectedColor = currentDetail.mauSac?.id || (this.availableColors[0]?.id);
         this.selectedSize = currentDetail.kichCo?.id || (this.availableSizes[0]?.id);
         this.currentProduct = currentDetail;
         
-        // Xử lý hình ảnh
-        this.updateImages();
+        // XỬ LÝ HÌNH ẢNH CHO SẢN PHẨM HIỆN TẠI - SỬA MỚI
+        const currentImages = [];
+        relatedDetails.forEach(detail => {
+          if (detail.hinhAnh) {
+            let imageUrl = '';
+            
+            if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
+              // Trường hợp API trả về object với id
+              if (detail.hinhAnh.id) {
+                imageUrl = imageMap.get(detail.hinhAnh.id);
+                console.log(`Found image by ID ${detail.hinhAnh.id}:`, imageUrl);
+              }
+              // Trường hợp API trả về object đầy đủ
+              else if (detail.hinhAnh.fullUrl) {
+                imageUrl = detail.hinhAnh.fullUrl;
+              } else if (detail.hinhAnh.duongDan) {
+                const duongDan = detail.hinhAnh.duongDan;
+                if (duongDan.startsWith('http')) {
+                  imageUrl = duongDan;
+                } else if (duongDan.startsWith('/hinh-anh/')) {
+                  imageUrl = 'http://localhost:8080' + duongDan;
+                } else {
+                  imageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
+                }
+              }
+            } else if (typeof detail.hinhAnh === 'number') {
+              // Trường hợp API trả về ID number trực tiếp
+              imageUrl = imageMap.get(detail.hinhAnh);
+              console.log(`Found image by number ID ${detail.hinhAnh}:`, imageUrl);
+            }
+            
+            if (imageUrl && imageUrl.trim() !== '') {
+              currentImages.push(imageUrl);
+            }
+          }
+        });
         
-        // Nếu không có hình ảnh từ màu sắc hiện tại, dùng hình mặc định
-        if (this.productImages.length === 0) {
-          this.productImages = ['/placeholder-shoe.png'];
+        if (currentImages.length > 0) {
+          this.productImages = [...new Set(currentImages)]; // Remove duplicates
+        } else {
+          // Fallback sang SVG placeholder
+          this.productImages = ['data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4='];
         }
         
-        // Fetch sản phẩm tương tự
+        console.log('Product images:', this.productImages);
+        
         await this.fetchSimilarProducts();
         
       } catch (error) {
@@ -792,77 +854,88 @@ export default {
       }
     },
     
+    // FETCHSIMILARPRODUCTS ĐÃ SỬA
     async fetchSimilarProducts() {
       try {
-        // Lấy tất cả sản phẩm từ ProductList API
-        const [productsResponse, detailsResponse] = await Promise.all([
+        const [productsResponse, detailsResponse, imagesResponse] = await Promise.all([
           axios.get('http://localhost:8080/api/san-pham'),
-          axios.get('http://localhost:8080/api/san-pham-chi-tiet')
+          axios.get('http://localhost:8080/api/san-pham-chi-tiet'),
+          axios.get('http://localhost:8080/hinh-anh')
         ]);
         
-        // Tạo map để lưu chi tiết đầu tiên và hình ảnh của mỗi sản phẩm
-        const firstDetailMap = new Map();
+        // Tạo map hình ảnh theo ID
         const imageMap = new Map();
+        imagesResponse.data.forEach(image => {
+          imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
+        });
+        
+        const firstDetailMap = new Map();
+        const productImageMap = new Map();
         const priceMap = new Map();
         
         detailsResponse.data.forEach(detail => {
           const productId = detail.sanPham?.id;
           if (productId) {
-            // Lưu chi tiết đầu tiên
             if (!firstDetailMap.has(productId)) {
               firstDetailMap.set(productId, detail.id);
             }
             
-            // Lưu giá thấp nhất
             if (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId)) {
               priceMap.set(productId, detail.giaBan);
             }
             
-            // Lưu hình ảnh đầu tiên
-            if (!imageMap.has(productId) && detail.hinhAnh) {
+            // XỬ LÝ HÌNH ẢNH SIMILAR PRODUCTS - SỬA MỚI
+            if (!productImageMap.has(productId) && detail.hinhAnh) {
               let imageUrl = '';
-              if (typeof detail.hinhAnh === 'object') {
-                imageUrl = detail.hinhAnh.duongDan || 
-                           detail.hinhAnh.url || 
-                           detail.hinhAnh.path || '';
-              } else if (typeof detail.hinhAnh === 'string') {
-                imageUrl = detail.hinhAnh;
+              
+              if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
+                // Trường hợp API trả về object với id
+                if (detail.hinhAnh.id) {
+                  imageUrl = imageMap.get(detail.hinhAnh.id);
+                }
+                // Trường hợp API trả về object đầy đủ
+                else if (detail.hinhAnh.fullUrl) {
+                  imageUrl = detail.hinhAnh.fullUrl;
+                } else if (detail.hinhAnh.duongDan) {
+                  const duongDan = detail.hinhAnh.duongDan;
+                  if (duongDan.startsWith('http')) {
+                    imageUrl = duongDan;
+                  } else if (duongDan.startsWith('/hinh-anh/')) {
+                    imageUrl = 'http://localhost:8080' + duongDan;
+                  } else {
+                    imageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
+                  }
+                }
+              } else if (typeof detail.hinhAnh === 'number') {
+                imageUrl = imageMap.get(detail.hinhAnh);
               }
               
-              if (imageUrl && !imageUrl.startsWith('http')) {
-                imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-              }
-              
-              if (imageUrl) {
-                imageMap.set(productId, imageUrl);
+              if (imageUrl && imageUrl.trim() !== '') {
+                productImageMap.set(productId, imageUrl);
               }
             }
           }
         });
         
-        // Chuyển đổi thành format cho similar products
         const allProducts = productsResponse.data
-          .filter(p => p.id !== this.product?.sanPham?.id) // Loại bỏ sản phẩm hiện tại
+          .filter(p => p.id !== this.product?.sanPham?.id)
           .map(p => ({
             id: p.id,
             firstDetailId: firstDetailMap.get(p.id),
-            imgUrl: imageMap.get(p.id) || '/placeholder-shoe.png',
+            imgUrl: productImageMap.get(p.id),
             label: p.tenSanPham || 'Sản phẩm',
             price: priceMap.get(p.id) || 0,
             categoryId: p.danhMuc?.id
           }));
         
-        // Lọc sản phẩm cùng danh mục trước
         const currentCategoryId = this.product?.sanPham?.danhMuc?.id;
         let sameCategoryProducts = allProducts.filter(p => p.categoryId === currentCategoryId);
         
-        // Nếu không đủ 4 sản phẩm cùng danh mục, lấy thêm từ danh mục khác
         if (sameCategoryProducts.length < 4) {
           const otherProducts = allProducts.filter(p => p.categoryId !== currentCategoryId);
           sameCategoryProducts = [...sameCategoryProducts, ...otherProducts];
         }
         
-        // Shuffle và lấy 4 sản phẩm ngẫu nhiên
         const shuffled = sameCategoryProducts.sort(() => 0.5 - Math.random());
         this.similarProducts = shuffled.slice(0, 4);
         
@@ -945,15 +1018,12 @@ export default {
     },
     
     goToProduct(productDetailId) {
-      // Scroll lên đầu trang
       window.scrollTo({ top: 0, behavior: 'smooth' });
       
-      // Reset các state
       this.selectedImageIndex = 0;
       this.quantity = 1;
       this.progressWidth = 0;
       
-      // Điều hướng đến sản phẩm mới
       this.$router.push(`/product/${productDetailId}`);
     },
     
@@ -961,12 +1031,24 @@ export default {
       this.$router.push('/products');
     },
     
+    // XỬ LÝ LỖI HÌNH ẢNH ĐÃ SỬA
     handleImageError(event) {
-      event.target.src = '/placeholder-shoe.png';
+      console.log('Product image load failed for:', event.target.src);
+      
+      // Chỉ set SVG placeholder nếu chưa phải SVG
+      if (!event.target.src.startsWith('data:image/svg+xml')) {
+        console.log('Setting SVG placeholder');
+        event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4=';
+      }
     },
     
     handleSimilarImageError(event) {
-      event.target.src = '/placeholder-shoe.png';
+      console.log('Similar product image load failed for:', event.target.src);
+      
+      // Chỉ set SVG placeholder nếu chưa phải SVG
+      if (!event.target.src.startsWith('data:image/svg+xml')) {
+        event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4=';
+      }
     }
   },
   mounted() {
@@ -980,30 +1062,24 @@ export default {
     '$route.params.id': {
       handler(newId) {
         if (newId) {
-          // Reset state
           this.selectedImageIndex = 0;
           this.quantity = 1;
           this.progressWidth = 0;
           this.selectedColor = null;
           this.selectedSize = null;
           
-          // Stop auto slide cũ
           this.stopAutoSlide();
           
-          // Fetch dữ liệu mới
           this.fetchProduct().then(() => {
-            // Start auto slide sau khi load xong
             this.startAutoSlide();
           });
         }
       },
       immediate: true
     }
-  },
-};
-</script>
-
-<style scoped>
+  }
+}
+</script><style scoped>
 /* Container Styles */
 .product-detail-container {
   min-height: 100vh;
