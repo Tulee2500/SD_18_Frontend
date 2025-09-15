@@ -10,19 +10,19 @@ const model = ref([
                 label: 'Home',
                 items: [{ label: 'Dashboard', icon: 'pi pi-fw pi-chart-line', to: '/' }]
             },
-            { 
-                label: 'Bán Hàng Tại Quầy', 
-                icon: 'pi pi-fw pi-shopping-cart', 
-                to: '/ban-hang' 
+            {
+                label: 'Bán Hàng Tại Quầy',
+                icon: 'pi pi-fw pi-shopping-cart',
+                to: '/ban-hang'
             },
             {
                 label: 'Quản lý sản phẩm',
                 icon: 'pi pi-fw pi-box',
                 items: [
-                    { 
-                        label: 'Sản Phẩm', 
-                        icon: 'pi pi-fw pi-shopping-bag', 
-                        to: '/san-pham' 
+                    {
+                        label: 'Sản Phẩm',
+                        icon: 'pi pi-fw pi-shopping-bag',
+                        to: '/san-pham'
                     },
                     {
                         label: 'Chất liệu',
@@ -65,20 +65,20 @@ const model = ref([
                 label: 'Quản lý tài khoản',
                 icon: 'pi pi-fw pi-users',
                 items: [
-                    { 
-                        label: 'Khách Hàng', 
-                        icon: 'pi pi-fw pi-user-plus', 
-                        to: '/khach-hang' 
+                    {
+                        label: 'Khách Hàng',
+                        icon: 'pi pi-fw pi-user-plus',
+                        to: '/khach-hang'
                     },
-                    { 
-                        label: 'Nhân viên', 
-                        icon: 'pi pi-fw pi-id-card', 
-                        to: '/nhan-vien' 
+                    {
+                        label: 'Nhân viên',
+                        icon: 'pi pi-fw pi-id-card',
+                        to: '/nhan-vien'
                     },
-                    { 
-                        label: 'Tài khoản', 
-                        icon: 'pi pi-fw pi-user-edit', 
-                        to: '/tai-khoan' 
+                    {
+                        label: 'Tài khoản',
+                        icon: 'pi pi-fw pi-user-edit',
+                        to: '/tai-khoan'
                     }
                 ]
             },
@@ -102,11 +102,6 @@ const model = ref([
                 label: 'Hóa đơn',
                 icon: 'pi pi-fw pi-receipt',
                 to: '/hoa-don'
-            },
-            { 
-                label: 'Thông báo', 
-                icon: 'pi pi-fw pi-bell', 
-                to: '/thong-bao' 
             }
         ]
     }

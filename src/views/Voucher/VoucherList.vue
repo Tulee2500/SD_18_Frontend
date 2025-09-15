@@ -14,7 +14,7 @@
         <DataTable
             ref="dt"
             v-model:selection="selectedVouchers"
-            :value="vouchers"
+            :value="displayedVouchers"
             dataKey="id"
             :paginator="true"
             :rows="10"
@@ -25,7 +25,49 @@
         >
             <template #header>
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h4 class="m-0">🎫 Quản lý Voucher</h4>
+                    <h2 class="m-1">🎫 Quản lý Voucher</h2>
+                </div>
+            </template>
+              <!-- 🆕 THÊM BỘ LỌC VÀO ĐÂY -->
+        <div class="mb-4 rounded-lg border bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center gap-2">
+                <i class="pi pi-filter text-blue-600"></i>
+                <h5 class="m-0 font-semibold">Bộ lọc</h5>
+            </div>
+            <div class="grid grid-cols-12 gap-4">
+                <!-- Lọc theo Loại giảm giá -->
+                <div class="col-span-6 md:col-span-4">
+                    <label class="mb-2 block text-sm font-medium">Loại giảm giá</label>
+                    <Select
+                        v-model="selectedDiscountType"
+                        :options="discountTypeOptions"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Tất cả loại giảm giá"
+                        showClear
+                        fluid
+                        @change="applyFilters"
+                    />
+                </div>
+
+                <!-- Lọc theo Trạng thái -->
+                <div class="col-span-6 md:col-span-4">
+                    <label class="mb-2 block text-sm font-medium">Trạng thái</label>
+                    <Select
+                        v-model="selectedStatus"
+                        :options="statusOptions"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Tất cả trạng thái"
+                        showClear
+                        fluid
+                        @change="applyFilters"
+                    />
+                </div>
+
+                <!-- Nút reset filter -->
+                <div class="col-span-12 md:col-span-4">
+                    <label class="mb-2 block text-sm font-medium">Tìm kiếm</label>
                     <IconField>
                         <InputIcon>
                             <i class="pi pi-search" />
@@ -33,10 +75,16 @@
                         <InputText v-model="filters['global'].value" placeholder="Tìm kiếm..." />
                     </IconField>
                 </div>
-            </template>
+            </div>
+        </div>
 
             <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
-            <Column field="id" header="ID" sortable style="min-width: 8rem"></Column>
+            <!-- <Column field="id" header="ID" sortable style="min-width: 8rem"></Column> -->
+             <Column field="STT" header="STT" sortable style="min-width: 8rem">
+                <template #body="slotProps">
+                    {{ getRowIndex(slotProps.index) }}
+                </template>
+            </Column>
             <Column field="maVoucher" header="Mã Voucher" sortable style="min-width: 12rem"></Column>
             <Column field="tenVoucher" header="Tên Voucher" sortable style="min-width: 16rem"></Column>
 
@@ -224,7 +272,7 @@
                     </small>
                 </div>
 
-                <div v-else-if="voucher.loaiGiamGia === 'SO_TIEN_CO_DINH'">
+                <!-- <div v-else-if="voucher.loaiGiamGia === 'SO_TIEN_CO_DINH'">
                     <label for="giaTriGiam" class="mb-3 block font-bold">
                         Số tiền giảm (VND) <span class="text-red-500">*</span>
                     </label>
@@ -250,7 +298,7 @@
                     <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiam)" class="text-red-500">
                         Số tiền giảm phải là số.
                     </small>
-                </div>
+                </div> -->
 
                 <!-- Đơn hàng tối thiểu và Giảm tối đa -->
                 <div class="grid grid-cols-12 gap-4">
@@ -453,7 +501,7 @@ import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
 import { InputText } from 'primevue';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 // ===== REACTIVE VARIABLES =====
 const toast = useToast();
@@ -499,6 +547,24 @@ const manualStatuses = ref([
 const discountTypes = ref([
     { label: 'Phần trăm', value: 'PHAN_TRAM' },
     { label: 'Số tiền cố định', value: 'SO_TIEN_CO_DINH' }
+]);
+
+// ===== THÊM CÁC VARIABLES CHO FILTER =====
+const selectedDiscountType = ref(null);
+const selectedStatus = ref(null);
+const filteredVouchers = ref([]);
+
+// Options cho dropdown filter
+const discountTypeOptions = ref([
+    { label: 'Phần trăm', value: 'PHAN_TRAM' },
+    { label: 'Số tiền cố định', value: 'SO_TIEN_CO_DINH' }
+]);
+
+const statusOptions = ref([
+    { label: 'Chưa diễn ra', value: 'CHUA_DIEN_RA' },
+    { label: 'Đang diễn ra', value: 'DANG_DIEN_RA' },
+    { label: 'Đã hết hạn', value: 'DA_KET_THUC' },
+    { label: 'Không hoạt động', value: 'VO_HIEU_HOA' }
 ]);
 
 // ===== HÀM TÍNH TOÁN TRẠNG THÁI DỰA TRÊN THỜI GIAN =====
@@ -567,6 +633,56 @@ function getVoucherStatusDisplay(voucherData) {
             };
     }
 }
+
+// ===== FILTER FUNCTIONS =====
+function applyFilters() {
+    let filtered = [...vouchers.value];
+
+    // Lọc theo loại giảm giá
+    if (selectedDiscountType.value) {
+        filtered = filtered.filter(voucher => 
+            voucher.loaiGiamGia === selectedDiscountType.value
+        );
+    }
+
+    // Lọc theo trạng thái
+    if (selectedStatus.value) {
+        filtered = filtered.filter(voucher => 
+            getVoucherStatus(voucher) === selectedStatus.value
+        );
+    }
+
+    filteredVouchers.value = filtered;
+}
+
+function clearFilters() {
+    selectedDiscountType.value = null;
+    selectedStatus.value = null;
+    filteredVouchers.value = [...vouchers.value];
+    
+    // Reset global search
+    filters.value.global.value = null;
+    
+    toast.add({
+        severity: 'info',
+        summary: 'Thông báo',
+        detail: 'Đã xóa tất cả bộ lọc',
+        life: 2000
+    });
+}
+
+// Computed property để trả về danh sách voucher đã lọc
+const displayedVouchers = computed(() => {
+    if (selectedDiscountType.value || selectedStatus.value) {
+        return filteredVouchers.value;
+    }
+    return vouchers.value;
+});
+
+// Watch để tự động apply filter khi vouchers thay đổi
+watch(vouchers, () => {
+    applyFilters();
+}, { deep: true });
 
 // ===== LIFECYCLE =====
 onMounted(() => {
@@ -724,6 +840,14 @@ function validateField(fieldName) {
     }
 }
 
+// Hàm tính toán số thứ tự với pagination
+function getRowIndex(index) {
+    // Lấy thông tin pagination từ DataTable
+    const currentPage = dt.value ? dt.value.d_first / dt.value.d_rows : 0;
+    const rowsPerPage = dt.value ? dt.value.d_rows : 10;
+    return currentPage * rowsPerPage + index + 1;
+}
+
 // ===== API FUNCTIONS =====
 async function fetchData() {
     try {
@@ -737,6 +861,9 @@ async function fetchData() {
             ngayBatDau: item.ngayBatDau ? new Date(item.ngayBatDau) : null,
             ngayKetThuc: item.ngayKetThuc ? new Date(item.ngayKetThuc) : null
         }));
+
+        // 🆕 THÊM DÒNG NÀY
+        filteredVouchers.value = [...vouchers.value];
 
         console.log('✅ Processed vouchers:', vouchers.value);
     } catch (error) {
@@ -1144,10 +1271,11 @@ function exportCSV() {
             return;
         }
 
-        const headers = ['ID', 'Mã Voucher', 'Tên Voucher', 'Hình Ảnh', 'Loại giảm giá', 'Giá trị giảm', 'Đơn hàng tối thiểu', 'Giảm tối đa', 'Số lượng', 'Ngày Bắt Đầu', 'Ngày Kết Thúc', 'Trạng Thái'];
+        const headers = ['STT', 'Mã Voucher', 'Tên Voucher', 'Hình Ảnh', 'Loại giảm giá', 'Giá trị giảm', 'Đơn hàng tối thiểu', 'Giảm tối đa', 'Số lượng', 'Ngày Bắt Đầu', 'Ngày Kết Thúc', 'Trạng Thái'];
 
-        const csvData = vouchers.value.map((item) => [
-            item.id || '',
+        const csvData = vouchers.value.map((item , ind) => [
+            // item.id || '',
+            ind + 1 ,
             item.maVoucher || '',
             item.tenVoucher || '',
             item.duongDanHinhAnh || '',
