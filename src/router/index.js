@@ -276,12 +276,6 @@ const router = createRouter({
                     meta: { requiresAuth: true, roles: ['ADMIN', 'NHANVIEN'] }
                 },
                 {
-                    name: 'ThongBaoList',
-                    path: '/thong-bao',
-                    component: () => import('@/views/ThongBao/ThongBaoList.vue'),
-                    meta: { requiresAuth: true, roles: ['ADMIN', 'NHANVIEN'] }
-                },
-                {
                     name: 'Voucher',
                     path: '/voucher',
                     component: () => import('@/views/Voucher/VoucherList.vue'),
@@ -368,7 +362,6 @@ const router = createRouter({
             redirect: '/pages/notfound'
         }
     ]
-
 });
 
 // ROUTE GUARDS - Kiểm tra quyền truy cập

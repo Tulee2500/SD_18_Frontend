@@ -240,65 +240,160 @@
 
   // Load user info
   const loadUserInfo = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/khach-hang/current`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
-        }
-      });
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/khach-hang/current`, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      }
+    });
 
-      userInfo.value = response.data;
-      console.log('User info loaded:', userInfo.value);
+    // DEBUG: Log để xem API response
+    console.log('🔍 USER INFO RESPONSE:', response.data);
+    console.log('🔍 USER INFO KEYS:', Object.keys(response.data || {}));
 
-    } catch (error) {
-      console.error('Error loading user info:', error);
-    }
-  };
+    // FIX: Lấy data từ đúng structure
+    const userData = response.data.data || response.data;
+    userInfo.value = userData;
+
+    console.log('👤 FINAL USER DATA:', userData);
+    console.log('🆔 Available IDs:', {
+      id: userData.id,
+      idTaiKhoan: userData.idTaiKhoan,
+      taiKhoanId: userData.taiKhoanId,
+      taiKhoan_id: userData.taiKhoan?.id
+    });
+
+  } catch (error) {
+    console.error('Error loading user info:', error);
+  }
+};
 
   // Load addresses
   const loadAddresses = async () => {
-    isLoadingAddresses.value = true;
-    try {
-      // Đảm bảo có taiKhoanId
-      let taiKhoanId = userInfo.value?.idTaiKhoan || userInfo.value?.taiKhoan?.id || userInfo.value?.taiKhoanId;
+  isLoadingAddresses.value = true;
+  try {
+    // FIX: Tìm taiKhoanId từ nhiều nguồn
+    let taiKhoanId = null;
 
-      if (!taiKhoanId) {
-        await loadUserInfo();
-        taiKhoanId = userInfo.value?.idTaiKhoan || userInfo.value?.taiKhoan?.id || userInfo.value?.taiKhoanId;
+    if (userInfo.value?.id) {
+      taiKhoanId = userInfo.value.id;
+      console.log('📋 Using userInfo.id:', taiKhoanId);
+    } else if (userInfo.value?.idTaiKhoan) {
+      taiKhoanId = userInfo.value.idTaiKhoan;
+      console.log('📋 Using userInfo.idTaiKhoan:', taiKhoanId);
+    } else if (userInfo.value?.taiKhoan?.id) {
+      taiKhoanId = userInfo.value.taiKhoan.id;
+      console.log('📋 Using userInfo.taiKhoan.id:', taiKhoanId);
+    } else if (userInfo.value?.taiKhoanId) {
+      taiKhoanId = userInfo.value.taiKhoanId;
+      console.log('📋 Using userInfo.taiKhoanId:', taiKhoanId);
+    }
 
-        if (!taiKhoanId) {
-          console.error('Vẫn không tìm thấy ID tài khoản sau khi reload');
-          return;
-        }
+    // Nếu vẫn không có, thử reload user info
+    if (!taiKhoanId) {
+      console.log('🔄 No taiKhoanId found, reloading user info...');
+      await loadUserInfo();
+
+      // Thử lại sau khi reload
+      if (userInfo.value?.id) {
+        taiKhoanId = userInfo.value.id;
+      } else if (userInfo.value?.idTaiKhoan) {
+        taiKhoanId = userInfo.value.idTaiKhoan;
+      } else if (userInfo.value?.taiKhoan?.id) {
+        taiKhoanId = userInfo.value.taiKhoan.id;
       }
+    }
 
-      const url = `${API_BASE_URL}/api/dia-chi/tai-khoan/${taiKhoanId}`;
+    if (!taiKhoanId) {
+      console.error('❌ Vẫn không tìm thấy taiKhoanId sau khi reload');
+      console.log('❌ UserInfo structure:', userInfo.value);
+      addresses.value = [];
+      return;
+    }
 
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json'
-        }
+    console.log('🔍 Final taiKhoanId to use:', taiKhoanId);
+
+    const url = `${API_BASE_URL}/api/dia-chi/tai-khoan/${taiKhoanId}`;
+    console.log('🌐 API URL:', url);
+
+    const response = await axios.get(url, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    // DEBUG: Log response
+    console.log('🔍 ADDRESS RESPONSE:', response.data);
+    console.log('🔍 IS ARRAY:', Array.isArray(response.data));
+
+    let addressData = [];
+    if (Array.isArray(response.data)) {
+      addressData = response.data;
+    } else if (response.data?.data && Array.isArray(response.data.data)) {
+      addressData = response.data.data;
+    } else if (response.data?.addresses && Array.isArray(response.data.addresses)) {
+      addressData = response.data.addresses;
+    }
+
+    console.log('📍 Raw address data:', addressData);
+    console.log('📍 Address count:', addressData.length);
+
+    // FIX: Map addresses với fallback values
+    addresses.value = addressData
+      .filter(addr => addr && addr.id) // Chỉ lấy địa chỉ có ID
+      .map(addr => ({
+        id: addr.id,
+        tenNguoiNhan: addr.tenNguoiNhan ||
+                      addr.hoTen ||
+                      userInfo.value?.hoTen ||
+                      'Khách hàng',
+        sdt: addr.sdt ||
+             userInfo.value?.sdt ||
+             '',
+        diaChiChiTiet: addr.diaChiChiTiet || '',
+        maTinh: addr.maTinh || '',
+        maHuyen: addr.maHuyen || '',
+        maPhuong: addr.maPhuong || '',
+        tenTinh: addr.tenTinh || '',
+        tenHuyen: addr.tenHuyen || '',
+        tenPhuong: addr.tenPhuong || '',
+        isDefault: Boolean(addr.isDefault || addr.trangThai === 1),
+        trangThai: addr.trangThai || 0
+      }))
+      .sort((a, b) => {
+        // Sort: default trước, sau đó theo ID
+        if (a.isDefault && !b.isDefault) return -1;
+        if (!a.isDefault && b.isDefault) return 1;
+        return b.id - a.id;
       });
 
-      const addressData = Array.isArray(response.data) ? response.data : [];
+    console.log('📍 Final mapped addresses:', addresses.value);
 
-      addresses.value = addressData.map(addr => ({
-        ...addr,
-        tenNguoiNhan: addr.tenNguoiNhan || addr.hoTen || userInfo.value.hoTen,
-        sdt: addr.sdt || userInfo.value.sdt,
-        isDefault: addr.isDefault || addr.trangThai === 1
-      }));
+  } catch (error) {
+    console.error('❌ Error loading addresses:', error);
+    console.error('❌ Error details:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
 
-      console.log('Final addresses array:', addresses.value);
+    addresses.value = [];
 
-    } catch (error) {
-      console.error('Error loading addresses:', error);
-      addresses.value = [];
-    } finally {
-      isLoadingAddresses.value = false;
+    if (error.response?.status === 401) {
+      toast.add({
+        severity: 'error',
+        summary: 'Phiên đăng nhập hết hạn',
+        detail: 'Vui lòng đăng nhập lại',
+        life: 3000
+      });
+    } else if (error.response?.status === 404) {
+      console.log('No addresses found for user');
     }
-  };
+  } finally {
+    isLoadingAddresses.value = false;
+  }
+};
 
   // Load address data
   const loadAddressData = async () => {
@@ -345,74 +440,101 @@
 
   // Save address
   const saveAddress = async () => {
-    isSubmitting.value = true;
-    try {
-      const ward = wards.value.find(w => w.id === addressForm.value.maPhuong);
-      addressForm.value.tenPhuong = ward?.name || '';
+  isSubmitting.value = true;
+  try {
+    const ward = wards.value.find(w => w.id === addressForm.value.maPhuong);
+    addressForm.value.tenPhuong = ward?.name || '';
 
-      const taiKhoanId = userInfo.value.taiKhoan?.id || userInfo.value.taiKhoanId;
+    // FIX: Tìm taiKhoanId cho save
+    let taiKhoanId = null;
 
-      if (!taiKhoanId) {
-        toast.add({
-          severity: 'error',
-          summary: 'Lỗi',
-          detail: 'Không tìm thấy thông tin tài khoản!',
-          life: 3000
-        });
-        return;
-      }
+    if (userInfo.value?.id) {
+      taiKhoanId = userInfo.value.id;
+    } else if (userInfo.value?.idTaiKhoan) {
+      taiKhoanId = userInfo.value.idTaiKhoan;
+    } else if (userInfo.value?.taiKhoan?.id) {
+      taiKhoanId = userInfo.value.taiKhoan.id;
+    } else if (userInfo.value?.taiKhoanId) {
+      taiKhoanId = userInfo.value.taiKhoanId;
+    }
 
-      const addressData = {
-        tenNguoiNhan: addressForm.value.tenNguoiNhan,
-        sdt: addressForm.value.sdt,
-        diaChiChiTiet: addressForm.value.diaChiChiTiet,
-        maTinh: addressForm.value.maTinh,
-        maHuyen: addressForm.value.maHuyen,
-        maPhuong: addressForm.value.maPhuong,
-        tenTinh: addressForm.value.tenTinh,
-        tenHuyen: addressForm.value.tenHuyen,
-        tenPhuong: addressForm.value.tenPhuong,
-        trangThai: addressForm.value.isDefault ? 1 : 0,
-        idTaiKhoan: taiKhoanId
-      };
+    console.log('💾 Saving with taiKhoanId:', taiKhoanId);
 
-      if (editingAddress.value) {
-        await axios.put(`${API_BASE_URL}/api/dia-chi/${editingAddress.value.id}`, addressData, {
-          headers: {
-            'Authorization': `Bearer ${getAuthToken()}`,
-            'Content-Type': 'application/json'
-          }
-        });
-      } else {
-        await axios.post(`${API_BASE_URL}/api/dia-chi`, addressData, {
-          headers: {
-            'Authorization': `Bearer ${getAuthToken()}`,
-            'Content-Type': 'application/json'
-          }
-        });
-      }
-
-      await loadAddresses();
-      closeAddressModal();
-
-      toast.add({
-        severity: 'success',
-        summary: 'Thành công',
-        detail: editingAddress.value ? 'Cập nhật địa chỉ thành công!' : 'Thêm địa chỉ thành công!',
-        life: 3000
-      });
-    } catch (error) {
-      console.error('Error saving address:', error);
+    if (!taiKhoanId) {
       toast.add({
         severity: 'error',
         summary: 'Lỗi',
-        detail: 'Không thể lưu địa chỉ!',
+        detail: 'Không tìm thấy thông tin tài khoản!',
         life: 3000
       });
-    } finally {
-      isSubmitting.value = false;
+      return;
     }
-  };
+
+    const addressData = {
+      tenNguoiNhan: addressForm.value.tenNguoiNhan,
+      sdt: addressForm.value.sdt,
+      diaChiChiTiet: addressForm.value.diaChiChiTiet,
+      maTinh: addressForm.value.maTinh,
+      maHuyen: addressForm.value.maHuyen,
+      maPhuong: addressForm.value.maPhuong,
+      tenTinh: addressForm.value.tenTinh,
+      tenHuyen: addressForm.value.tenHuyen,
+      tenPhuong: addressForm.value.tenPhuong,
+      trangThai: addressForm.value.isDefault ? 1 : 0,
+      isDefault: addressForm.value.isDefault,
+      idTaiKhoan: taiKhoanId
+    };
+
+    console.log('💾 Address data to save:', addressData);
+
+    let response;
+    if (editingAddress.value) {
+      console.log('✏️ Updating address ID:', editingAddress.value.id);
+      response = await axios.put(`${API_BASE_URL}/api/dia-chi/${editingAddress.value.id}`, addressData, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } else {
+      console.log('➕ Creating new address');
+      response = await axios.post(`${API_BASE_URL}/api/dia-chi`, addressData, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    console.log('✅ Save response:', response.data);
+
+    await loadAddresses();
+    closeAddressModal();
+
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: editingAddress.value ? 'Cập nhật địa chỉ thành công!' : 'Thêm địa chỉ thành công!',
+      life: 3000
+    });
+  } catch (error) {
+    console.error('❌ Error saving address:', error);
+    console.error('❌ Save error details:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.response?.data?.message || 'Không thể lưu địa chỉ!',
+      life: 3000
+    });
+  } finally {
+    isSubmitting.value = false;
+  }
+};
 
   // Edit address
   const editAddress = (address) => {

@@ -23,6 +23,91 @@
             </template>
         </Toolbar>
 
+        <!-- Enhanced Search and Filter Section -->
+        <div class="search-filter-section mb-6 p-4 bg-gray-50 rounded-lg border">
+            <!-- Global Search -->
+            <div class="mb-4">
+                <IconField>
+                    <InputIcon>
+                        <i class="pi pi-search" />
+                    </InputIcon>
+                    <InputText 
+                        v-model="globalFilter" 
+                        placeholder="Tìm kiếm tất cả thông tin tài khoản (email, mã TK, vai trò, trạng thái)..." 
+                        class="w-full"
+                        @input="debouncedSearch"
+                    />
+                </IconField>
+            </div>
+
+            <!-- Advanced Filters -->
+            <div class="flex flex-wrap items-center gap-3">
+                <Select 
+                    v-model="roleFilter" 
+                    :options="ROLE_FILTER_OPTIONS" 
+                    optionLabel="label" 
+                    optionValue="value" 
+                    placeholder="Lọc vai trò" 
+                    class="w-40"
+                    @change="applyFilters"
+                    showClear
+                />
+
+                <Select 
+                    v-model="statusFilter" 
+                    :options="STATUS_OPTIONS" 
+                    optionLabel="label" 
+                    optionValue="value" 
+                    placeholder="Lọc trạng thái" 
+                    class="w-40"
+                    @change="applyFilters"
+                    showClear
+                />
+
+                <DatePicker
+                    v-model="dateFilters.startDate"
+                    placeholder="Từ ngày"
+                    dateFormat="dd/mm/yy"
+                    @date-select="applyFilters"
+                    @clear="applyFilters"
+                    class="w-36"
+                    showIcon
+                    showClear
+                    :maxDate="dateFilters.endDate || new Date()"
+                />
+
+                <DatePicker
+                    v-model="dateFilters.endDate"
+                    placeholder="Đến ngày"
+                    dateFormat="dd/mm/yy"
+                    @date-select="applyFilters"
+                    @clear="applyFilters"
+                    class="w-36"
+                    showIcon
+                    showClear
+                    :minDate="dateFilters.startDate"
+                    :maxDate="new Date()"
+                />
+                <Button
+                    label="Reset"
+                    icon="pi pi-refresh"
+                    outlined
+                    @click="resetFilters"
+                />
+
+                <div class="ml-auto flex items-center gap-2">
+                    <Badge 
+                        v-if="selectedAccounts && selectedAccounts.length" 
+                        :value="`${selectedAccounts.length} đã chọn`" 
+                        severity="info" 
+                    />
+                    <span class="text-sm text-gray-600">
+                        Hiển thị {{ filteredAccounts.length }} / {{ accounts.length }} tài khoản
+                    </span>
+                </div>
+            </div>
+        </div>
+
         <!-- DataTable -->
         <DataTable
             ref="dt"
@@ -31,61 +116,57 @@
             dataKey="id"
             :paginator="true"
             :rows="PAGINATION_CONFIG.defaultRows"
-            :filters="filters"
             :paginatorTemplate="PAGINATION_CONFIG.paginatorTemplate"
             :rowsPerPageOptions="PAGINATION_CONFIG.rowsPerPageOptions"
             currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} tài khoản"
             :loading="isLoading"
+            class="responsive-table"
         >
             <template #header>
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h4 class="m-0">Quản Lý Tài Khoản</h4>
-                    <div class="flex gap-2">
-                        <IconField>
-                            <InputIcon>
-                                <i class="pi pi-search" />
-                            </InputIcon>
-                            <InputText v-model="filters['global'].value" placeholder="Tìm kiếm..." />
-                        </IconField>
-                        <Select 
-                            v-model="roleFilter" 
-                            :options="ROLE_FILTER_OPTIONS" 
-                            optionLabel="label" 
-                            optionValue="value" 
-                            placeholder="Lọc vai trò" 
-                            class="w-12rem" 
-                        />
-                        <Select 
-                            v-model="statusFilter" 
-                            :options="STATUS_OPTIONS" 
-                            optionLabel="label" 
-                            optionValue="value" 
-                            placeholder="Lọc trạng thái" 
-                            class="w-12rem" 
-                        />
+                    <h4 class="m-0 text-xl font-bold text-gray-800">Quản Lý Tài Khoản</h4>
+                    <div class="flex items-center gap-3">
+                        <div class="stats-summary flex gap-4 text-sm">
+                            <div class="flex items-center gap-1">
+                                <div class="w-3 h-3 rounded bg-blue-500"></div>
+                                <span>Tổng: {{ accounts.length }}</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <div class="w-3 h-3 rounded bg-green-500"></div>
+                                <span>Hoạt động: {{ getActiveAccountsCount() }}</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <div class="w-3 h-3 rounded bg-red-500"></div>
+                                <span>Khóa: {{ getInactiveAccountsCount() }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </template>
 
             <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
+            
             <Column field="id" header="ID" sortable style="width: 6rem">
                 <template #body="slotProps">
                     <span class="font-bold text-primary">#{{ slotProps.data.id }}</span>
                 </template>
             </Column>
+            
             <Column field="maTaiKhoan" header="Mã TK" sortable style="width: 10rem">
                 <template #body="slotProps">
                     <Tag :value="slotProps.data.maTaiKhoan" severity="info" />
                 </template>
             </Column>
-            <Column field="email" header="Email" sortable style="min-width: 16rem">
+            
+            <Column field="email" header="Email" sortable style="min-width: 20rem">
                 <template #body="slotProps">
                     <div class="flex items-center">
                         <i class="pi pi-envelope text-muted mr-2"></i>
-                        <span>{{ slotProps.data.email }}</span>
+                        <span class="font-medium">{{ slotProps.data.email }}</span>
                     </div>
                 </template>
             </Column>
+            
             <Column field="vaiTro" header="Vai trò" sortable style="width: 12rem">
                 <template #body="slotProps">
                     <Tag 
@@ -97,6 +178,7 @@
                     </Tag>
                 </template>
             </Column>
+            
             <Column field="trangThai" header="Trạng thái" sortable style="width: 12rem">
                 <template #body="slotProps">
                     <Tag 
@@ -108,12 +190,36 @@
                     </Tag>
                 </template>
             </Column>
+            
+            <Column header="Thông tin liên kết" style="min-width: 15rem">
+                <template #body="slotProps">
+                    <div class="flex flex-col gap-1 text-sm">
+                        <div v-if="slotProps.data.vaiTro === 'USER'" class="flex items-center gap-2">
+                            <i class="pi pi-user text-blue-500"></i>
+                            <span>KH: {{ getLinkedCustomerInfo(slotProps.data.id) }}</span>
+                        </div>
+                        <div v-else-if="slotProps.data.vaiTro === 'NHANVIEN'" class="flex items-center gap-2">
+                            <i class="pi pi-users text-green-500"></i>
+                            <span>NV: {{ getLinkedEmployeeInfo(slotProps.data.id) }}</span>
+                        </div>
+                        <div v-else class="flex items-center gap-2">
+                            <i class="pi pi-crown text-yellow-500"></i>
+                            <span>Admin hệ thống</span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            Tạo: {{ formatDate(slotProps.data.ngayTao) }}
+                        </div>
+                    </div>
+                </template>
+            </Column>
+            
             <Column field="ngayTao" header="Ngày tạo" sortable style="width: 10rem">
                 <template #body="slotProps">
                     <span class="text-sm">{{ formatDate(slotProps.data.ngayTao) }}</span>
                 </template>
             </Column>
-            <Column :exportable="false" style="width: 14rem">
+            
+            <Column :exportable="false" style="width: 16rem">
                 <template #body="slotProps">
                     <div class="flex gap-1">
                         <Button 
@@ -131,14 +237,6 @@
                             title="Sửa" 
                         />
                         <Button 
-                            icon="pi pi-trash" 
-                            outlined 
-                            severity="danger" 
-                            size="small" 
-                            @click="confirmDeleteAccount(slotProps.data)" 
-                            title="Xóa" 
-                        />
-                        <Button 
                             icon="pi pi-refresh" 
                             outlined 
                             severity="secondary" 
@@ -146,14 +244,45 @@
                             @click="handleChangeStatus(slotProps.data)" 
                             :title="slotProps.data.trangThai === 1 ? 'Ngưng hoạt động' : 'Kích hoạt'" 
                         />
+                        <Button 
+                            icon="pi pi-trash" 
+                            outlined 
+                            severity="danger" 
+                            size="small" 
+                            @click="confirmDeleteAccount(slotProps.data)" 
+                            title="Xóa" 
+                        />
                     </div>
                 </template>
             </Column>
+
             <template #empty>
-                <div class="p-5 text-center">
-                    <i class="pi pi-users text-muted mb-3 text-5xl"></i>
-                    <h5 class="text-muted">Không tìm thấy tài khoản</h5>
-                    <p class="text-muted">Thử thay đổi bộ lọc hoặc thêm tài khoản mới.</p>
+                <div class="p-8 text-center">
+                    <i class="pi pi-users text-gray-400 text-6xl mb-4"></i>
+                    <h5 class="text-gray-600 mb-2">Không tìm thấy tài khoản</h5>
+                    <p class="text-gray-500 mb-4">
+                        {{ globalFilter ? 'Thử thay đổi từ khóa tìm kiếm hoặc thêm tài khoản mới.' : 'Thử thay đổi bộ lọc hoặc thêm tài khoản mới.' }}
+                    </p>
+                    <div class="flex gap-2 justify-center">
+                        <Button
+                            v-if="globalFilter"
+                            label="Xóa tìm kiếm"
+                            icon="pi pi-times"
+                            outlined
+                            @click="clearSearch"
+                        />
+                        <Button
+                            label="Làm mới"
+                            icon="pi pi-refresh"
+                            outlined
+                            @click="fetchData"
+                        />
+                        <Button
+                            label="Thêm tài khoản"
+                            icon="pi pi-plus"
+                            @click="openNew"
+                        />
+                    </div>
                 </div>
             </template>
         </DataTable>
@@ -163,9 +292,9 @@
             <div class="flex flex-col gap-6">
                 <!-- Chọn vai trò -->
                 <div class="border-bottom pb-4">
-                    <h5 class="mb-3">
-                        <i class="pi pi-users mr-2"></i>
-                        Chọn vai trò
+                    <h5 class="mb-3 flex items-center gap-2">
+                        <i class="pi pi-users"></i>
+                        Chọn vai trò *
                     </h5>
                     <div class="mb-4">
                         <label for="vaiTro" class="mb-3 block font-bold">Vai trò *</label>
@@ -188,8 +317,8 @@
 
                 <!-- Thông tin cá nhân (chỉ hiện khi không phải Admin) -->
                 <div v-if="newAccount.vaiTro && newAccount.vaiTro !== 'ADMIN'" class="border-bottom pb-4">
-                    <h5 class="mb-3">
-                        <i class="pi pi-user mr-2"></i>
+                    <h5 class="mb-3 flex items-center gap-2">
+                        <i class="pi pi-user"></i>
                         Thông tin {{ newAccount.vaiTro === 'USER' ? 'khách hàng' : 'nhân viên' }}
                     </h5>
                     
@@ -226,8 +355,30 @@
                             </small>
                         </div>
                     </div>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+     
+<!-- Đoạn code cần sửa trong template (dòng 360-376) -->
+<div class="grid grid-cols-2 gap-4 mt-4">
+    <div>
+        <label for="addNgaySinh" class="mb-3 block font-bold">Ngày sinh</label>
+        <Calendar
+            id="addNgaySinh"
+            v-model="personalInfo.ngaySinh"
+            dateFormat="dd/mm/yy"
+            :maxDate="new Date()"
+            showIcon
+            showClear
+            fluid
+            placeholder="Chọn ngày sinh"
+        />
+        <small class="text-gray-500">Tùy chọn - để trống nếu không có</small>
+    </div>
+</div>
+</div>
+
+
+
+                    <div class="grid grid-cols-1 gap-4 mb-4">
                         <div>
                             <label for="personalEmail" class="mb-3 block font-bold">Email *</label>
                             <InputText 
@@ -243,74 +394,47 @@
                                 {{ getValidationError('email') }}
                             </small>
                         </div>
-                        <div v-if="newAccount.vaiTro === 'USER'">
-                            <label for="ngaySinh" class="mb-3 block font-bold">Ngày sinh</label>
-                            <DatePicker 
-                                id="ngaySinh" 
-                                v-model="personalInfo.ngaySinh" 
-                                dateFormat="dd/mm/yy" 
-                                fluid 
-                                placeholder="Chọn ngày sinh"
-                                :maxDate="new Date()"
-                                showIcon
-                            />
-                        </div>
-                        <div v-if="newAccount.vaiTro === 'NHANVIEN'">
-                            <label for="chucVu" class="mb-3 block font-bold">Chức vụ</label>
-                            <InputText 
-                                id="chucVu" 
-                                v-model.trim="personalInfo.chucVu" 
-                                fluid 
-                                placeholder="Nhập chức vụ"
-                            />
-                        </div>
                     </div>
 
-                    <!-- Địa chỉ - 2 cấp: Tỉnh/TP và Xã/Phường -->
+                    <!-- Địa chỉ với API tích hợp -->
                     <div class="mt-4">
-                        <label class="mb-3 block font-bold">
-                            <i class="pi pi-map-marker mr-1"></i>
-                            Địa chỉ *
+                        <label class="mb-3 block font-bold flex items-center gap-1">
+                            <i class="pi pi-map-marker"></i>
+                            Địa chỉ
                         </label>
                         
                         <!-- Tỉnh/Thành phố -->
                         <div class="grid grid-cols-2 gap-3 mb-3">
                             <div>
-                                <label class="mb-2 block text-sm font-medium">Tỉnh/Thành phố *</label>
+                                <label class="mb-2 block text-sm font-medium">Tỉnh/Thành phố</label>
                                 <Select
-                                    v-model="personalInfo.tinhThanhCode"
+                                    v-model="personalInfo.maTinh"
                                     :options="provinces"
                                     optionLabel="name"
                                     optionValue="code"
                                     placeholder="Chọn Tỉnh/TP"
                                     :loading="loadingProvinces"
                                     @change="onProvinceChange"
-                                    :invalid="hasValidationError('tinhThanhCode')"
                                     fluid
+                                    showClear
                                 />
-                                <small v-if="hasValidationError('tinhThanhCode')" class="text-red-500">
-                                    {{ getValidationError('tinhThanhCode') }}
-                                </small>
                             </div>
                             
                             <!-- Xã/Phường -->
                             <div>
-                                <label class="mb-2 block text-sm font-medium">Xã/Phường *</label>
+                                <label class="mb-2 block text-sm font-medium">Xã/Phường</label>
                                 <Select
-                                    v-model="personalInfo.phuongXaCode"
+                                    v-model="personalInfo.maPhuong"
                                     :options="wards"
                                     optionLabel="name"
                                     optionValue="code"
                                     placeholder="Chọn Xã/Phường"
-                                    :disabled="!personalInfo.tinhThanhCode"
+                                    :disabled="!personalInfo.maTinh"
                                     :loading="loadingWards"
                                     @change="onWardChange"
-                                    :invalid="hasValidationError('phuongXaCode')"
                                     fluid
+                                    showClear
                                 />
-                                <small v-if="hasValidationError('phuongXaCode')" class="text-red-500">
-                                    {{ getValidationError('phuongXaCode') }}
-                                </small>
                             </div>
                         </div>
                         
@@ -327,8 +451,8 @@
                         
                         <!-- Hiển thị địa chỉ đầy đủ -->
                         <div v-if="personalInfo.fullAddress" class="rounded bg-green-50 p-3 border border-green-200">
-                            <label class="mb-1 block text-sm font-bold text-green-800">
-                                <i class="pi pi-check-circle mr-1"></i>
+                            <label class="mb-1 block text-sm font-bold text-green-800 flex items-center gap-1">
+                                <i class="pi pi-check-circle"></i>
                                 Địa chỉ đầy đủ:
                             </label>
                             <p class="text-green-700 font-medium">{{ personalInfo.fullAddress }}</p>
@@ -338,8 +462,8 @@
 
                 <!-- Thông tin tài khoản -->
                 <div class="border-bottom pb-4">
-                    <h5 class="mb-3">
-                        <i class="pi pi-lock mr-2"></i>
+                    <h5 class="mb-3 flex items-center gap-2">
+                        <i class="pi pi-lock"></i>
                         Thông tin đăng nhập
                     </h5>
                     <div class="grid grid-cols-2 gap-4">
@@ -393,10 +517,8 @@
                                     <Divider />
                                     <p class="mt-2">Yêu cầu</p>
                                     <ul class="ml-2 mt-0 pl-2" style="line-height: 1.5">
-                                        <li>Ít nhất một chữ thường</li>
-                                        <li>Ít nhất một chữ hoa</li>
-                                        <li>Ít nhất một số</li>
-                                        <li>Tối thiểu 8 ký tự</li>
+                                        <li>Tối thiểu 6 ký tự</li>
+                                        <li>Tối đa 50 ký tự</li>
                                     </ul>
                                 </template>
                             </Password>
@@ -458,22 +580,36 @@
             </template>
         </Dialog>
 
-        <!-- Edit Account Dialog -->
-        <Dialog v-model:visible="editDialog" :style="{ width: DIALOG_SIZES.MEDIUM }" header="Cập nhật tài khoản" :modal="true">
+        <!-- Edit Account Dialog - CHỈ EMAIL VÀ MẬT KHẨU -->
+        <Dialog v-model:visible="editDialog" :style="{ width: DIALOG_SIZES.MEDIUM }" header="Cập nhật thông tin đăng nhập" :modal="true">
             <div class="flex flex-col gap-4">
+                <!-- THÔNG BÁO GIỚI HẠN -->
+                <div class="bg-amber-50 p-3 rounded border border-amber-200 mb-4">
+                    <div class="flex items-center gap-2 text-amber-700">
+                        <i class="pi pi-info-circle"></i>
+                        <span class="font-semibold text-sm">Lưu ý:</span>
+                    </div>
+                    <p class="text-sm text-amber-600 mt-1 mb-0">
+                        Chỉ có thể chỉnh sửa Email và Mật khẩu. Vai trò và trạng thái được quản lý bằng các chức năng khác.
+                    </p>
+                </div>
+
                 <div>
-                    <label for="editEmail" class="mb-3 block font-bold">Email *</label>
+                    <label for="editEmail" class="mb-3 block font-bold">Email đăng nhập *</label>
                     <InputText 
                         id="editEmail" 
                         v-model.trim="editAccountData.email" 
                         required="true" 
                         :invalid="hasValidationError('editEmail')" 
                         fluid 
+                        placeholder="Nhập email mới"
+                        @input="clearFieldError('editEmail')"
                     />
                     <small v-if="hasValidationError('editEmail')" class="text-red-500">
                         {{ getValidationError('editEmail') }}
                     </small>
                 </div>
+                
                 <div>
                     <label for="editMatKhau" class="mb-3 block font-bold">Mật khẩu mới</label>
                     <Password 
@@ -482,39 +618,37 @@
                         placeholder="Để trống nếu không đổi" 
                         toggleMask 
                         fluid 
+                        @input="clearFieldError('editMatKhau')"
                     />
-                    <small class="text-muted">Để trống nếu không muốn thay đổi mật khẩu</small>
-                </div>
-                <div>
-                    <label for="editVaiTro" class="mb-3 block font-bold">Vai trò *</label>
-                    <Select 
-                        id="editVaiTro" 
-                        v-model="editAccountData.vaiTro" 
-                        :options="ROLE_OPTIONS_FOR_FORM" 
-                        optionLabel="label" 
-                        optionValue="value" 
-                        placeholder="Chọn vai trò" 
-                        :invalid="hasValidationError('editVaiTro')" 
-                        fluid 
-                    />
-                    <small v-if="hasValidationError('editVaiTro')" class="text-red-500">
-                        {{ getValidationError('editVaiTro') }}
+                    <small v-if="hasValidationError('editMatKhau')" class="text-red-500">
+                        {{ getValidationError('editMatKhau') }}
                     </small>
+                    <small v-else class="text-muted">Để trống nếu không muốn thay đổi mật khẩu</small>
                 </div>
-                <div>
-                    <label for="editTrangThai" class="mb-3 block font-bold">Trạng thái *</label>
-                    <Select
-                        id="editTrangThai"
-                        v-model="editAccountData.trangThai"
-                        :options="STATUS_OPTIONS_FOR_FORM"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Chọn trạng thái"
-                        :invalid="hasValidationError('editTrangThai')"
-                        fluid
-                    />
-                    <small v-if="hasValidationError('editTrangThai')" class="text-red-500">
-                        {{ getValidationError('editTrangThai') }}
+
+                <!-- HIỂN THỊ THÔNG TIN KHÔNG ĐƯỢC SỬA -->
+                <div class="bg-gray-50 p-3 rounded border">
+                    <h6 class="mb-2 text-gray-700 font-semibold">Thông tin chỉ đọc:</h6>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <strong>Vai trò:</strong>
+                            <Tag 
+                                :value="getRoleLabel(editAccountData.vaiTro)" 
+                                :severity="getRoleSeverity(editAccountData.vaiTro)" 
+                                class="ml-2"
+                            />
+                        </div>
+                        <div>
+                            <strong>Trạng thái:</strong>
+                            <Tag
+                                :value="getStatusLabel(editAccountData.trangThai)"
+                                :severity="getStatusSeverity(editAccountData.trangThai)"
+                                class="ml-2"
+                            />
+                        </div>
+                    </div>
+                    <small class="text-gray-500 mt-2 block">
+                        Sử dụng nút "Đổi trạng thái" ở bảng chính để thay đổi trạng thái hoạt động.
                     </small>
                 </div>
             </div>
@@ -524,12 +658,15 @@
             </template>
         </Dialog>
 
-        <!-- View Account Dialog -->
+        <!-- View Account Dialog - KHÔNG HIỂN THỊ MẬT KHẨU -->
         <Dialog v-model:visible="viewDialog" :style="{ width: DIALOG_SIZES.LARGE }" :header="`Chi tiết tài khoản - ${viewingAccount?.email || 'N/A'}`" :modal="true">
-            <div v-if="viewingAccount" class="flex flex-col gap-4">
+            <div v-if="viewingAccount" class="flex flex-col gap-6">
                 <!-- Thông tin tài khoản -->
-                <div class="rounded-lg bg-blue-50 p-4">
-                    <h6 class="mb-3 font-semibold text-blue-700">Thông tin tài khoản:</h6>
+                <div class="rounded-lg bg-blue-50 p-4 border border-blue-200">
+                    <h6 class="mb-3 font-semibold text-blue-700 flex items-center gap-2">
+                        <i class="pi pi-user"></i>
+                        Thông tin tài khoản:
+                    </h6>
                     <div class="grid grid-cols-2 gap-3 text-sm">
                         <div><strong>ID:</strong> #{{ viewingAccount.id }}</div>
                         <div><strong>Mã TK:</strong> {{ viewingAccount.maTaiKhoan }}</div>
@@ -539,6 +676,7 @@
                             <Tag 
                                 :value="getRoleLabel(viewingAccount.vaiTro)" 
                                 :severity="getRoleSeverity(viewingAccount.vaiTro)" 
+                                class="ml-2"
                             />
                         </div>
                         <div>
@@ -546,41 +684,76 @@
                             <Tag 
                                 :value="getStatusLabel(viewingAccount.trangThai)" 
                                 :severity="getStatusSeverity(viewingAccount.trangThai)" 
+                                class="ml-2"
                             />
                         </div>
                         <div><strong>Ngày tạo:</strong> {{ formatDate(viewingAccount.ngayTao) }}</div>
                         <div><strong>Cập nhật:</strong> {{ formatDate(viewingAccount.ngayCapNhat) }}</div>
                     </div>
                 </div>
+
+                <!-- Thông tin liên kết -->
+                <div class="rounded-lg bg-green-50 p-4 border border-green-200">
+                    <h6 class="mb-3 font-semibold text-green-700 flex items-center gap-2">
+                        <i class="pi pi-link"></i>
+                        Thông tin liên kết:
+                    </h6>
+                    <div class="text-sm">
+                        <div v-if="viewingAccount.vaiTro === 'USER'">
+                            <strong>Khách hàng:</strong> {{ getLinkedCustomerInfo(viewingAccount.id) }}
+                        </div>
+                        <div v-else-if="viewingAccount.vaiTro === 'NHANVIEN'">
+                            <strong>Nhân viên:</strong> {{ getLinkedEmployeeInfo(viewingAccount.id) }}
+                        </div>
+                        <div v-else>
+                            <strong>Vai trò:</strong> Admin hệ thống (không liên kết)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thông báo bảo mật -->
+                <div class="rounded-lg bg-yellow-50 p-4 border border-yellow-200">
+                    <div class="flex items-center gap-2 text-yellow-700">
+                        <i class="pi pi-shield"></i>
+                        <span class="font-semibold">Bảo mật:</span>
+                    </div>
+                    <p class="text-sm text-yellow-600 mt-1 mb-0">
+                        Mật khẩu được mã hóa và không hiển thị vì lý do bảo mật. Sử dụng chức năng "Sửa" để thay đổi mật khẩu.
+                    </p>
+                </div>
             </div>
             <template #footer>
                 <Button label="Đóng" icon="pi pi-times" text @click="viewDialog = false" />
-                <Button label="Sửa" icon="pi pi-pencil" @click="editFromView" />
+                <Button label="Sửa thông tin đăng nhập" icon="pi pi-pencil" @click="editFromView" />
             </template>
         </Dialog>
 
         <!-- Delete Dialogs -->
         <Dialog v-model:visible="deleteAccountDialog" :style="{ width: DIALOG_SIZES.SMALL }" header="Xác nhận xóa" :modal="true">
             <div class="flex items-center gap-4">
-                <i class="pi pi-exclamation-triangle !text-3xl" />
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
                 <span v-if="selectedAccountForDelete">
                     Bạn có chắc chắn muốn xóa tài khoản <b>{{ selectedAccountForDelete.email }}</b>?
+                    <br><small class="text-red-600">Hành động này sẽ xóa tất cả dữ liệu liên quan.</small>
                 </span>
             </div>
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteAccountDialog = false" :disabled="deleting" />
-                <Button label="Có" icon="pi pi-check" @click="handleDeleteAccount" :loading="deleting" />
+                <Button label="Có" icon="pi pi-check" severity="danger" @click="handleDeleteAccount" :loading="deleting" />
             </template>
         </Dialog>
 
         <Dialog v-model:visible="deleteAccountsDialog" :style="{ width: DIALOG_SIZES.SMALL }" header="Xác nhận xóa" :modal="true">
             <div class="flex items-center gap-4">
-                <i class="pi pi-exclamation-triangle !text-3xl" />
-                <span>Bạn có chắc chắn muốn xóa các tài khoản đã chọn?</span>
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <span>
+                    Bạn có chắc chắn muốn xóa {{ selectedAccounts?.length }} tài khoản đã chọn?
+                    <br><small class="text-red-600">Hành động này sẽ xóa tất cả dữ liệu liên quan.</small>
+                </span>
             </div>
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteAccountsDialog = false" :disabled="deleting" />
-                <Button label="Có" icon="pi pi-check" @click="handleDeleteSelectedAccounts" :loading="deleting" />
+                <Button label="Có" icon="pi pi-check" severity="danger" @click="handleDeleteSelectedAccounts" :loading="deleting" />
             </template>
         </Dialog>
 
@@ -589,15 +762,14 @@
 </template>
 
 <script setup>
-import { FilterMatchMode } from '@primevue/core/api'
 import axios from 'axios'
 import { useToast } from 'primevue/usetoast'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 // Constants
 const STATUS_OPTIONS = [
-    { label: 'Tất cả trạng thái', value: '' },
+    { label: 'Tất cả trạng thái', value: null },
     { label: 'Hoạt động', value: 1 },
     { label: 'Ngưng hoạt động', value: 0 }
 ]
@@ -608,7 +780,7 @@ const STATUS_OPTIONS_FOR_FORM = [
 ]
 
 const ROLE_FILTER_OPTIONS = [
-    { label: 'Tất cả vai trò', value: '' },
+    { label: 'Tất cả vai trò', value: null },
     { label: 'Khách hàng', value: 'USER' },
     { label: 'Nhân viên', value: 'NHANVIEN' },
     { label: 'Admin', value: 'ADMIN' }
@@ -640,6 +812,8 @@ const toast = useToast()
 // ===== REACTIVE STATE =====
 const dt = ref()
 const accounts = ref([])
+const customers = ref([])
+const employees = ref([])
 const selectedAccounts = ref()
 const isLoading = ref(false)
 const addDialog = ref(false)
@@ -653,22 +827,24 @@ const personalInfo = ref({
     hoTen: '',
     email: '',
     sdt: '',
-    tinhThanhCode: '',
-    phuongXaCode: '',
+    ngaySinh: null, // THÊM NGÀY SINH
+    maTinh: '',
+    maPhuong: '',
     diaChiChiTiet: '',
-    fullAddress: '',
-    ngaySinh: null,
-    chucVu: ''
+    fullAddress: ''
 })
 const editAccountData = ref({})
 const viewingAccount = ref(null)
 const selectedAccountForDelete = ref(null)
 
-const filters = ref({
-    global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+const globalFilter = ref('')
+const roleFilter = ref(null)
+const statusFilter = ref(null)
+const dateFilters = ref({
+    startDate: null,
+    endDate: null
 })
-const roleFilter = ref('')
-const statusFilter = ref('')
+
 const submitted = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
@@ -680,12 +856,29 @@ const provinces = ref([])
 const wards = ref([])
 const loadingProvinces = ref(false)
 const loadingWards = ref(false)
-const addressFallbackShown = ref(false)
 
-// ===== UTILITY FUNCTIONS - ĐỊNH NGHĨA TRƯỚC =====
+const lastCreatedAccountRole = ref('')
+
+// ===== UTILITY FUNCTIONS =====
 const formatDate = (date) => {
     if (!date) return ''
-    return new Date(date).toLocaleDateString('vi-VN')
+    
+    try {
+        const dateObj = new Date(date)
+        if (isNaN(dateObj.getTime())) {
+            console.warn('⚠️ Invalid date:', date)
+            return 'Ngày không hợp lệ'
+        }
+        
+        return dateObj.toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric'
+        })
+    } catch (error) {
+        console.error('❌ Error formatting date:', error)
+        return 'Lỗi định dạng ngày'
+    }
 }
 
 const getStatusLabel = (status) => {
@@ -727,16 +920,115 @@ const getRoleIcon = (vaiTro) => {
     }
 }
 
+const getActiveAccountsCount = () => {
+    return accounts.value.filter(acc => acc.trangThai === 1).length
+}
+
+const getInactiveAccountsCount = () => {
+    return accounts.value.filter(acc => acc.trangThai === 0).length
+}
+
+const getLinkedCustomerInfo = (accountId) => {
+    const customer = customers.value.find(c => c.idTaiKhoan === accountId)
+    return customer ? `${customer.hoTen} (ID: ${customer.id})` : 'Chưa liên kết'
+}
+
+const getLinkedEmployeeInfo = (accountId) => {
+    const employee = employees.value.find(e => e.idTaiKhoan === accountId)
+    return employee ? `${employee.hoTen} (ID: ${employee.id})` : 'Chưa liên kết'
+}
+
+const navigateToRolePage = (role) => {
+    console.log('🔄 Navigating to page for role:', role)
+    
+    try {
+        switch (role) {
+            case 'USER':
+                router.push('/khach-hang')
+                break
+            case 'NHANVIEN':
+                router.push('/nhan-vien')
+                break
+            case 'ADMIN':
+                toast.add({
+                    severity: 'info',
+                    summary: 'Thông tin',
+                    detail: 'Tài khoản Admin đã được tạo thành công',
+                    life: 3000
+                })
+                break
+            default:
+                console.warn('Unknown role:', role)
+        }
+    } catch (error) {
+        console.error('❌ Error navigating:', error)
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Không thể chuyển trang, vui lòng điều hướng thủ công',
+            life: 4000
+        })
+    }
+}
+
 // ===== COMPUTED =====
 const filteredAccounts = computed(() => {
     let filtered = accounts.value || []
 
-    if (roleFilter.value !== '') {
-        filtered = filtered.filter((acc) => acc.vaiTro === roleFilter.value)
+    // Tìm kiếm toàn bộ
+    if (globalFilter.value && globalFilter.value.trim()) {
+        const searchTerm = globalFilter.value.toLowerCase().trim()
+        filtered = filtered.filter(acc => 
+            (acc.email && acc.email.toLowerCase().includes(searchTerm)) ||
+            (acc.maTaiKhoan && acc.maTaiKhoan.toLowerCase().includes(searchTerm)) ||
+            getRoleLabel(acc.vaiTro).toLowerCase().includes(searchTerm) ||
+            getStatusLabel(acc.trangThai).toLowerCase().includes(searchTerm)
+        )
     }
 
-    if (statusFilter.value !== '') {
-        filtered = filtered.filter((acc) => acc.trangThai === parseInt(statusFilter.value))
+    // Lọc vai trò
+    if (roleFilter.value !== null && roleFilter.value !== undefined && roleFilter.value !== '') {
+        filtered = filtered.filter(acc => acc.vaiTro === roleFilter.value)
+    }
+
+    // Lọc trạng thái
+    if (statusFilter.value !== null && statusFilter.value !== undefined && statusFilter.value !== '') {
+        const statusValue = parseInt(statusFilter.value)
+        if (!isNaN(statusValue)) {
+            filtered = filtered.filter(acc => acc.trangThai === statusValue)
+        }
+    }
+
+    // Lọc theo ngày
+    if (dateFilters.value.startDate || dateFilters.value.endDate) {
+        filtered = filtered.filter(acc => {
+            if (!acc.ngayTao) return false
+            
+            const accDate = new Date(acc.ngayTao)
+            if (isNaN(accDate.getTime())) return false
+            
+            const accDateOnly = new Date(accDate.getFullYear(), accDate.getMonth(), accDate.getDate())
+            
+            if (dateFilters.value.startDate) {
+                const startDateOnly = new Date(
+                    dateFilters.value.startDate.getFullYear(), 
+                    dateFilters.value.startDate.getMonth(), 
+                    dateFilters.value.startDate.getDate()
+                )
+                if (accDateOnly < startDateOnly) return false
+            }
+            
+            if (dateFilters.value.endDate) {
+                const endDateOnly = new Date(
+                    dateFilters.value.endDate.getFullYear(), 
+                    dateFilters.value.endDate.getMonth(), 
+                    dateFilters.value.endDate.getDate()
+                )
+                if (accDateOnly > endDateOnly) return false
+            }
+            
+            return true
+        })
     }
 
     return filtered
@@ -754,34 +1046,40 @@ const getValidationError = (field) => {
 const fetchData = async () => {
     isLoading.value = true
     try {
-        let url = 'http://localhost:8080/api/tai-khoan'
-        const params = new URLSearchParams()
+        const [accountsResponse, customersResponse, employeesResponse] = await Promise.all([
+            axios.get('http://localhost:8080/api/tai-khoan?size=1000'),
+            axios.get('http://localhost:8080/api/khach-hang').catch(() => ({ data: [] })),
+            axios.get('http://localhost:8080/api/nhan-vien').catch(() => ({ data: [] }))
+        ])
         
-        if (roleFilter.value && roleFilter.value !== '') {
-            params.append('vaiTro', roleFilter.value)
-        }
-        if (statusFilter.value && statusFilter.value !== '') {
-            params.append('trangThai', statusFilter.value)
-        }
-        if (filters.value.global.value && filters.value.global.value.trim() !== '') {
-            params.append('email', filters.value.global.value.trim())
-        }
+        accounts.value = Array.isArray(accountsResponse.data) ? accountsResponse.data : []
         
-        if (params.toString()) {
-            url += '/search?' + params.toString()
-        }
-        
-        console.log('📡 Fetching accounts from:', url)
-        
-        const response = await axios.get(url)
-        if (response.data && Array.isArray(response.data)) {
-            accounts.value = response.data
-            console.log('✅ Loaded accounts:', response.data.length)
+        if (customersResponse.data) {
+            if (Array.isArray(customersResponse.data)) {
+                customers.value = customersResponse.data
+            } else if (customersResponse.data.content) {
+                customers.value = customersResponse.data.content
+            } else {
+                customers.value = []
+            }
         } else {
-            accounts.value = []
+            customers.value = []
         }
+        
+        if (employeesResponse.data) {
+            if (Array.isArray(employeesResponse.data)) {
+                employees.value = employeesResponse.data
+            } else if (employeesResponse.data.content) {
+                employees.value = employeesResponse.data.content
+            } else {
+                employees.value = []
+            }
+        } else {
+            employees.value = []
+        }
+        
     } catch (error) {
-        console.error('❌ Error fetching accounts:', error)
+        console.error('❌ Error fetching data:', error)
         toast.add({
             severity: 'error',
             summary: 'Lỗi kết nối',
@@ -789,6 +1087,8 @@ const fetchData = async () => {
             life: 5000
         })
         accounts.value = []
+        customers.value = []
+        employees.value = []
     } finally {
         isLoading.value = false
     }
@@ -800,8 +1100,6 @@ const fetchProvinces = async () => {
     
     try {
         loadingProvinces.value = true
-        console.log('🌍 Fetching provinces from API...')
-        
         const response = await axios.get('http://localhost:8080/api/vietnam-address/provinces')
         
         if (response.data && response.data.success && response.data.data) {
@@ -810,31 +1108,20 @@ const fetchProvinces = async () => {
                 name: item.name,
                 codename: item.codename
             }))
-            console.log('✅ Loaded provinces:', provinces.value.length)
         } else {
-            throw new Error('Invalid provinces data structure')
+            provinces.value = [
+                { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
+                { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
+                { code: '48', name: 'Đà Nẵng', codename: 'da_nang' }
+            ]
         }
-        
     } catch (error) {
         console.error('❌ Error fetching provinces:', error)
-        
-        // Fallback data
         provinces.value = [
             { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
             { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
-            { code: '48', name: 'Đà Nẵng', codename: 'da_nang' },
-            { code: '92', name: 'Cần Thơ', codename: 'can_tho' }
+            { code: '48', name: 'Đà Nẵng', codename: 'da_nang' }
         ]
-        
-        if (!addressFallbackShown.value) {
-            toast.add({
-                severity: 'warn',
-                summary: 'Cảnh báo',
-                detail: 'API địa chỉ không khả dụng, sử dụng dữ liệu dự phòng',
-                life: 4000
-            })
-            addressFallbackShown.value = true
-        }
     } finally {
         loadingProvinces.value = false
     }
@@ -848,8 +1135,6 @@ const fetchWards = async (provinceCode) => {
     
     try {
         loadingWards.value = true
-        console.log('🏘️ Fetching wards for province:', provinceCode)
-        
         const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
         
         if (response.data && response.data.success && response.data.data) {
@@ -858,35 +1143,28 @@ const fetchWards = async (provinceCode) => {
                 name: item.name,
                 codename: item.codename
             }))
-            console.log('✅ Loaded wards by province:', wards.value.length)
         } else {
-            console.log('⚠️ Invalid wards data structure, using fallback...')
-            wards.value = getFallbackWards(provinceCode)
+            wards.value = [
+                { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
+                { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' }
+            ]
         }
-        
     } catch (error) {
-        console.warn('⚠️ Wards API failed, using fallback data:', error.message)
-        wards.value = getFallbackWards(provinceCode)
-        console.log('📍 Using fallback wards for province:', provinceCode)
+        wards.value = [
+            { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
+            { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' }
+        ]
     } finally {
         loadingWards.value = false
     }
 }
 
-const getFallbackWards = (provinceCode) => {
-    return [
-        { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
-        { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' },
-        { code: '3', name: 'Phường/Xã 3', codename: 'phuong_xa_3' }
-    ]
-}
-
-const onProvinceChange = () => {
-    personalInfo.value.phuongXaCode = ''
+const onProvinceChange = async () => {
+    personalInfo.value.maPhuong = ''
     wards.value = []
     
-    if (personalInfo.value.tinhThanhCode) {
-        fetchWards(personalInfo.value.tinhThanhCode)
+    if (personalInfo.value.maTinh) {
+        await fetchWards(personalInfo.value.maTinh)
     }
     updateFullAddress()
 }
@@ -896,8 +1174,8 @@ const onWardChange = () => {
 }
 
 const updateFullAddress = () => {
-    const provinceName = provinces.value.find(p => p.code === personalInfo.value.tinhThanhCode)?.name || ''
-    const wardName = wards.value.find(w => w.code === personalInfo.value.phuongXaCode)?.name || ''
+    const provinceName = provinces.value.find(p => p.code === personalInfo.value.maTinh)?.name || ''
+    const wardName = wards.value.find(w => w.code === personalInfo.value.maPhuong)?.name || ''
     
     const addressParts = [
         personalInfo.value.diaChiChiTiet,
@@ -906,6 +1184,53 @@ const updateFullAddress = () => {
     ].filter(part => part && part.trim() !== '')
     
     personalInfo.value.fullAddress = addressParts.join(', ')
+}
+
+// ===== SEARCH AND FILTER =====
+const debounce = (func, wait) => {
+    let timeout
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout)
+            func(...args)
+        }
+        clearTimeout(timeout)
+        timeout = setTimeout(later, wait)
+    }
+}
+
+const debouncedSearch = debounce(() => {
+    // Search is handled by computed filteredAccounts
+}, 300)
+
+const applyFilters = () => {
+    if (dateFilters.value.startDate && dateFilters.value.endDate) {
+        if (dateFilters.value.startDate > dateFilters.value.endDate) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Lỗi ngày tháng',
+                detail: 'Ngày bắt đầu không thể lớn hơn ngày kết thúc',
+                life: 3000
+            })
+            const temp = dateFilters.value.startDate
+            dateFilters.value.startDate = dateFilters.value.endDate
+            dateFilters.value.endDate = temp
+        }
+    }
+}
+
+const resetFilters = () => {
+    globalFilter.value = ''
+    roleFilter.value = null
+    statusFilter.value = null
+    dateFilters.value = {
+        startDate: null,
+        endDate: null
+    }
+}
+
+const clearSearch = () => {
+    globalFilter.value = ''
 }
 
 // ===== DIALOG MANAGEMENT =====
@@ -928,12 +1253,11 @@ const resetForms = () => {
         hoTen: '',
         email: '',
         sdt: '',
-        tinhThanhCode: '',
-        phuongXaCode: '',
+        ngaySinh: null, // RESET ngày sinh
+        maTinh: '',
+        maPhuong: '',
         diaChiChiTiet: '',
-        fullAddress: '',
-        ngaySinh: null,
-        chucVu: ''
+        fullAddress: ''
     }
     
     wards.value = []
@@ -942,42 +1266,32 @@ const resetForms = () => {
 }
 
 const refreshFormAfterError = () => {
-    // Clear validation errors but keep form data
     validationErrors.value = {}
     submitted.value = false
 }
 
 const onRoleChange = () => {
-    // Reset personal info when role changes
     personalInfo.value = {
         hoTen: '',
         email: '',
         sdt: '',
-        tinhThanhCode: '',
-        phuongXaCode: '',
+        maTinh: '',
+        maPhuong: '',
         diaChiChiTiet: '',
-        fullAddress: '',
-        ngaySinh: null,
-        chucVu: ''
+        fullAddress: ''
     }
     
-    // Reset address dropdowns
     wards.value = []
-    
-    // Clear validation errors
     validationErrors.value = {}
     
     if (newAccount.value.vaiTro === 'ADMIN') {
         newAccount.value.email = ''
     }
-    
-    console.log('🔄 Role changed to:', newAccount.value.vaiTro)
 }
 
 const syncEmailToAccount = () => {
     newAccount.value.email = personalInfo.value.email
     
-    // Clear email validation errors when user changes email
     if (validationErrors.value.email) {
         delete validationErrors.value.email
     }
@@ -1036,10 +1350,19 @@ const confirmDeleteSelected = () => {
 }
 
 // ===== VALIDATION =====
-const checkEmailExists = (email) => {
+const checkEmailExists = (email, excludeId = null) => {
     return accounts.value.some(account => 
-        account.email.toLowerCase() === email.toLowerCase()
+        account.email.toLowerCase() === email.toLowerCase() && account.id !== excludeId
     )
+}
+
+const checkPhoneExists = (phone) => {
+    // Kiểm tra trong danh sách khách hàng và nhân viên
+    const customerPhones = customers.value.map(c => c.sdt?.replace(/\s/g, '') || '')
+    const employeePhones = employees.value.map(e => e.sdt?.replace(/\s/g, '') || '')
+    const allPhones = [...customerPhones, ...employeePhones]
+    
+    return allPhones.includes(phone)
 }
 
 const validateForm = () => {
@@ -1053,17 +1376,22 @@ const validateForm = () => {
     // Validate email
     if (!newAccount.value.email?.trim()) {
         validationErrors.value.accountEmail = 'Email không được để trống'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newAccount.value.email)) {
-        validationErrors.value.accountEmail = 'Email không hợp lệ'
-    } else if (checkEmailExists(newAccount.value.email)) {
-        validationErrors.value.accountEmail = 'Email đã tồn tại trong hệ thống'
+    } else {
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+        if (!emailRegex.test(newAccount.value.email.trim())) {
+            validationErrors.value.accountEmail = 'Email không hợp lệ'
+        } else if (checkEmailExists(newAccount.value.email)) {
+            validationErrors.value.accountEmail = 'Email đã tồn tại trong hệ thống'
+        }
     }
     
-    // Validate password
+    // Validate mật khẩu
     if (!newAccount.value.matKhau?.trim()) {
         validationErrors.value.matKhau = 'Mật khẩu không được để trống'
     } else if (newAccount.value.matKhau.length < 6) {
         validationErrors.value.matKhau = 'Mật khẩu phải có ít nhất 6 ký tự'
+    } else if (newAccount.value.matKhau.length > 50) {
+        validationErrors.value.matKhau = 'Mật khẩu không được quá 50 ký tự'
     }
     
     // Validate trạng thái
@@ -1071,252 +1399,416 @@ const validateForm = () => {
         validationErrors.value.trangThai = 'Vui lòng chọn trạng thái'
     }
     
-    // Validate personal info for non-admin accounts
+    // Validate thông tin cá nhân cho các vai trò không phải admin
     if (newAccount.value.vaiTro && newAccount.value.vaiTro !== 'ADMIN') {
         if (!personalInfo.value.hoTen?.trim()) {
             validationErrors.value.hoTen = 'Họ tên không được để trống'
         } else if (personalInfo.value.hoTen.trim().length < 2) {
             validationErrors.value.hoTen = 'Họ tên phải có ít nhất 2 ký tự'
+        } else if (personalInfo.value.hoTen.trim().length > 100) {
+            validationErrors.value.hoTen = 'Họ tên không được quá 100 ký tự'
         }
         
         if (!personalInfo.value.email?.trim()) {
             validationErrors.value.email = 'Email không được để trống'
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalInfo.value.email)) {
-            validationErrors.value.email = 'Email không hợp lệ'
+        } else {
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+            if (!emailRegex.test(personalInfo.value.email.trim())) {
+                validationErrors.value.email = 'Email không hợp lệ'
+            }
         }
         
         if (!personalInfo.value.sdt?.trim()) {
             validationErrors.value.sdt = 'Số điện thoại không được để trống'
-        } else if (!/^0\d{9,10}$/.test(personalInfo.value.sdt.replace(/\s/g, ''))) {
-            validationErrors.value.sdt = 'Số điện thoại không hợp lệ (10-11 số, bắt đầu bằng 0)'
+        } else {
+            const phoneRegex = /^0\d{9,10}$/
+            const cleanPhone = personalInfo.value.sdt.replace(/\s/g, '')
+            if (!phoneRegex.test(cleanPhone)) {
+                validationErrors.value.sdt = 'Số điện thoại không hợp lệ (10-11 số, bắt đầu bằng 0)'
+            } else if (checkPhoneExists(cleanPhone)) {
+                validationErrors.value.sdt = 'Số điện thoại đã tồn tại trong hệ thống'
+            }
         }
         
-        // Address validation - at least one field required
-        if (!personalInfo.value.tinhThanhCode && !personalInfo.value.phuongXaCode) {
-            validationErrors.value.tinhThanhCode = 'Vui lòng chọn ít nhất Tỉnh/TP hoặc Xã/Phường'
-            validationErrors.value.phuongXaCode = 'Vui lòng chọn ít nhất Tỉnh/TP hoặc Xã/Phường'
+        // Validate ngày sinh nếu có
+        if (personalInfo.value.ngaySinh) {
+            const today = new Date()
+            const birthDate = new Date(personalInfo.value.ngaySinh)
+            if (birthDate > today) {
+                validationErrors.value.ngaySinh = 'Ngày sinh không thể lớn hơn ngày hiện tại'
+            }
+            
+            // Kiểm tra tuổi hợp lý (ít nhất 16 tuổi)
+            const age = today.getFullYear() - birthDate.getFullYear()
+            if (age < 16) {
+                validationErrors.value.ngaySinh = 'Người dùng phải ít nhất 16 tuổi'
+            }
         }
     }
     
     return Object.keys(validationErrors.value).length === 0
 }
-
-// Debounce function
-const debounce = (func, wait) => {
-    let timeout
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout)
-            func(...args)
-        }
-        clearTimeout(timeout)
-        timeout = setTimeout(later, wait)
-    }
-}
-
-// Watch for filters changes
-watch([roleFilter, statusFilter], () => {
-    fetchData()
-}, { deep: true })
-
-// Watch for global search with debounce
-watch(() => filters.value.global.value, debounce(() => {
-    fetchData()
-}, 500))
-
-// ===== CRUD OPERATIONS =====
+// ===== ENHANCED SAVE ACCOUNT METHOD =====
 const handleSaveAccount = async () => {
     submitted.value = true
     saving.value = true
     
     try {
         if (!validateForm()) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Dữ liệu không hợp lệ',
+                detail: 'Vui lòng kiểm tra và sửa các lỗi được đánh dấu',
+                life: 4000
+            })
             return
         }
         
         updateFullAddress()
+        lastCreatedAccountRole.value = newAccount.value.vaiTro
         
+        // SỬA: Chuẩn bị dữ liệu đúng format backend
         const accountData = {
-            email: newAccount.value.email,
+            email: newAccount.value.email.trim(),
             matKhau: newAccount.value.matKhau,
-            vaiTroString: newAccount.value.vaiTro,
+            vaiTro: newAccount.value.vaiTro,
             trangThai: newAccount.value.trangThai
         }
         
+        // Thêm mã tài khoản nếu có
         if (newAccount.value.maTaiKhoan && newAccount.value.maTaiKhoan.trim()) {
             accountData.maTaiKhoan = newAccount.value.maTaiKhoan.trim()
         }
         
-        // Add personal info for non-admin accounts
+        // SỬA: Thêm thông tin cá nhân đầy đủ cho non-admin
         if (newAccount.value.vaiTro !== 'ADMIN') {
-            accountData.hoTen = personalInfo.value.hoTen
-            accountData.sdt = personalInfo.value.sdt
+            accountData.hoTen = personalInfo.value.hoTen.trim()
+            accountData.sdt = personalInfo.value.sdt.replace(/\s/g, '')
             
-            // Address data
-            if (personalInfo.value.tinhThanhCode || personalInfo.value.phuongXaCode) {
-                accountData.diaChi = {
-                    maTinh: personalInfo.value.tinhThanhCode,
-                    maPhuong: personalInfo.value.phuongXaCode,
-                    tenTinh: provinces.value.find(p => p.code === personalInfo.value.tinhThanhCode)?.name || '',
-                    tenPhuong: wards.value.find(w => w.code === personalInfo.value.phuongXaCode)?.name || '',
-                    diaChiChiTiet: personalInfo.value.diaChiChiTiet || ''
-                }
-                
-                accountData.maTinh = personalInfo.value.tinhThanhCode
-                accountData.maPhuong = personalInfo.value.phuongXaCode
-                accountData.tenTinh = provinces.value.find(p => p.code === personalInfo.value.tinhThanhCode)?.name || ''
-                accountData.tenPhuong = wards.value.find(w => w.code === personalInfo.value.phuongXaCode)?.name || ''
-                accountData.diaChiChiTiet = personalInfo.value.diaChiChiTiet || ''
-            }
-            
-            if (newAccount.value.vaiTro === 'USER' && personalInfo.value.ngaySinh) {
+            // THÊM: Ngày sinh nếu có
+            if (personalInfo.value.ngaySinh) {
                 accountData.ngaySinh = personalInfo.value.ngaySinh.toISOString().split('T')[0]
             }
             
-            if (newAccount.value.vaiTro === 'NHANVIEN' && personalInfo.value.chucVu) {
-                accountData.chucVu = personalInfo.value.chucVu
+            // SỬA: Chỉ thêm địa chỉ nếu đã chọn đầy đủ
+            if (personalInfo.value.maTinh && personalInfo.value.maPhuong) {
+                accountData.maTinh = personalInfo.value.maTinh
+                accountData.tenTinh = provinces.value.find(p => p.code === personalInfo.value.maTinh)?.name || ''
+                accountData.maPhuong = personalInfo.value.maPhuong
+                accountData.tenPhuong = wards.value.find(w => w.code === personalInfo.value.maPhuong)?.name || ''
+                
+                if (personalInfo.value.diaChiChiTiet && personalInfo.value.diaChiChiTiet.trim()) {
+                    accountData.diaChiChiTiet = personalInfo.value.diaChiChiTiet.trim()
+                }
             }
         }
         
-        console.log('📤 Creating account with data:', accountData)
+        console.log('🚀 Sending account data:', accountData)
         
         const response = await axios.post('http://localhost:8080/api/tai-khoan', accountData, {
-            headers: {
-                'Content-Type': 'application/json'
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
-            timeout: 10000
+            timeout: 15000
         })
         
         if (response.status === 201 || response.status === 200) {
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: 'Tài khoản đã được tạo thành công',
-                life: 4000
-            })
-            
+            handleSuccessResponse(response)
             await fetchData()
             hideAddDialog()
             
-            // Navigate based on role
+            // Chuyển trang tùy theo vai trò
             setTimeout(() => {
-                switch(newAccount.value.vaiTro) {
+                switch(lastCreatedAccountRole.value) {
                     case 'USER':
-                        router.push('/khach-hang')
+                        toast.add({
+                            severity: 'info',
+                            summary: 'Chuyển trang',
+                            detail: 'Đang chuyển đến trang quản lý khách hàng...',
+                            life: 2000
+                        })
+                        setTimeout(() => navigateToRolePage('USER'), 2000)
                         break
                     case 'NHANVIEN':
-                        router.push('/nhan-vien')
+                        toast.add({
+                            severity: 'info',
+                            summary: 'Chuyển trang',
+                            detail: 'Đang chuyển đến trang quản lý nhân viên...',
+                            life: 2000
+                        })
+                        setTimeout(() => navigateToRolePage('NHANVIEN'), 2000)
                         break
-                    default:
+                    case 'ADMIN':
+                        toast.add({
+                            severity: 'info',
+                            summary: 'Thông tin',
+                            detail: 'Tài khoản Admin đã được tạo thành công',
+                            life: 3000
+                        })
                         break
                 }
-            }, 1500)
+            }, 1000)
         }
         
     } catch (error) {
-        console.error('❌ Error saving account:', error)
-        
-        let errorMessage = 'Không thể tạo tài khoản'
-        let errorDetail = ''
-        
-        if (error.response) {
-            const status = error.response.status
-            const data = error.response.data
-            
-            switch (status) {
-                case 400:
-                    errorMessage = 'Dữ liệu không hợp lệ'
-                    if (data.errors && typeof data.errors === 'object') {
-                        Object.keys(data.errors).forEach(field => {
-                            validationErrors.value[field] = data.errors[field]
-                        })
-                        errorDetail = 'Vui lòng sửa các lỗi được đánh dấu'
-                    } else {
-                        errorDetail = data.error || data.message || 'Vui lòng kiểm tra lại thông tin'
-                    }
-                    break
-                    
-                case 409:
-                    errorMessage = 'Email đã tồn tại'
-                    errorDetail = 'Email này đã được sử dụng. Vui lòng chọn email khác.'
-                    validationErrors.value.email = 'Email đã tồn tại'
-                    validationErrors.value.accountEmail = 'Email đã tồn tại'
-                    break
-                    
-                case 500:
-                    errorMessage = 'Lỗi server'
-                    errorDetail = 'Có lỗi xảy ra trên server. Vui lòng thử lại sau.'
-                    break
-                    
-                default:
-                    errorMessage = `Lỗi HTTP ${status}`
-                    errorDetail = data.error || data.message || error.message || 'Lỗi không xác định'
-            }
-        } else {
-            errorMessage = 'Lỗi kết nối'
-            errorDetail = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.'
-        }
-        
-        toast.add({
-            severity: 'error',
-            summary: errorMessage,
-            detail: errorDetail,
-            life: 6000
-        })
+        console.error('❌ Lỗi tạo tài khoản:', error)
+        handleApiError(error, 'Không thể tạo tài khoản')
     } finally {
         saving.value = false
     }
 }
+// ===== SUCCESS HANDLING =====
+const handleSuccessResponse = (response) => {
+    console.log('✅ Tạo tài khoản thành công:', response.data)
+    
+    // Phân tích response để hiển thị thông tin chi tiết
+    if (response.data && response.data.data) {
+        const result = response.data.data
+        
+        let successDetail = 'Tài khoản đã được tạo thành công'
+        
+        if (result.taiKhoan) {
+            successDetail += `. Mã tài khoản: ${result.taiKhoan.maTaiKhoan}`
+        }
+        
+        if (result.khachHang) {
+            successDetail += `. Mã khách hàng: ${result.khachHang.maKhachHang}`
+        }
+        
+        if (result.nhanVien) {
+            successDetail += `. Mã nhân viên: ${result.nhanVien.maNhanVien}`
+            }
+        
+        if (result.warning) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Cảnh báo',
+                detail: result.warning,
+                life: 4000
+            })
+        }
+        
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: successDetail,
+            life: 5000
+        })
+    } else {
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Tài khoản ${getRoleLabel(newAccount.value.vaiTro).toLowerCase()} đã được tạo thành công`,
+            life: 4000
+        })
+    }
+}
 
+// ===== ENHANCED API ERROR HANDLING =====
+const handleApiError = (error, defaultMessage) => {
+    let errorMessage = defaultMessage
+    let errorDetail = ''
+    let severity = 'error'
+    
+    console.error('API Error Details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+    })
+    
+    if (error.response) {
+        const { status, data } = error.response
+        
+        switch (status) {
+            case 400:
+                errorMessage = 'Dữ liệu không hợp lệ'
+                severity = 'warn'
+                
+                // Xử lý lỗi validation chi tiết
+                if (data.errors && typeof data.errors === 'object') {
+                    Object.keys(data.errors).forEach(field => {
+                        validationErrors.value[field] = data.errors[field]
+                    })
+                    errorDetail = 'Vui lòng sửa các lỗi được đánh dấu màu đỏ'
+                } else if (data.message) {
+                    // Xử lý các lỗi cụ thể từ backend
+                    if (data.message.includes('Số điện thoại đã tồn tại')) {
+                        errorMessage = 'Số điện thoại đã được sử dụng'
+                        errorDetail = 'Vui lòng sử dụng số điện thoại khác'
+                        validationErrors.value.sdt = 'Số điện thoại này đã tồn tại trong hệ thống'
+                    } else if (data.message.includes('Email đã tồn tại')) {
+                        errorMessage = 'Email đã được sử dụng'
+                        errorDetail = 'Vui lòng sử dụng email khác'
+                        validationErrors.value.email = 'Email này đã tồn tại trong hệ thống'
+                        validationErrors.value.accountEmail = 'Email này đã tồn tại trong hệ thống'
+                    } else if (data.message.includes('Mã tài khoản đã tồn tại')) {
+                        errorMessage = 'Mã tài khoản đã được sử dụng'
+                        errorDetail = 'Vui lòng để trống để hệ thống tự tạo mã'
+                        validationErrors.value.maTaiKhoan = 'Mã tài khoản này đã tồn tại'
+                    } else {
+                        errorDetail = data.message
+                    }
+                } else {
+                    errorDetail = 'Vui lòng kiểm tra lại thông tin nhập vào'
+                }
+                break
+                
+            case 409:
+                errorMessage = 'Dữ liệu bị trùng lặp'
+                severity = 'warn'
+                
+                if (data.errorCode === 'EMAIL_EXISTS') {
+                    errorDetail = 'Email đã tồn tại trong hệ thống'
+                    validationErrors.value.email = 'Email đã tồn tại'
+                    validationErrors.value.accountEmail = 'Email đã tồn tại'
+                } else if (data.errorCode === 'PHONE_EXISTS' || data.message.includes('Số điện thoại')) {
+                    errorDetail = 'Số điện thoại đã tồn tại trong hệ thống'
+                    validationErrors.value.sdt = 'Số điện thoại đã tồn tại'
+                } else {
+                    errorDetail = data.message || 'Dữ liệu đã tồn tại trong hệ thống'
+                }
+                break
+                
+            case 403:
+                errorMessage = 'Không có quyền truy cập'
+                errorDetail = 'Bạn không có quyền thực hiện thao tác này'
+                severity = 'warn'
+                break
+                
+            case 404:
+                errorMessage = 'Không tìm thấy tài nguyên'
+                errorDetail = 'Endpoint API không tồn tại hoặc đã bị thay đổi'
+                break
+                
+            case 422:
+                errorMessage = 'Dữ liệu không thể xử lý'
+                severity = 'warn'
+                
+                if (data.message && data.message.includes('Transaction')) {
+                    errorDetail = 'Có lỗi trong quá trình xử lý. Vui lòng thử lại sau.'
+                } else {
+                    errorDetail = data.message || 'Dữ liệu không phù hợp với yêu cầu hệ thống'
+                }
+                break
+                
+            case 500:
+                errorMessage = 'Lỗi hệ thống'
+                errorDetail = 'Có lỗi xảy ra trên máy chủ. Vui lòng thử lại sau hoặc liên hệ quản trị viên.'
+                
+                // Phân tích thêm lỗi 500
+                if (data && data.message) {
+                    if (data.message.includes('Transaction silently rolled back')) {
+                        errorDetail = 'Giao dịch bị hủy do vi phạm ràng buộc dữ liệu. Vui lòng kiểm tra lại thông tin.'
+                        severity = 'warn'
+                    } else if (data.message.includes('constraint')) {
+                        errorDetail = 'Vi phạm ràng buộc dữ liệu. Có thể do email hoặc số điện thoại đã tồn tại.'
+                        severity = 'warn'
+                    } else if (data.message.includes('foreign key')) {
+                        errorDetail = 'Lỗi liên kết dữ liệu. Vui lòng thử lại.'
+                        severity = 'warn'
+                    }
+                }
+                break
+                
+            case 503:
+                errorMessage = 'Dịch vụ không khả dụng'
+                errorDetail = 'Hệ thống đang bảo trì hoặc quá tải. Vui lòng thử lại sau.'
+                break
+                
+            default:
+                errorMessage = `Lỗi HTTP ${status}`
+                errorDetail = data?.message || data?.error || error.message || 'Lỗi không xác định từ máy chủ'
+        }
+    } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+        errorMessage = 'Lỗi kết nối'
+        errorDetail = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.'
+        severity = 'warn'
+    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'Hết thời gian chờ'
+        errorDetail = 'Quá trình xử lý mất quá nhiều thời gian. Vui lòng thử lại.'
+        severity = 'warn'
+    } else {
+        errorMessage = 'Lỗi không xác định'
+        errorDetail = error.message || defaultMessage
+    }
+
+    // Hiển thị thông báo lỗi
+    toast.add({
+        severity: severity,
+        summary: errorMessage,
+        detail: errorDetail,
+        life: severity === 'error' ? 8000 : 6000
+    })
+    
+    // Log chi tiết cho debug
+    console.error('🔍 Error Analysis:', {
+        originalError: error,
+        processedMessage: errorMessage,
+        processedDetail: errorDetail,
+        validationErrors: validationErrors.value
+    })
+}
+
+// ===== UPDATE ACCOUNT METHOD =====
 const handleUpdateAccount = async () => {
     submitted.value = true
     saving.value = true
     
     try {
-        // Validate edit form
         validationErrors.value = {}
         
+        // CHỈ VALIDATE EMAIL VÀ MẬT KHẨU
         if (!editAccountData.value.email?.trim()) {
             validationErrors.value.editEmail = 'Email không được để trống'
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAccountData.value.email)) {
+            validationErrors.value.editEmail = 'Email không hợp lệ'
+        } else if (checkEmailExists(editAccountData.value.email, editAccountData.value.id)) {
+            validationErrors.value.editEmail = 'Email đã tồn tại'
         }
         
-        if (!editAccountData.value.vaiTro) {
-            validationErrors.value.editVaiTro = 'Vui lòng chọn vai trò'
-        }
-        
-        if (editAccountData.value.trangThai === undefined) {
-            validationErrors.value.editTrangThai = 'Vui lòng chọn trạng thái'
+        // VALIDATE MẬT KHẨU NẾU CÓ NHẬP
+        if (editAccountData.value.matKhau && editAccountData.value.matKhau.trim()) {
+            if (editAccountData.value.matKhau.length < 6) {
+                validationErrors.value.editMatKhau = 'Mật khẩu phải có ít nhất 6 ký tự'
+            } else if (editAccountData.value.matKhau.length > 50) {
+                validationErrors.value.editMatKhau = 'Mật khẩu không được quá 50 ký tự'
+            }
         }
         
         if (Object.keys(validationErrors.value).length > 0) {
             return
         }
         
+        // CHỈ GỬI EMAIL VÀ MẬT KHẨU (NẾU CÓ)
         const updateData = {
-            email: editAccountData.value.email,
-            vaiTro: editAccountData.value.vaiTro,
-            trangThai: editAccountData.value.trangThai
+            email: editAccountData.value.email.trim()
         }
         
-        if (editAccountData.value.matKhau) {
-            updateData.matKhau = editAccountData.value.matKhau
+        // Chỉ thêm mật khẩu nếu có nhập
+        if (editAccountData.value.matKhau && editAccountData.value.matKhau.trim()) {
+            updateData.matKhau = editAccountData.value.matKhau.trim()
         }
+        
+        console.log('🔧 Updating account (email/password only):', updateData)
         
         const response = await axios.put(
             `http://localhost:8080/api/tai-khoan/${editAccountData.value.id}`, 
-            updateData
+            updateData,
+            {
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                timeout: 10000
+            }
         )
         
         if (response.status === 200) {
-            const index = accounts.value.findIndex(acc => acc.id === editAccountData.value.id)
-            if (index !== -1) {
-                accounts.value[index] = { ...accounts.value[index], ...response.data }
-            }
-            
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
-                detail: 'Tài khoản đã được cập nhật',
+                detail: 'Thông tin đăng nhập đã được cập nhật',
                 life: 3000
             })
             
@@ -1325,41 +1817,71 @@ const handleUpdateAccount = async () => {
         }
         
     } catch (error) {
-        console.error('❌ Error updating account:', error)
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi cập nhật',
-            detail: error.response?.data?.message || 'Không thể cập nhật tài khoản',
-            life: 5000
-        })
+        console.error('❌ Update error:', error)
+        handleApiError(error, 'Không thể cập nhật thông tin đăng nhập')
     } finally {
         saving.value = false
     }
 }
 
-const handleDeleteAccount = async () => {
+// ===== DELETE METHODS =====
+const handleDeleteSelectedAccounts = async () => {
     deleting.value = true
+    
     try {
-        await axios.delete(`http://localhost:8080/api/tai-khoan/${selectedAccountForDelete.value.id}`)
+        const totalAccounts = selectedAccounts.value.length
+        let successCount = 0
+        let failedAccounts = []
         
-        accounts.value = accounts.value.filter(acc => acc.id !== selectedAccountForDelete.value.id)
+        // Xóa từng tài khoản và track kết quả
+        for (const account of selectedAccounts.value) {
+            try {
+                await axios.delete(`http://localhost:8080/api/tai-khoan/${account.id}`, {
+                    timeout: 10000
+                })
+                successCount++
+            } catch (error) {
+                failedAccounts.push({
+                    account: account,
+                    error: error.response?.data?.message || error.message
+                })
+            }
+        }
         
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Tài khoản đã được xóa',
-            life: 3000
-        })
+        // Hiển thị kết quả
+        if (successCount === totalAccounts) {
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã xóa thành công ${successCount} tài khoản`,
+                life: 3000
+            })
+        } else if (successCount > 0) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Hoàn thành một phần',
+                detail: `Đã xóa ${successCount}/${totalAccounts} tài khoản. ${failedAccounts.length} tài khoản không thể xóa.`,
+                life: 5000
+            })
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Thất bại',
+                detail: 'Không thể xóa tài khoản nào. Có thể do ràng buộc dữ liệu.',
+                life: 5000
+            })
+        }
         
-        deleteAccountDialog.value = false
-        selectedAccountForDelete.value = null
+        deleteAccountsDialog.value = false
+        selectedAccounts.value = null
+        await fetchData()
         
     } catch (error) {
-        console.error('❌ Error deleting account:', error)
+        console.error('❌ Lỗi xóa nhiều tài khoản:', error)
         toast.add({
             severity: 'error',
-            summary: 'Lỗi xóa tài khoản',
-            detail: error.response?.data?.message || 'Không thể xóa tài khoản',
+            summary: 'Lỗi hệ thống',
+            detail: 'Có lỗi xảy ra khi xóa tài khoản',
             life: 5000
         })
     } finally {
@@ -1367,37 +1889,37 @@ const handleDeleteAccount = async () => {
     }
 }
 
-const handleDeleteSelectedAccounts = async () => {
+const handleDeleteAccount = async () => {
     deleting.value = true
     try {
-        const deletePromises = selectedAccounts.value.map(account => 
-            axios.delete(`http://localhost:8080/api/tai-khoan/${account.id}`)
+        console.log('🗑️ Đang xóa tài khoản:', selectedAccountForDelete.value.id)
+        
+        const response = await axios.delete(
+            `http://localhost:8080/api/tai-khoan/${selectedAccountForDelete.value.id}`,
+            {
+                timeout: 30000,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
         )
         
-        await Promise.all(deletePromises)
-        
-        accounts.value = accounts.value.filter(acc => 
-            !selectedAccounts.value.some(selected => selected.id === acc.id)
-        )
-        
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Các tài khoản đã được xóa',
-            life: 3000
-        })
-        
-        deleteAccountsDialog.value = false
-        selectedAccounts.value = null
+        if (response.status === 200) {
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Tài khoản đã được xóa thành công',
+                life: 3000
+            })
+            
+            deleteAccountDialog.value = false
+            selectedAccountForDelete.value = null
+            await fetchData()
+        }
         
     } catch (error) {
-        console.error('❌ Error deleting accounts:', error)
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi xóa tài khoản',
-            detail: 'Không thể xóa một số tài khoản',
-            life: 5000
-        })
+        console.error('❌ Lỗi xóa tài khoản:', error)
+        handleApiError(error, 'Không thể xóa tài khoản')
     } finally {
         deleting.value = false
     }
@@ -1407,37 +1929,64 @@ const handleChangeStatus = async (account) => {
     try {
         const newStatus = account.trangThai === 1 ? 0 : 1
         
+        console.log('🔄 Thay đổi trạng thái:', {
+            accountId: account.id,
+            currentStatus: account.trangThai,
+            newStatus: newStatus
+        })
+        
+        // SỬA: Gửi trong request body thay vì query param
         const response = await axios.patch(
-            `http://localhost:8080/api/tai-khoan/${account.id}/trang-thai?trangThai=${newStatus}`
+            `http://localhost:8080/api/tai-khoan/${account.id}/trang-thai`,
+            { 
+                trangThai: newStatus  // Gửi trong body
+            },
+            {
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                timeout: 10000
+            }
         )
         
         if (response.status === 200) {
-            const index = accounts.value.findIndex(acc => acc.id === account.id)
-            if (index !== -1) {
-                accounts.value[index].trangThai = newStatus
-                accounts.value[index].ngayCapNhat = new Date()
-            }
-            
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
                 detail: `Tài khoản đã được ${newStatus === 1 ? 'kích hoạt' : 'ngưng hoạt động'}`,
                 life: 3000
             })
+            await fetchData()
         }
         
     } catch (error) {
-        console.error('❌ Error changing status:', error)
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi thay đổi trạng thái',
-            detail: error.response?.data?.error || 'Không thể thay đổi trạng thái',
-            life: 5000
-        })
+        console.error('❌ Lỗi thay đổi trạng thái:', error)
+        
+        // Xử lý lỗi chi tiết
+        if (error.response) {
+            const { status, data } = error.response
+            let errorMessage = 'Không thể thay đổi trạng thái'
+            
+            if (status === 400 && data.message) {
+                errorMessage = data.message
+            } else if (status === 404) {
+                errorMessage = 'Không tìm thấy tài khoản'
+            } else if (data.message) {
+                errorMessage = data.message
+            }
+            
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: errorMessage,
+                life: 5000
+            })
+        } else {
+            handleApiError(error, 'Không thể thay đổi trạng thái')
+        }
     }
-}
-
-// ===== EXPORT FUNCTION =====
+}// ===== EXPORT FUNCTION =====
 const handleExportCSV = () => {
     exporting.value = true
     try {
@@ -1446,7 +1995,7 @@ const handleExportCSV = () => {
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
-                detail: 'Đã xuất file CSV',
+                detail: `Đã xuất ${filteredAccounts.value.length} tài khoản`,
                 life: 3000
             })
         }
@@ -1465,15 +2014,17 @@ const handleExportCSV = () => {
 
 // ===== LIFECYCLE =====
 onMounted(() => {
-    console.log('🚀 TaiKhoanManagement component mounted, fetching data...')
     fetchData()
 })
 </script>
-
 <style scoped>
 .card {
     border: none;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.search-filter-section {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 .border-bottom {
@@ -1498,5 +2049,49 @@ onMounted(() => {
 
 .font-medium {
     font-weight: 500;
+}
+
+.stats-summary {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+.responsive-table {
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Table Styling */
+:deep(.p-datatable) {
+    border: none;
+}
+
+:deep(.p-datatable-header) {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 2px solid #e2e8f0;
+    padding: 1.5rem;
+}
+
+:deep(.p-datatable-tbody tr) {
+    transition: all 0.2s ease;
+}
+
+:deep(.p-datatable-tbody tr:hover) {
+    background-color: #f8fafc;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.p-datatable-tbody tr.p-datatable-row-selected) {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border-left: 4px solid #3b82f6;
+}
+
+:deep(.p-paginator) {
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
 }
 </style>

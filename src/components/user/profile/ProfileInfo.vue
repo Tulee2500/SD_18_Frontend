@@ -132,76 +132,119 @@
 
   // Load user info
   const loadUserInfo = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/khach-hang/current`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
-        }
-      });
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/khach-hang/current`, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      }
+    });
 
-      userInfo.value = response.data;
-      console.log('User info loaded:', userInfo.value);
+    // DEBUG: Log để xem API response structure
+    console.log('🔍 FULL API RESPONSE:', response.data);
+    console.log('🔍 RESPONSE KEYS:', Object.keys(response.data || {}));
 
-      // Split họ tên
-      const fullName = response.data.hoTen || '';
-      const nameParts = fullName.split(' ');
-      profileForm.value = {
-        ho: nameParts.slice(0, -1).join(' '),
-        ten: nameParts[nameParts.length - 1] || '',
-        gioiTinh: response.data.gioiTinh || 'Nu',
-        ngaySinh: response.data.ngaySinh ? formatDateForInput(response.data.ngaySinh) : '',
-        sdt: response.data.sdt || '',
-        email: response.data.taiKhoan?.email || response.data.email || ''
-      };
-    } catch (error) {
-      console.error('Error loading user info:', error);
-      toast.add({
-        severity: 'error',
-        summary: 'Lỗi',
-        detail: 'Không thể tải thông tin người dùng',
-        life: 3000
-      });
+    // FIX: Lấy data từ response.data.data hoặc response.data
+    const userData = response.data.data || response.data;
+    userInfo.value = userData;
+
+    console.log('👤 FINAL USER DATA:', userData);
+
+    // FIX: Map dữ liệu với nhiều field names có thể có
+    const fullName = userData.hoTen || userData.tenKhachHang || userData.name || '';
+    const nameParts = fullName.split(' ');
+
+    profileForm.value = {
+      ho: nameParts.slice(0, -1).join(' '),
+      ten: nameParts[nameParts.length - 1] || '',
+      gioiTinh: userData.gioiTinh || userData.gender || 'Nu',
+      ngaySinh: userData.ngaySinh ? formatDateForInput(userData.ngaySinh) : '',
+      sdt: userData.sdt || userData.dienThoai || userData.phone || '',
+      email: userData.taiKhoan?.email ||
+             userData.email ||
+             userData.khachHang?.email ||
+             ''
+    };
+
+    console.log('📋 MAPPED FORM DATA:', profileForm.value);
+
+  } catch (error) {
+    console.error('Error loading user info:', error);
+
+    // Debug error response
+    if (error.response) {
+      console.log('❌ ERROR RESPONSE:', error.response.data);
+      console.log('❌ ERROR STATUS:', error.response.status);
     }
-  };
+
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: 'Không thể tải thông tin người dùng',
+      life: 3000
+    });
+  }
+};
+
 
   // Update profile
   const updateProfile = async () => {
-    isLoading.value = true;
-    try {
-      const updateData = {
-        hoTen: `${profileForm.value.ho} ${profileForm.value.ten}`.trim(),
-        gioiTinh: profileForm.value.gioiTinh,
-        ngaySinh: profileForm.value.ngaySinh,
-        sdt: profileForm.value.sdt
-      };
+  isLoading.value = true;
+  try {
+    const updateData = {
+      hoTen: `${profileForm.value.ho} ${profileForm.value.ten}`.trim(),
+      gioiTinh: profileForm.value.gioiTinh,
+      ngaySinh: profileForm.value.ngaySinh,
+      sdt: profileForm.value.sdt
+    };
 
-      await axios.put(`${API_BASE_URL}/api/khach-hang/${userInfo.value.id}`, updateData, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json'
-        }
-      });
+    console.log('📝 SENDING UPDATE DATA:', updateData);
+    console.log('📝 USER ID:', userInfo.value.id);
 
-      toast.add({
-        severity: 'success',
-        summary: 'Thành công',
-        detail: 'Cập nhật thông tin thành công!',
-        life: 3000
-      });
+    // FIX: Đảm bảo có user ID
+    const userId = userInfo.value.id || userInfo.value.idKhachHang;
 
-      await loadUserInfo();
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.add({
-        severity: 'error',
-        summary: 'Lỗi',
-        detail: 'Không thể cập nhật thông tin!',
-        life: 3000
-      });
-    } finally {
-      isLoading.value = false;
+    if (!userId) {
+      throw new Error('Không tìm thấy ID người dùng');
     }
-  };
+
+    const response = await axios.put(`${API_BASE_URL}/api/khach-hang/${userId}`, updateData, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('✅ UPDATE RESPONSE:', response.data);
+
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: 'Cập nhật thông tin thành công!',
+      life: 3000
+    });
+
+    await loadUserInfo();
+
+  } catch (error) {
+    console.error('Error updating profile:', error);
+
+    let errorMessage = 'Không thể cập nhật thông tin!';
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: errorMessage,
+      life: 3000
+    });
+  } finally {
+    isLoading.value = false;
+  }
+};
 
   // Utility functions
   const formatDateForInput = (date) => {

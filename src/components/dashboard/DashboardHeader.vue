@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div class="mb-8">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between">
       <div>
@@ -30,6 +30,15 @@
           <RefreshIcon :class="{ 'animate-spin': loading }" class="w-4 h-4 mr-2" />
           Cập nhật
         </button>
+      </div>
+    </div>
+  </div>
+</template> -->
+<template>
+  <div class="mb-8">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+      <div>
+          <h1 class="text-3xl font-bold text-gray-900 mb-2">Quản lý thống kê</h1>
       </div>
     </div>
   </div>

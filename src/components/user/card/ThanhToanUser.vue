@@ -1135,17 +1135,18 @@ const loadSavedAddresses = async () => {
         return addr && addr.id && addr.trangThai === 1;
       })
       .map(addr => ({
-        id: addr.id,
-        tenNguoiNhan: addr.hoTen || addr.tenNguoiNhan || shippingInfo.value.fullName || 'Khách hàng',
-        sdt: addr.sdt || shippingInfo.value.phone || '',
-        diaChiChiTiet: addr.diaChiChiTiet || '',
-        maTinh: addr.maTinh || '',
-        maPhuong: addr.maPhuong || '',
-        tenTinh: addr.tenTinh || '',
-        tenPhuong: addr.tenPhuong || '',
-        trangThai: addr.trangThai,
-        isDefault: Boolean(addr.isDefault)
-      }))
+  id: addr.id,
+  // FIX: Lấy từ userInfo thay vì addr
+  tenNguoiNhan: userInfo.value?.hoTen || shippingInfo.value.fullName || 'Khách hàng',
+  sdt: userInfo.value?.sdt || shippingInfo.value.phone || '',
+  diaChiChiTiet: addr.diaChiChiTiet || '',
+  maTinh: addr.maTinh || '',
+  maPhuong: addr.maPhuong || '',
+  tenTinh: addr.tenTinh || '',
+  tenPhuong: addr.tenPhuong || '',
+  trangThai: addr.trangThai,
+  isDefault: Boolean(addr.isDefault)
+}))
       .sort((a, b) => {
         // Sort: isDefault trước, sau đó theo ID mới nhất
         if (a.isDefault && !b.isDefault) return -1;
@@ -1200,7 +1201,7 @@ const loadUserInfo = async () => {
       }
     });
 
-    const customer = response.data;
+    const customer = response.data.data || response.data;
     userInfo.value = customer;
 
     console.log('Customer info loaded:', customer);

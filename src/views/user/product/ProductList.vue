@@ -1,11 +1,10 @@
 <script>
+import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
 import Nav from '@/components/user/Nav.vue';
 import ScrollToggler from '@/components/user/ScrollToggler.vue';
 import Footer from '@/views/user/Footer.vue';
 import axios from 'axios';
 import Hero from '../Hero.vue';
-// ===== ĐÃ THÊM CHATBOT IMPORT =====
-import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
 
 export default {
     name: 'ProductList',
@@ -15,7 +14,7 @@ export default {
         Footer,
         Hero,
         ScrollToggler,
-        ChatBot // ✅ giữ ChatBot
+        ChatBot
     },
 
     data() {
@@ -76,15 +75,66 @@ export default {
             console.log('Added to cart:', product);
             this.$emit('add-to-cart', product);
 
-            this.$toast?.success(`Đã thêm ${product.label} vào giỏ hàng!`) ||
-            alert(`Đã thêm ${product.label} vào giỏ hàng!`);
+            this.$toast?.success(`Đã thêm ${product.label} vào giỏ hàng!`) || alert(`Đã thêm ${product.label} vào giỏ hàng!`);
         },
 
+        // Method để lấy URL hình ảnh với fallback chain - ĐÃ SỬA
+        getImageUrl(product) {
+            // Kiểm tra nếu có imgUrl trực tiếp và hợp lệ
+            if (product.imgUrl && product.imgUrl.trim() !== '' && product.imgUrl !== 'null' && product.imgUrl !== 'undefined' && !product.imgUrl.includes('null')) {
+                return product.imgUrl;
+            }
+
+            // Fallback sang SVG placeholder ngay
+            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4=';
+        },
+
+        // Xử lý khi load hình ảnh thành công - SIMPLIFIED
+        handleImageLoad(event) {
+            console.log('Image loaded successfully:', event.target.src);
+        },
+
+        // Xử lý khi load hình ảnh thất bại - KHÔNG TỰ ĐỘNG RETRY
         handleImageError(event) {
-            event.target.style.display = 'none';
-            const placeholder = event.target.parentElement.querySelector('.product-placeholder');
-            if (placeholder) {
-                placeholder.style.display = 'flex';
+            console.log('Image load failed for:', event.target.src);
+
+            // Chỉ set placeholder SVG nếu chưa phải SVG
+            if (!event.target.src.startsWith('data:image/svg+xml')) {
+                console.log('Setting SVG placeholder');
+                event.target.src =
+                    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4=';
+            }
+        },
+
+        // Test API connectivity - THÊM MỚI
+        async testAPIConnectivity() {
+            try {
+                console.log('Testing API connectivity...');
+
+                // Test hinh-anh endpoint
+                const imageResponse = await axios.get('http://localhost:8080/hinh-anh');
+                console.log('Images API success:', imageResponse.data.length, 'images found');
+
+                // Test nếu có image nào
+                if (imageResponse.data.length > 0) {
+                    const firstImage = imageResponse.data[0];
+                    console.log('First image:', firstImage);
+
+                    // Test truy cập trực tiếp
+                    if (firstImage.fullUrl) {
+                        console.log('Testing direct image access:', firstImage.fullUrl);
+                        const testImg = new Image();
+                        testImg.onload = () => console.log('✅ Image loads successfully');
+                        testImg.onerror = () => console.log('❌ Image access failed');
+                        testImg.src = firstImage.fullUrl;
+                    }
+                }
+            } catch (error) {
+                console.error('API connectivity test failed:', error);
+                if (error.response) {
+                    console.error('Response status:', error.response.status);
+                    console.error('Response data:', error.response.data);
+                }
             }
         },
 
@@ -107,17 +157,17 @@ export default {
             }
         },
 
+        // PHẦN FETCHPRODUCTS ĐÃ SỬA HOÀN TOÀN
         async fetchProducts() {
             try {
                 this.loading = true;
 
-                const [productsResponse, detailsResponse] = await Promise.all([
-                    axios.get('http://localhost:8080/api/san-pham'),
-                    axios.get('http://localhost:8080/api/san-pham-chi-tiet')
-                ]);
+                // Lấy danh sách hình ảnh từ API - THÊM MỚI
+                const [productsResponse, detailsResponse, imagesResponse] = await Promise.all([axios.get('http://localhost:8080/api/san-pham'), axios.get('http://localhost:8080/api/san-pham-chi-tiet'), axios.get('http://localhost:8080/hinh-anh')]);
 
-                console.log('Products API Response:', productsResponse.data);
-                console.log('Details API Response:', detailsResponse.data);
+                console.log('Products API Response:', productsResponse.data.length, 'products');
+                console.log('Details API Response:', detailsResponse.data.length, 'details');
+                console.log('Images API Response:', imagesResponse.data.length, 'images');
 
                 if (!productsResponse.data || productsResponse.data.length === 0) {
                     console.warn('No products data received from API');
@@ -125,18 +175,27 @@ export default {
                     return;
                 }
 
+                // Tạo map hình ảnh theo ID - THÊM MỚI
+                const imageMap = new Map();
+                imagesResponse.data.forEach((image) => {
+                    imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
+                });
+
                 const firstDetailMap = new Map();
                 const priceMap = new Map();
-                const imageMap = new Map();
+                const productImageMap = new Map();
 
-                detailsResponse.data.forEach((detail) => {
+                // Xử lý từng detail để debug và extract thông tin
+                detailsResponse.data.forEach((detail, index) => {
                     if (detail.sanPham?.id) {
                         const productId = detail.sanPham.id;
 
+                        // Map first detail ID
                         if (!firstDetailMap.has(productId)) {
                             firstDetailMap.set(productId, detail.id);
                         }
 
+                        // Map price info
                         if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
                             priceMap.set(productId, {
                                 giaBan: detail.giaBan,
@@ -144,37 +203,58 @@ export default {
                             });
                         }
 
-                        if (!imageMap.has(productId) && detail.hinhAnh) {
-                            let imageUrl = '';
-                            if (typeof detail.hinhAnh === 'object') {
-                                imageUrl = detail.hinhAnh.duongDan || detail.hinhAnh.url || detail.hinhAnh.path || detail.hinhAnh.link || detail.hinhAnh.src || '';
-                            } else if (typeof detail.hinhAnh === 'string') {
-                                imageUrl = detail.hinhAnh;
+                        // XỬ LÝ HÌNH ẢNH THEO ENTITY MỚI - SỬA ĐỔI HOÀN TOÀN
+                        if (!productImageMap.has(productId) && detail.hinhAnh) {
+                            console.log(`Processing image for detail ${detail.id}:`, detail.hinhAnh);
+
+                            let finalImageUrl = null;
+
+                            if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
+                                // Trường hợp API trả về object với id
+                                if (detail.hinhAnh.id) {
+                                    finalImageUrl = imageMap.get(detail.hinhAnh.id);
+                                    console.log(`Found image by ID ${detail.hinhAnh.id}:`, finalImageUrl);
+                                }
+                                // Trường hợp API trả về object đầy đủ
+                                else if (detail.hinhAnh.fullUrl) {
+                                    finalImageUrl = detail.hinhAnh.fullUrl;
+                                    console.log(`Using fullUrl:`, finalImageUrl);
+                                } else if (detail.hinhAnh.duongDan) {
+                                    const duongDan = detail.hinhAnh.duongDan;
+                                    if (duongDan.startsWith('http')) {
+                                        finalImageUrl = duongDan;
+                                    } else if (duongDan.startsWith('/hinh-anh/')) {
+                                        finalImageUrl = 'http://localhost:8080' + duongDan;
+                                    } else {
+                                        finalImageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
+                                    }
+                                    console.log(`Built URL from duongDan:`, finalImageUrl);
+                                }
+                            } else if (typeof detail.hinhAnh === 'number') {
+                                // Trường hợp API trả về ID number trực tiếp
+                                finalImageUrl = imageMap.get(detail.hinhAnh);
+                                console.log(`Found image by number ID ${detail.hinhAnh}:`, finalImageUrl);
                             }
 
-                            if (imageUrl && !imageUrl.startsWith('http')) {
-                                imageUrl = 'http://localhost:8080' + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;
-                            }
-
-                            if (imageUrl) {
-                                imageMap.set(productId, imageUrl);
+                            if (finalImageUrl) {
+                                productImageMap.set(productId, finalImageUrl);
+                                console.log(`Final image URL for product ${productId}:`, finalImageUrl);
+                            } else {
+                                console.log(`No valid image URL found for detail ${detail.id}`);
                             }
                         }
                     }
                 });
 
-                this.products = productsResponse.data.map((p, index) => {
-                    if (index < 3) {
-                        console.log(`Product ${index + 1} full data:`, p);
-                    }
-
+                // Map sản phẩm với thông tin từ chi tiết
+                this.products = productsResponse.data.map((p) => {
                     const priceInfo = priceMap.get(p.id) || { giaBan: 0, giaGoc: 0 };
-                    const imageUrl = imageMap.get(p.id) || null;
+                    const imageUrl = productImageMap.get(p.id);
                     const firstDetailId = firstDetailMap.get(p.id);
 
                     const product = {
                         id: p.id,
-                        firstDetailId,
+                        firstDetailId: firstDetailId,
                         imgUrl: imageUrl,
                         label: p.tenSanPham || 'Sản phẩm không tên',
                         price: priceInfo.giaBan,
@@ -193,16 +273,23 @@ export default {
                         trangThai: p.trangThai
                     };
 
-                    if (index < 3) {
-                        console.log(`Processed product ${index + 1}:`, product);
-                    }
-
                     return product;
                 });
 
                 console.log('Total processed products:', this.products.length);
                 console.log('Products with prices:', this.products.filter((p) => p.price > 0).length);
                 console.log('Products with images:', this.products.filter((p) => p.imgUrl).length);
+
+                // Log products có hình ảnh để debug
+                const productsWithImages = this.products.filter((p) => p.imgUrl);
+                console.log(
+                    'Products with images:',
+                    productsWithImages.map((p) => ({
+                        id: p.id,
+                        name: p.label,
+                        imgUrl: p.imgUrl
+                    }))
+                );
             } catch (error) {
                 console.error('Error fetching products:', error);
                 console.error('Error details:', {
@@ -230,6 +317,10 @@ export default {
 
     mounted() {
         console.log('ProductList component mounted');
+
+        // Test API connectivity - THÊM MỚI
+        this.testAPIConnectivity();
+
         this.fetchCategories();
         this.fetchProducts();
     },
@@ -246,8 +337,6 @@ export default {
     }
 };
 </script>
-
-
 <template>
     <div class="nike-complete-layout">
         <!-- Navigation Component -->
@@ -346,26 +435,11 @@ export default {
                     <!-- Products Grid -->
                     <div v-else class="products-grid">
                         <div v-for="(product, index) in filteredProducts" :key="product.id" @click="goToProductDetail(product)" class="product-card" :style="{ animationDelay: `${index * 0.1}s` }">
-                            <!-- Product Image Container -->
+                            <!-- Product Image Container - SIMPLIFIED -->
                             <div class="product-image-container">
-                                <!-- Nếu có ảnh thì hiển thị ảnh -->
-                                <div v-if="product.imgUrl" class="product-image-wrapper">
-                                    <img :src="product.imgUrl" :alt="product.label" class="product-image" @error="handleImageError" />
-                                </div>
-
-                                <!-- Nếu không có ảnh thì hiển thị placeholder -->
-                                <div v-else class="product-placeholder">
-                                    <svg viewBox="0 0 120 80" class="placeholder-icon">
-                                        <defs>
-                                            <linearGradient id="placeholderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                <stop offset="0%" stop-color="#e5e7eb" />
-                                                <stop offset="50%" stop-color="#f3f4f6" />
-                                                <stop offset="100%" stop-color="#e5e7eb" />
-                                            </linearGradient>
-                                        </defs>
-                                        <path d="M15 50 Q20 35 40 32 Q60 30 80 32 Q100 35 105 50 L102 58 Q85 62 60 62 Q35 62 18 58 Z" fill="url(#placeholderGradient)" />
-                                        <path d="M18 58 Q35 68 60 68 Q85 68 102 58 L100 62 Q82 66 60 66 Q38 66 20 62 Z" fill="#d1d5db" />
-                                    </svg>
+                                <!-- LUÔN hiển thị hình ảnh với fallback -->
+                                <div class="product-image-wrapper">
+                                    <img :src="getImageUrl(product)" :alt="product.label" class="product-image" @error="handleImageError" @load="handleImageLoad" loading="lazy" />
                                 </div>
 
                                 <!-- Product Badge -->
@@ -431,17 +505,17 @@ export default {
                 </div>
             </div>
         </main>
+
         <!-- Footer Component -->
         <section id="#" class="padding-x padding-t bg-black pb-8">
             <Footer />
         </section>
         <ScrollToggler />
 
-        <!-- ===== ĐÃ THÊM CHATBOT COMPONENT ===== -->
+        <!-- ChatBot Component -->
         <ChatBot />
     </div>
 </template>
-
 <style lang="scss" scoped>
 .nike-complete-layout {
     font-family: 'Helvetica Neue', Arial, sans-serif;

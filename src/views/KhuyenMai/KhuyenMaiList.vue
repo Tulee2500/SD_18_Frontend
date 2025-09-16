@@ -1,47 +1,85 @@
 <template>
     <div class="card">
         <!-- Toolbar -->
-        <Toolbar class="mb-6">
-            <template #start>
-                <Button label="Thêm mới" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" />
-                <Button label="Xóa" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedKhuyenMai || !selectedKhuyenMai.length" />
-            </template>
-            <template #end>
-                <Button label="Xuất CSV" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
-            </template>
-        </Toolbar>
+<Toolbar class="mb-4">
+    <template #start>
+        <Button label="Thêm mới" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" />
+        <Button label="Xóa" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedKhuyenMai || !selectedKhuyenMai.length" />
+    </template>
+    <template #end>
+        <Button label="Xuất CSV" icon="pi pi-upload" severity="secondary" @click="exportCSV" />
+    </template>
+</Toolbar>
 
-        <!-- DataTable -->
-        <DataTable
-            ref="dt"
-            v-model:selection="selectedKhuyenMai"
-            :value="filteredKhuyenMai"
-            dataKey="id"
-            :paginator="true"
-            :rows="10"
-            :filters="filters"
-            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            :rowsPerPageOptions="[5, 10, 25]"
-            currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} khuyến mãi"
-            :loading="isLoading"
-        >
-            <template #header>
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h4 class="m-0">Quản Lý Khuyến Mãi</h4>
-                    <IconField>
-                        <InputIcon>
-                            <i class="pi pi-search" />
-                        </InputIcon>
-                        <InputText v-model="filters['global'].value" placeholder="Tìm kiếm..." />
-                    </IconField>
-                    <Select v-model="statusFilter" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Lọc trạng thái" class="w-12rem" />
-                </div>
-            </template>
+<!-- 🆕 BỘ LỌC VÀ TÌM KIẾM ĐƯỢC TÍCH HỢP -->
+<div class="mb-4 rounded-lg border bg-white p-4 shadow-sm">
+    <div class="mb-3 flex items-center gap-2">
+        <i class="pi pi-filter text-blue-600"></i>
+        <h5 class="m-0 font-semibold">Tìm kiếm & Bộ lọc</h5>
+    </div>
+    <div class="grid grid-cols-12 gap-2">
+        <!-- Tìm kiếm -->
+        <div class="col-span-12 md:col-span-5">
+            <label class="mb-2 block text-sm font-medium">Tìm kiếm</label>
+            <IconField>
+                <InputIcon>
+                    <i class="pi pi-search" />
+                </InputIcon>
+                <InputText 
+                    v-model="filters['global'].value" 
+                    placeholder="Tìm theo tên, mã khuyến mãi..." 
+                    fluid
+                />
+            </IconField>
+        </div>
 
+        <!-- Lọc theo trạng thái -->
+        <div class="col-span-12 md:col-span-6">
+            <label class="mb-2 block text-sm font-medium">Trạng thái</label>
+            <Select 
+                v-model="statusFilter" 
+                :options="statusOptions" 
+                optionLabel="label" 
+                optionValue="value" 
+                placeholder="Chọn trạng thái"
+                showClear
+                fluid
+                @change="onStatusFilterChange"
+            />
+        </div>
+        
+    </div>
+</div>
+
+<!-- DataTable - CẬP NHẬT HEADER -->
+<DataTable
+    ref="dt"
+    v-model:selection="selectedKhuyenMai"
+    :value="filteredKhuyenMai"
+    dataKey="id"
+    :paginator="true"
+    :rows="10"
+    :filters="filters"
+    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+    :rowsPerPageOptions="[5, 10, 25]"
+    currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} khuyến mãi"
+    :loading="isLoading"
+>
+    <!-- ✅ HEADER ĐÃ ĐƯỢC ĐƠN GIẢN HÓA -->
+    <template #header>
+        <div class="flex items-center justify-between">
+            <h4 class="m-0">🎫 Quản Lý Khuyến Mãi</h4>
+        </div>
+    </template>
             <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
-            <Column field="id" header="ID" sortable style="width: 8rem">
+            <!-- <Column field="id" header="ID" sortable style="width: 8rem">
                 <template #body="slotProps">
                     <span class="font-bold text-primary">#{{ slotProps.data.id }}</span>
+                </template>
+            </Column> -->
+            <Column field="STT" header="STT" sortable style="min-width: 8rem">
+                <template #body="slotProps">
+                    {{ getRowIndex(slotProps.index) }}
                 </template>
             </Column>
             <Column field="maKhuyenMai" header="Mã KM" sortable style="width: 10rem">
@@ -112,11 +150,22 @@
                     </div>
                 </template>
             </Column>
+            
             <template #empty>
                 <div class="p-5 text-center">
                     <i class="pi pi-tags text-muted mb-3 text-5xl"></i>
                     <h5 class="text-muted">Không tìm thấy khuyến mãi</h5>
-                    <p class="text-muted">Thử thay đổi bộ lọc hoặc thêm khuyến mãi mới.</p>
+                    <p class="text-muted">
+                        {{ filters['global'].value || statusFilter ? 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.' : 'Thêm khuyến mãi mới để bắt đầu.' }}
+                    </p>
+                    <Button 
+                        v-if="filters['global'].value || statusFilter" 
+                        label="Xóa bộ lọc" 
+                        icon="pi pi-times" 
+                        text 
+                        @click="clearAllFilters" 
+                        class="mt-3" 
+                    />
                 </div>
             </template>
         </DataTable>
@@ -655,7 +704,7 @@ const selectedProductForRemove = ref(null);
 let searchTimeout = null;
 
 const statusOptions = ref([
-    { label: 'Tất cả trạng thái', value: '' },
+    // { label: 'Tất cả trạng thái', value: '' },
     { label: 'Chưa diễn ra', value: 'pending' },
     { label: 'Đang diễn ra', value: 'active' },
     { label: 'Đã hết hạn', value: 'expired' },
@@ -796,7 +845,8 @@ function getPromotionStatusIcon(promotion) {
 const filteredKhuyenMai = computed(() => {
     let filtered = khuyenMais.value;
 
-    if (statusFilter.value !== '') {
+    // Lọc theo trạng thái - chỉ lọc khi có giá trị
+    if (statusFilter.value && statusFilter.value !== '') {
         filtered = filtered.filter((km) => {
             const status = getPromotionStatus(km);
             return status === statusFilter.value;
@@ -805,6 +855,24 @@ const filteredKhuyenMai = computed(() => {
 
     return filtered;
 });
+
+// ✅ THÊM FUNCTION MỚI
+function onStatusFilterChange() {
+    // Function này có thể để trống hoặc thêm logic xử lý nếu cần
+    console.log('Status filter changed to:', statusFilter.value);
+}
+
+function clearAllFilters() {
+    statusFilter.value = null; // Đặt về null thay vì ''
+    filters.value.global.value = null;
+    
+    toast.add({
+        severity: 'info',
+        summary: 'Thông báo',
+        detail: 'Đã xóa tất cả bộ lọc',
+        life: 2000
+    });
+}
 
 const isEndDateBeforeStartDate = computed(() => {
     if (!khuyenMai.value.ngayBatDau || !khuyenMai.value.ngayKetThuc) return false;
@@ -828,6 +896,13 @@ const totalPromotionValue = computed(() => {
     return totalOriginalValue.value - totalDiscountedValue.value;
 });
 
+// Hàm tính toán số thứ tự với pagination
+function getRowIndex(index) {
+    // Lấy thông tin pagination từ DataTable
+    const currentPage = dt.value ? dt.value.d_first / dt.value.d_rows : 0;
+    const rowsPerPage = dt.value ? dt.value.d_rows : 10;
+    return currentPage * rowsPerPage + index + 1;
+}
 // Main data fetching
 async function fetchData() {
     isLoading.value = true;
@@ -1457,11 +1532,12 @@ function exportCSV() {
             return;
         }
 
-        const headers = ['ID', 'Mã Khuyến Mãi', 'Tên Khuyến Mãi', 'Giá Trị Giảm (%)', 'Ngày Bắt Đầu', 'Ngày Kết Thúc', 'Trạng Thái', 'Số Lượng Sản Phẩm'];
+        const headers = ['STT', 'Mã Khuyến Mãi', 'Tên Khuyến Mãi', 'Giá Trị Giảm (%)', 'Ngày Bắt Đầu', 'Ngày Kết Thúc', 'Trạng Thái', 'Số Lượng Sản Phẩm'];
 
-        const csvData = khuyenMais.value.map((item) => {
+        const csvData = khuyenMais.value.map((item , index) => {
             return [
-                item.id || '',
+                // item.id || '',
+                index + 1 ,
                 item.maKhuyenMai || '',
                 item.tenKhuyenMai || '',
                 formatPercentage(item.giaTri) + '%',
