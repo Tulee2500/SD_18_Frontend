@@ -44,7 +44,8 @@ async function fetchWithErrorHandling(url, options = {}) {
             if (response.status === 401) {
                 throw new Error('Authentication failed - Token không hợp lệ hoặc đã hết hạn');
             }
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
         }
 
         return await response.json();
@@ -68,7 +69,7 @@ const loadingMessage = ref('');
 const searchKeyword = ref('');
 const statusFilter = ref('');
 const typeFilter = ref('');
-const dateFilter = ref(null); // Changed to null for Calendar
+const dateFilter = ref(null);
 const showAdvancedFilter = ref(false);
 const minAmount = ref(null);
 const maxAmount = ref(null);
@@ -124,7 +125,6 @@ async function fetchAllData() {
         loadingMessage.value = 'Đang tải danh sách hóa đơn...';
         const response = await fetchWithErrorHandling(API_ENDPOINTS.hoaDon);
 
-        // Xử lý response từ controller: trực tiếp List<HoaDonDTO>
         let data = [];
         if (Array.isArray(response)) {
             data = response;
@@ -132,7 +132,6 @@ async function fetchAllData() {
             data = Array.isArray(response.data) ? response.data : [];
         }
 
-        // Ensure dates are properly parsed and handle null ngayTao
         hoaDons.value = data.map(normalizeHoaDon);
 
         toast.add({
@@ -162,7 +161,6 @@ async function fetchAllData() {
                 life: 3000
             });
 
-            // Fallback to sample data
             hoaDons.value = createSampleData();
         }
     } finally {
@@ -177,7 +175,6 @@ async function fetchChiTietHoaDon(hoaDonId) {
         const endpoint = `${API_ENDPOINTS.hoaDonChiTiet}/by-hoa-don/${hoaDonId}`;
         const response = await fetchWithErrorHandling(endpoint);
 
-        // Xử lý response theo format từ HoaDonChiTietRestController: {success, data: List}
         let data = [];
         if (response.success && response.data) {
             data = Array.isArray(response.data) ? response.data : [];
@@ -217,6 +214,7 @@ async function processNextStep(hoaDon) {
         if (currentIndex >= 0 && currentIndex < steps.length - 1) {
             const nextStep = steps[currentIndex + 1];
 
+            // ✅ FIX: Sử dụng đúng endpoint format từ backend
             const endpoint = `${API_ENDPOINTS.hoaDon}/${hoaDon.id}/trang-thai`;
             const requestData = {
                 trangThai: nextStep,
@@ -228,24 +226,24 @@ async function processNextStep(hoaDon) {
                 body: JSON.stringify(requestData)
             });
 
-            // Xử lý response: HoaDonDTO trực tiếp
+            // ✅ FIX: Xử lý response đúng cách
             let updatedHoaDon = null;
-            if (response.success && response.data) {
-                updatedHoaDon = response.data;
-            } else {
-                updatedHoaDon = response;
+            if (response && response.id) {
+                // Response trả về trực tiếp HoaDonDTO
+                updatedHoaDon = normalizeHoaDon(response);
+            } else if (response && response.data) {
+                // Response có wrapper
+                updatedHoaDon = normalizeHoaDon(response.data);
             }
 
             if (updatedHoaDon) {
-                // Normalize dates
-                updatedHoaDon = normalizeHoaDon(updatedHoaDon);
-
-                // Update local data với dữ liệu từ server
+                // ✅ FIX: Cập nhật dữ liệu trong danh sách
                 const index = hoaDons.value.findIndex((hd) => hd.id === hoaDon.id);
                 if (index !== -1) {
                     hoaDons.value[index] = updatedHoaDon;
                 }
 
+                // ✅ FIX: Cập nhật selectedHoaDon nếu đang xem chi tiết
                 if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDon.id) {
                     selectedHoaDon.value = updatedHoaDon;
                 }
@@ -253,9 +251,11 @@ async function processNextStep(hoaDon) {
                 toast.add({
                     severity: 'success',
                     summary: 'Thành công',
-                    detail: response.message || `Đã cập nhật trạng thái sang ${getStatusLabel(nextStep)}`,
+                    detail: `Đã cập nhật trạng thái sang ${getStatusLabel(nextStep)}`,
                     life: 3000
                 });
+            } else {
+                throw new Error('Không nhận được dữ liệu cập nhật từ server');
             }
         } else {
             throw new Error('Không thể chuyển sang bước tiếp theo');
@@ -292,19 +292,15 @@ async function cancelInvoice(hoaDon) {
             body: JSON.stringify(requestData)
         });
 
-        // Xử lý response: HoaDonDTO
+        // ✅ FIX: Xử lý response đúng cách
         let updatedHoaDon = null;
-        if (response.success && response.data) {
-            updatedHoaDon = response.data;
-        } else {
-            updatedHoaDon = response;
+        if (response && response.id) {
+            updatedHoaDon = normalizeHoaDon(response);
+        } else if (response && response.data) {
+            updatedHoaDon = normalizeHoaDon(response.data);
         }
 
         if (updatedHoaDon) {
-            // Normalize dates
-            updatedHoaDon = normalizeHoaDon(updatedHoaDon);
-
-            // Update local data
             const index = hoaDons.value.findIndex((hd) => hd.id === hoaDon.id);
             if (index !== -1) {
                 hoaDons.value[index] = updatedHoaDon;
@@ -317,9 +313,11 @@ async function cancelInvoice(hoaDon) {
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
-                detail: response.message || 'Đã hủy đơn hàng thành công',
+                detail: 'Đã hủy đơn hàng thành công',
                 life: 3000
             });
+        } else {
+            throw new Error('Không nhận được dữ liệu cập nhật từ server');
         }
     } catch (error) {
         console.error('Error cancelling invoice:', error);
@@ -350,41 +348,46 @@ async function confirmStatusUpdate() {
             ghiChu: statusNote.value || `Cập nhật trạng thái sang ${getStatusLabel(newStatus.value)}`
         };
 
+        console.log('Sending request:', requestData); // Debug log
+
         const response = await fetchWithErrorHandling(endpoint, {
             method: 'PUT',
             body: JSON.stringify(requestData)
         });
 
-        // Xử lý response: HoaDonDTO
+        console.log('Received response:', response); // Debug log
+
+        // ✅ FIX: Xử lý response đúng cách
         let updatedHoaDon = null;
-        if (response.success && response.data) {
-            updatedHoaDon = response.data;
-        } else {
-            updatedHoaDon = response;
+        if (response && response.id) {
+            updatedHoaDon = normalizeHoaDon(response);
+        } else if (response && response.data) {
+            updatedHoaDon = normalizeHoaDon(response.data);
         }
 
         if (updatedHoaDon) {
-            // Normalize dates
-            updatedHoaDon = normalizeHoaDon(updatedHoaDon);
-
-            // Update local data
+            // ✅ FIX: Cập nhật dữ liệu
             const index = hoaDons.value.findIndex((hd) => hd.id === selectedInvoiceForUpdate.value.id);
             if (index !== -1) {
                 hoaDons.value[index] = updatedHoaDon;
+                console.log('Updated invoice in list:', hoaDons.value[index]); // Debug log
             }
 
             if (selectedHoaDon.value && selectedHoaDon.value.id === selectedInvoiceForUpdate.value.id) {
                 selectedHoaDon.value = updatedHoaDon;
+                console.log('Updated selectedHoaDon:', selectedHoaDon.value); // Debug log
             }
 
             toast.add({
                 severity: 'success',
                 summary: 'Thành công',
-                detail: response.message || `Cập nhật trạng thái thành công sang ${getStatusLabel(newStatus.value)}`,
+                detail: `Cập nhật trạng thái thành công sang ${getStatusLabel(newStatus.value)}`,
                 life: 3000
             });
 
             closeStatusUpdateDialog();
+        } else {
+            throw new Error('Không nhận được dữ liệu cập nhật từ server');
         }
     } catch (error) {
         console.error('Error updating status:', error);
@@ -406,14 +409,12 @@ async function saveQuantity(itemId) {
         });
 
         if (response.success) {
-            // Update local data
             const index = hoaDonChiTiets.value.findIndex((item) => item.id === itemId);
             if (index !== -1) {
                 if (response.data) {
                     hoaDonChiTiets.value[index] = response.data;
                 } else {
                     hoaDonChiTiets.value[index].soLuong = editQuantity.value;
-                    // Recalculate thành tiền
                     hoaDonChiTiets.value[index].thanhTien = hoaDonChiTiets.value[index].giaBan * editQuantity.value;
                 }
             }
@@ -544,7 +545,6 @@ function createSampleChiTietData(hoaDonId) {
 const filteredHoaDons = computed(() => {
     let filtered = [...hoaDons.value];
 
-    // Tab filter
     if (activeTab.value === 'pos') {
         filtered = filtered.filter((hd) => hd.loaiHoaDon && hd.loaiHoaDon.toUpperCase() === 'OFFLINE');
     } else if (activeTab.value === 'online') {
@@ -556,7 +556,6 @@ const filteredHoaDons = computed(() => {
         });
     }
 
-    // Search filter
     if (searchKeyword.value.trim()) {
         const keyword = searchKeyword.value.toLowerCase();
         filtered = filtered.filter(
@@ -564,12 +563,10 @@ const filteredHoaDons = computed(() => {
         );
     }
 
-    // Type filter
     if (typeFilter.value) {
         filtered = filtered.filter((hd) => hd.loaiHoaDon && hd.loaiHoaDon.toUpperCase() === typeFilter.value);
     }
 
-    // Status filter
     if (statusFilter.value) {
         filtered = filtered.filter((hd) => {
             const status = normalizeStatus(hd.trangThaiHoaDon);
@@ -577,7 +574,6 @@ const filteredHoaDons = computed(() => {
         });
     }
 
-    // Date filter
     if (dateFilter.value) {
         const filterDate = new Date(dateFilter.value).toDateString();
         filtered = filtered.filter((hd) => {
@@ -586,7 +582,6 @@ const filteredHoaDons = computed(() => {
         });
     }
 
-    // Advanced filters
     if (minAmount.value || maxAmount.value) {
         filtered = filtered.filter((hd) => {
             const amount = parseFloat(hd.tongTien) || 0;
@@ -688,16 +683,14 @@ const completionRate = computed(() => {
 
 // ===== UTILITY FUNCTIONS =====
 function normalizeHoaDon(hd) {
-    // Handle null or invalid ngayTao by setting to current date if necessary
     let ngayTaoDate = null;
     if (hd.ngayTao) {
         ngayTaoDate = new Date(hd.ngayTao);
-        // If parsing fails, fall back to current date
         if (isNaN(ngayTaoDate.getTime())) {
             ngayTaoDate = new Date();
         }
     } else {
-        ngayTaoDate = new Date(); // Default to now if null
+        ngayTaoDate = new Date();
     }
 
     return {
@@ -747,7 +740,6 @@ function getInitials(name) {
 }
 
 function getCustomerName(hoaDon) {
-    // Try different possible field names from backend
     return hoaDon.tenKhachHang || hoaDon.tenNguoiDung || hoaDon.customerName || hoaDon.userName || (hoaDon.khachHang && hoaDon.khachHang.hoTen) || 'Khách lẻ';
 }
 
@@ -755,7 +747,6 @@ function getStatusLabel(status) {
     if (!status) return 'Không xác định';
 
     const statusMap = {
-        // Backend statuses
         PENDING: 'Chờ xác nhận',
         CONFIRMED: 'Đã xác nhận',
         SHIPPING: 'Đang giao',
@@ -765,7 +756,6 @@ function getStatusLabel(status) {
         RETURNED: 'Hoàn trả'
     };
 
-    // Try to match both uppercase and as-is
     return statusMap[status.toUpperCase()] || statusMap[status] || status;
 }
 
@@ -896,7 +886,6 @@ function canUpdateStatus(hoaDon) {
     const terminalStates = ['COMPLETED', 'CANCELLED', 'RETURNED'];
     const hasTerminalStatus = terminalStates.includes(normalizedStatus);
 
-    // Check if there are available status transitions
     const availableStatuses = getAvailableStatuses(hoaDon);
     const hasAvailableTransitions = availableStatuses.length > 0;
 
@@ -940,12 +929,9 @@ function canEditItems(hoaDon) {
 function getAvailableStatuses(hoaDon) {
     if (!hoaDon) return [];
 
-    // Normalize status to English for processing
     const currentStatus = normalizeStatus(hoaDon.trangThaiHoaDon);
-    const invoiceType = hoaDon.loaiHoaDon ? hoaDon.loaiHoaDon.toUpperCase() : '';
     const availableSteps = [];
 
-    // Define all possible transitions based on current status and invoice type (matching backend)
     switch (currentStatus) {
         case 'PENDING':
             availableSteps.push({ value: 'CONFIRMED', label: 'Đã xác nhận' });
@@ -961,7 +947,6 @@ function getAvailableStatuses(hoaDon) {
             break;
     }
 
-    // Add cancel option for non-terminal states
     const terminalStates = ['COMPLETED', 'CANCELLED', 'RETURNED'];
     if (!terminalStates.includes(currentStatus)) {
         availableSteps.push({
@@ -973,20 +958,24 @@ function getAvailableStatuses(hoaDon) {
     return availableSteps;
 }
 
-// Helper function to normalize status
 function normalizeStatus(status) {
     if (!status) return '';
 
-    // Convert to string and trim
     const statusStr = status.toString().trim().toUpperCase();
 
-    const englishStatuses = ['PENDING', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED'];
-    if (englishStatuses.includes(statusStr)) {
-        return statusStr;
-    }
+    // Map các trạng thái tiếng Việt sang tiếng Anh
+    const vietnameseToEnglish = {
+        CHO_XAC_NHAN: 'PENDING',
+        DA_XAC_NHAN: 'CONFIRMED',
+        DANG_GIAO: 'SHIPPING',
+        DA_GIAO: 'DELIVERED',
+        HOAN_THANH: 'COMPLETED',
+        DA_HUY: 'CANCELLED',
+        HOAN_TRA: 'RETURNED'
+    };
 
-    // If no mapping found, return uppercase version for consistency
-    return statusStr;
+    // Nếu có mapping thì dùng, không thì giữ nguyên
+    return vietnameseToEnglish[statusStr] || statusStr;
 }
 
 function needsNote(status) {
@@ -1011,7 +1000,7 @@ function hideModal(modalRef) {
 }
 
 async function viewChiTiet(hoaDon) {
-    selectedHoaDon.value = { ...hoaDon }; // Clone to avoid mutation
+    selectedHoaDon.value = { ...hoaDon };
     searchChiTietKeyword.value = '';
     showChiTietDialog.value = true;
 
@@ -1031,7 +1020,7 @@ function closeChiTietDialog() {
 }
 
 function updateInvoiceStatus(hoaDon) {
-    selectedInvoiceForUpdate.value = { ...hoaDon }; // Clone
+    selectedInvoiceForUpdate.value = { ...hoaDon };
     newStatus.value = '';
     statusNote.value = '';
     showStatusUpdateDialog.value = true;
@@ -1089,25 +1078,29 @@ async function refreshSingleInvoice(hoaDonId) {
         const endpoint = `${API_ENDPOINTS.hoaDon}/${hoaDonId}`;
         const response = await fetchWithErrorHandling(endpoint);
 
+        console.log('Refresh response:', response); // Debug log
+
         let updatedHoaDon = null;
-        if (response.success && response.data) {
-            updatedHoaDon = response.data;
-        } else if (response.id) {
-            updatedHoaDon = response;
+        if (response && response.id) {
+            updatedHoaDon = normalizeHoaDon(response);
+        } else if (response && response.data) {
+            updatedHoaDon = normalizeHoaDon(response.data);
         }
 
         if (updatedHoaDon) {
-            // Normalize dates
-            updatedHoaDon = normalizeHoaDon(updatedHoaDon);
-
             const index = hoaDons.value.findIndex((hd) => hd.id === hoaDonId);
             if (index !== -1) {
                 hoaDons.value[index] = updatedHoaDon;
+                console.log('Refreshed invoice:', hoaDons.value[index]);
             }
 
             if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDonId) {
                 selectedHoaDon.value = updatedHoaDon;
+                console.log('Refreshed selectedHoaDon:', selectedHoaDon.value);
             }
+
+            // ✅ FIX: Force reactivity update
+            hoaDons.value = [...hoaDons.value];
         }
     } catch (error) {
         console.error('Error refreshing invoice:', error);
@@ -1649,21 +1642,31 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <!-- Actions Bar -->
                         <div class="d-flex justify-content-end bg-light mb-3 gap-2 rounded p-3">
+                            <!-- ✅ DEBUG: Show status info -->
+                            <small class="text-muted me-auto"> Trạng thái: {{ selectedHoaDon?.trangThaiHoaDon }} ({{ normalizeStatus(selectedHoaDon?.trangThaiHoaDon) }}) </small>
+
                             <button v-if="canProcessNextStep(selectedHoaDon)" @click="processNextStepWithRefresh(selectedHoaDon)" class="btn btn-success btn-sm">
                                 <i class="pi pi-arrow-right me-1"></i>
                                 {{ getNextStepAction(selectedHoaDon) }}
                             </button>
+
+                            <button v-if="canUpdateStatus(selectedHoaDon)" @click="updateInvoiceStatus(selectedHoaDon)" class="btn btn-warning btn-sm">
+                                <i class="pi pi-edit me-1"></i>
+                                Cập nhật trạng thái
+                            </button>
+
                             <button v-if="canCancelInvoice(selectedHoaDon)" @click="cancelInvoice(selectedHoaDon)" class="btn btn-danger btn-sm">
                                 <i class="pi pi-times me-1"></i>
                                 Hủy đơn
                             </button>
-                            <button v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE'" @click="printInvoice(selectedHoaDon)" class="btn btn-info btn-sm">
+
+                            <button v-if="selectedHoaDon?.loaiHoaDon === 'OFFLINE'" @click="printInvoice(selectedHoaDon)" class="btn btn-info btn-sm">
                                 <i class="pi pi-print me-1"></i>
                                 In hóa đơn
                             </button>
-                            <button v-if="selectedHoaDon.loaiHoaDon === 'ONLINE'" @click="trackingInfo(selectedHoaDon)" class="btn btn-warning btn-sm">
+
+                            <button v-if="selectedHoaDon?.loaiHoaDon === 'ONLINE'" @click="trackingInfo(selectedHoaDon)" class="btn btn-warning btn-sm">
                                 <i class="pi pi-map-marker me-1"></i>
                                 Tracking
                             </button>
@@ -1896,12 +1899,23 @@ onMounted(() => {
                         <button type="button" class="btn-close" @click="closeStatusUpdateDialog"></button>
                     </div>
                     <div class="modal-body">
+                        <!-- ✅ DEBUG: Show current status info -->
+                        <div class="mb-3" v-if="selectedInvoiceForUpdate">
+                            <label class="form-label">Hóa đơn:</label>
+                            <div>
+                                <strong>{{ selectedInvoiceForUpdate.maHoaDon }}</strong> -
+                                {{ getCustomerName(selectedInvoiceForUpdate) }}
+                            </div>
+                        </div>
+
                         <div class="mb-3">
                             <label class="form-label">Trạng thái hiện tại:</label>
                             <div>
                                 <span :class="['badge', 'bg-' + getStatusColor(selectedInvoiceForUpdate?.trangThaiHoaDon)]">
                                     {{ getStatusLabel(selectedInvoiceForUpdate?.trangThaiHoaDon) }}
                                 </span>
+                                <!-- ✅ DEBUG: Show raw status -->
+                                <small class="text-muted ms-2">({{ selectedInvoiceForUpdate?.trangThaiHoaDon }})</small>
                             </div>
                         </div>
 
@@ -1913,14 +1927,17 @@ onMounted(() => {
                                     {{ status.label }}
                                 </option>
                             </select>
+                            <!-- ✅ DEBUG: Show selected status -->
+                            <small class="text-muted" v-if="newStatus">Đã chọn: {{ newStatus }}</small>
                         </div>
+
                         <div v-if="needsNote(newStatus)" class="mb-3">
                             <label class="form-label">Ghi chú:</label>
                             <textarea v-model="statusNote" class="form-control" rows="3" placeholder="Nhập ghi chú..."></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button @click="confirmStatusUpdate" class="btn btn-primary">
+                        <button @click="confirmStatusUpdate" class="btn btn-primary" :disabled="!newStatus">
                             <i class="pi pi-check me-1"></i>
                             Cập nhật
                         </button>
