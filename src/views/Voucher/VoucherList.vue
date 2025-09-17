@@ -1,459 +1,9 @@
-<template>
-    <div class="card">
-        <Toast />
-        <Toolbar class="mb-4">
-            <template #start>
-                <Button label="Thêm mới" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" :loading="loading" />
-                <Button label="Xóa" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedVouchers || !selectedVouchers.length" :loading="loading" />
-            </template>
-            <template #end>
-                <Button label="Xuất CSV" icon="pi pi-upload" severity="primary" @click="exportCSV" :loading="loading" />
-            </template>
-        </Toolbar>
-
-        <DataTable
-            ref="dt"
-            v-model:selection="selectedVouchers"
-            :value="vouchers"
-            dataKey="id"
-            :paginator="true"
-            :rows="10"
-            :filters="filters"
-            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            :rowsPerPageOptions="[5, 10, 25]"
-            currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} voucher"
-        >
-            <template #header>
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h4 class="m-0">🎫 Quản lý Voucher</h4>
-                    <IconField>
-                        <InputIcon>
-                            <i class="pi pi-search" />
-                        </InputIcon>
-                        <InputText v-model="filters['global'].value" placeholder="Tìm kiếm..." />
-                    </IconField>
-                </div>
-            </template>
-
-            <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
-            <Column field="id" header="ID" sortable style="min-width: 8rem"></Column>
-            <Column field="maVoucher" header="Mã Voucher" sortable style="min-width: 12rem"></Column>
-            <Column field="tenVoucher" header="Tên Voucher" sortable style="min-width: 16rem"></Column>
-
-            <!-- CỘT HÌNH ẢNH (FIXED) -->
-            <Column header="Hình ảnh" style="min-width: 12rem">
-                <template #body="slotProps">
-                    <div class="flex justify-center">
-                        <img
-                            v-if="slotProps.data.duongDanHinhAnh"
-                            :src="`http://localhost:8080${slotProps.data.duongDanHinhAnh}`"
-                            :alt="slotProps.data.tenVoucher"
-                            class="h-16 w-16 cursor-pointer rounded border object-cover shadow-sm transition-transform hover:scale-105"
-                            @click="previewImage(slotProps.data)"
-                            @error="handleImageError($event)"
-                        />
-                        <div v-else class="flex h-16 w-16 items-center justify-center rounded border bg-gray-100">
-                            <i class="pi pi-image text-gray-400"></i>
-                        </div>
-                    </div>
-                </template>
-            </Column>
-
-            <Column field="loaiGiamGia" header="Loại giảm giá" sortable style="min-width: 12rem"></Column>
-            <Column field="giaTriGiam" header="Giá trị giảm" sortable style="min-width: 12rem">
-                <template #body="slotProps">
-                    <span v-if="slotProps.data.loaiGiamGia === 'PHAN_TRAM'">{{ slotProps.data.giaTriGiam }}%</span>
-                    <span v-else>{{ formatCurrency(slotProps.data.giaTriGiam) }}</span>
-                </template>
-            </Column>
-            <Column field="giaTriGiamToiThieu" header="Đơn hàng tối thiểu" sortable style="min-width: 12rem">
-                <template #body="slotProps">{{ formatCurrency(slotProps.data.giaTriGiamToiThieu) }}</template>
-            </Column>
-            <Column field="giaTriGiamToiDa" header="Giảm tối đa" sortable style="min-width: 12rem">
-                <template #body="slotProps">{{ formatCurrency(slotProps.data.giaTriGiamToiDa) }}</template>
-            </Column>
-            <Column field="soLuong" header="Số lượng" sortable style="min-width: 10rem"></Column>
-            <Column field="ngayBatDau" header="Ngày bắt đầu" sortable style="min-width: 12rem">
-                <template #body="slotProps">{{ formatDate(slotProps.data.ngayBatDau) }}</template>
-            </Column>
-            <Column field="ngayKetThuc" header="Ngày kết thúc" sortable style="min-width: 12rem">
-                <template #body="slotProps">{{ formatDate(slotProps.data.ngayKetThuc) }}</template>
-            </Column>
-            
-            <!-- CỘT TRẠNG THÁI ĐÃ CẬP NHẬT -->
-            <Column field="trangThai" header="Trạng thái" sortable style="min-width: 12rem">
-                <template #body="slotProps">
-                    <Tag 
-                        :severity="getVoucherStatusDisplay(slotProps.data).severity"
-                    >
-                        <div class="flex items-center gap-2">
-                            <i :class="getVoucherStatusDisplay(slotProps.data).icon"></i>
-                            <span>{{ getVoucherStatusDisplay(slotProps.data).label }}</span>
-                        </div>
-                    </Tag>
-                </template>
-            </Column>
-            
-            <Column :exportable="false" style="width: 10rem">
-                <template #body="slotProps">
-                    <div class="flex justify-center gap-2">
-                        <Button icon="pi pi-pencil" outlined rounded size="small" @click="editVoucher(slotProps.data)" :disabled="loading" />
-                        <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteVoucher(slotProps.data)" :disabled="loading" />
-                        <!-- CHỈ CHO PHÉP THAY ĐỔI TRẠNG THÁI KHI ĐANG ACTIVE -->
-                        <Button 
-                            icon="pi pi-ban" 
-                            outlined 
-                            rounded 
-                            severity="warning" 
-                            size="small" 
-                            @click="deactivateVoucher(slotProps.data)" 
-                            :disabled="loading || getVoucherStatus(slotProps.data) !== 'DANG_DIEN_RA' || slotProps.data.trangThai === 0"
-                            v-tooltip.top="'Đặt không hoạt động'"
-                        />
-                    </div>
-                </template>
-            </Column>
-        </DataTable>
-
-        <!-- DIALOG THÊM/SỬA VOUCHER với validation cải thiện -->
-        <Dialog v-model:visible="voucherDialog" :style="{ width: '600px' }" header="Chi tiết Voucher" :modal="true">
-            <div class="flex flex-col gap-6">
-                <!-- Mã Voucher -->
-                <div>
-                    <label for="maVoucher" class="mb-3 block font-bold">Mã Voucher</label>
-                    <InputText 
-                        id="maVoucher" 
-                        v-model.trim="voucher.maVoucher" 
-                        fluid 
-                        readonly="true" 
-                        class="bg-gray-50"
-                    />
-                </div>
-
-                <!-- Tên Voucher -->
-                <div>
-                    <label for="tenVoucher" class="mb-3 block font-bold">
-                        Tên Voucher <span class="text-red-500">*</span>
-                    </label>
-                    <InputText 
-                        id="tenVoucher" 
-                        v-model.trim="voucher.tenVoucher" 
-                        required="true" 
-                        :invalid="submitted && (!voucher.tenVoucher || duplicateErrors.tenVoucher)" 
-                        fluid 
-                        @blur="validateField('tenVoucher')"
-                        @input="() => { if (submitted) validateField('tenVoucher') }"
-                        placeholder="Nhập tên voucher..."
-                    />
-                    <small v-if="submitted && !voucher.tenVoucher" class="text-red-500">
-                        Tên voucher là bắt buộc.
-                    </small>
-                    <small v-else-if="submitted && duplicateErrors.tenVoucher" class="text-red-500">
-                        {{ duplicateErrors.tenVoucher }}
-                    </small>
-                </div>
-
-                <!-- PHẦN UPLOAD FILE -->
-                <div>
-                    <label class="mb-3 block font-bold">Hình ảnh voucher</label>
-                    <div class="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition-colors hover:border-blue-400" @click="$refs.fileInput.click()">
-                        <input type="file" ref="fileInput" @change="handleFileSelect" accept="image/*" class="hidden" />
-
-                        <!-- Hiển thị hình ảnh preview -->
-                        <div v-if="imagePreview" class="mb-4">
-                            <img :src="imagePreview" alt="Preview" class="mx-auto max-h-48 max-w-full rounded border shadow-sm" />
-                            <p class="mt-2 text-sm text-gray-600">{{ selectedFileName }}</p>
-                        </div>
-
-                        <!-- Nút chọn file -->
-                        <div v-else class="mb-4">
-                            <i class="pi pi-cloud-upload mb-4 text-4xl text-gray-400"></i>
-                            <p class="text-gray-600">Nhấn để chọn hình ảnh</p>
-                            <p class="text-sm text-gray-400">JPG, PNG, GIF, WEBP (Tối đa 5MB)</p>
-                        </div>
-
-                        <div class="flex justify-center gap-2" @click.stop>
-                            <Button label="Chọn file" icon="pi pi-upload" @click="$refs.fileInput.click()" severity="secondary" />
-                            <Button v-if="imagePreview" label="Xóa" icon="pi pi-times" @click="clearFile" severity="danger" outlined />
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Loại Giảm Giá -->
-                <div>
-                    <label for="loaiGiamGia" class="mb-3 block font-bold">
-                        Loại giảm giá <span class="text-red-500">*</span>
-                    </label>
-                    <Select
-                        id="loaiGiamGia"
-                        v-model="voucher.loaiGiamGia"
-                        :options="discountTypes"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Chọn loại giảm giá..."
-                        fluid
-                        :invalid="submitted && !voucher.loaiGiamGia"
-                        @change="validateField('loaiGiamGia')"
-                    />
-                    <small v-if="submitted && !voucher.loaiGiamGia" class="text-red-500">
-                        Loại giảm giá là bắt buộc.
-                    </small>
-                </div>
-
-                <!-- Giá Trị Giảm (theo loại) -->
-                <div v-if="voucher.loaiGiamGia === 'PHAN_TRAM'">
-                    <label for="giaTriGiam" class="mb-3 block font-bold">
-                        Phần trăm giảm (1% - 100%) <span class="text-red-500">*</span>
-                    </label>
-                    <InputText
-                        id="giaTriGiam" 
-                        v-model="voucher.giaTriGiam" 
-                        fluid 
-                        :min="1" 
-                        :max="100" 
-                        suffix="%"
-                        :invalid="submitted && (!isValidNumber(voucher.giaTriGiam) || voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)"
-                        @blur="validateField('giaTriGiam')"
-                        placeholder="Nhập % giảm..."
-                    />
-                    <small v-if="submitted && ( voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)" class="text-red-500">
-                        Phần trăm giảm là bắt buộc phải từ 1% đến 100%.
-                    </small>
-                    <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiam)" class="text-red-500">
-                        Phần trăm giảm phải là số.
-                    </small>
-                </div>
-
-                <div v-else-if="voucher.loaiGiamGia === 'SO_TIEN_CO_DINH'">
-                    <label for="giaTriGiam" class="mb-3 block font-bold">
-                        Số tiền giảm (VND) <span class="text-red-500">*</span>
-                    </label>
-                    <InputText
-                        id="giaTriGiam" 
-                        v-model="voucher.giaTriGiam" 
-                        fluid 
-                        :min="1000"
-                        :max="99999999"
-                        mode="currency"
-                        currency="VND"
-                        locale="vi-VN"
-                        :invalid="submitted && (!isValidNumber(voucher.giaTriGiam) || voucher.giaTriGiam <= 0 || voucher.giaTriGiam >= 100000000)"
-                        @blur="validateField('giaTriGiam')"
-                        placeholder="Nhập số tiền giảm..."
-                    />
-                    <small v-if="submitted && ( voucher.giaTriGiam <= 0)" class="text-red-500">
-                        Số tiền giảm phải lớn hơn 0.
-                    </small>
-                    <small v-else-if="submitted && voucher.giaTriGiam >= 100000000" class="text-red-500">
-                        Số tiền giảm phải < 100,000,000 VND.
-                    </small>
-                    <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiam)" class="text-red-500">
-                        Số tiền giảm phải là số.
-                    </small>
-                </div>
-
-                <!-- Đơn hàng tối thiểu và Giảm tối đa -->
-                <div class="grid grid-cols-12 gap-4">
-                    <div class="col-span-6">
-                        <label for="giaTriGiamToiThieu" class="mb-3 block font-bold">
-                            Đơn hàng tối thiểu (VND) <span class="text-red-500">*</span>
-                        </label>
-                        <InputText 
-                            id="giaTriGiamToiThieu" 
-                            v-model="voucher.giaTriGiamToiThieu" 
-                            fluid 
-                            :min="0"
-                            :max="99999999"
-                            mode="currency"
-                            currency="VND"
-                            locale="vi-VN"
-                            :invalid="submitted && (!isValidNumber(voucher.giaTriGiamToiThieu) || voucher.giaTriGiamToiThieu < 0 || voucher.giaTriGiamToiThieu >= 100000000)"
-                            @blur="validateField('giaTriGiamToiThieu')"
-                            placeholder="Nhập giá trị đơn hàng tối thiểu..."
-                        />
-                        <small v-if="submitted && ( voucher.giaTriGiamToiThieu <= 0)" class="text-red-500">
-                            Giá trị đơn hàng tối thiểu là bắt buộc và phải > 0.
-                        </small>
-                        <small v-else-if="submitted && voucher.giaTriGiamToiThieu >= 100000000" class="text-red-500">
-                            Giá trị phải < 100,000,000 VND.
-                        </small>
-                        <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiamToiThieu)" class="text-red-500">
-                            Giá trị đơn hàng tối thiểu phải là số.
-                        </small>
-                    </div>
-                    <div class="col-span-6">
-                        <label for="giaTriGiamToiDa" class="mb-3 block font-bold">
-                            Giảm tối đa (VND) <span class="text-red-500">*</span>
-                        </label>
-                        <InputText 
-                            id="giaTriGiamToiDa" 
-                            v-model="voucher.giaTriGiamToiDa" 
-                            fluid 
-                            :min="1000"
-                            :max="99999999"
-                            mode="currency"
-                            currency="VND"
-                            locale="vi-VN"
-                            :invalid="submitted && (!isValidNumber(voucher.giaTriGiamToiDa) || voucher.giaTriGiamToiDa <= 0 || voucher.giaTriGiamToiDa >= 100000000)"
-                            @blur="validateField('giaTriGiamToiDa')"
-                            placeholder="Nhập giá trị giảm tối đa..."
-                        />
-                        <small v-if="submitted && ( voucher.giaTriGiamToiDa <= 0)" class="text-red-500">
-                            Giá trị giảm tối đa là bắt buộc và phải > 0.
-                        </small>
-                        <small v-else-if="submitted && voucher.giaTriGiamToiDa >= 100000000" class="text-red-500">
-                            Giá trị phải < 100,000,000 VND.
-                        </small>
-                        <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiamToiDa)" class="text-red-500">
-                            Giá trị giảm tối đa phải là số.
-                        </small>
-                    </div>
-                </div>
-
-                <!-- Số Lượng -->
-                <div>
-                    <label for="soLuong" class="mb-3 block font-bold">
-                        Số lượng <span class="text-red-500">*</span>
-                    </label>
-                    <InputText
-                        id="soLuong"
-                        v-model="voucher.soLuong"
-                        fluid
-                        :min="1"
-                        :max="99999"
-                        :invalid="submitted && (!isValidNumber(voucher.soLuong) || voucher.soLuong <= 0 || voucher.soLuong >= 100000)"
-                        @blur="validateField('soLuong')"
-                        placeholder="Nhập số lượng voucher (1-99,999)..."
-                    />
-                    <small v-if="submitted && (voucher.soLuong <= 0)" class="text-red-500">
-                        Số lượng là bắt buộc và phải > 0.
-                    </small>
-                    <small v-else-if="submitted && voucher.soLuong >= 100000" class="text-red-500">
-                        Số lượng phải < 100,000.
-                    </small>
-                    <small v-else-if="submitted && !isValidNumber(voucher.soLuong)" class="text-red-500">
-                        Số lượng phải là số.
-                    </small>
-                </div>
-
-                <!-- Ngày bắt đầu và Ngày kết thúc -->
-                <div class="grid grid-cols-12 gap-4">
-                    <div class="col-span-6">
-                        <label for="ngayBatDau" class="mb-3 block font-bold">
-                            Ngày bắt đầu <span class="text-red-500">*</span>
-                        </label>
-                        <Calendar 
-                            id="ngayBatDau" 
-                            v-model="voucher.ngayBatDau" 
-                            showIcon 
-                            fluid 
-                            dateFormat="dd/mm/yy" 
-                            :invalid="submitted && !voucher.ngayBatDau"
-                            @date-select="validateField('ngayBatDau')"
-                            placeholder="Chọn ngày bắt đầu..."
-                        />
-                        <small v-if="submitted && !voucher.ngayBatDau" class="text-red-500">
-                            Ngày bắt đầu là bắt buộc.
-                        </small>
-                    </div>
-                    <div class="col-span-6">
-                        <label for="ngayKetThuc" class="mb-3 block font-bold">
-                            Ngày kết thúc <span class="text-red-500">*</span>
-                        </label>
-                        <Calendar 
-                            id="ngayKetThuc" 
-                            v-model="voucher.ngayKetThuc" 
-                            showIcon 
-                            fluid 
-                            dateFormat="dd/mm/yy" 
-                            :invalid="submitted && !voucher.ngayKetThuc"
-                            @date-select="validateField('ngayKetThuc')"
-                            placeholder="Chọn ngày kết thúc..."
-                        />
-                        <small v-if="submitted && !voucher.ngayKetThuc" class="text-red-500">
-                            Ngày kết thúc là bắt buộc.
-                        </small>
-                    </div>
-                </div>
-
-                <!-- TRẠNG THÁI CHỈ CHO SỬA KHI ĐANG ACTIVE -->
-                <div>
-                    <label for="trangThai" class="mb-3 block font-bold">
-                        Trạng thái thủ công <span class="text-red-500">*</span>
-                    </label>
-                    <Select 
-                        id="trangThai" 
-                        v-model="voucher.trangThai" 
-                        :options="manualStatuses" 
-                        optionLabel="label" 
-                        optionValue="value" 
-                        placeholder="Chọn trạng thái..." 
-                        fluid 
-                        :invalid="submitted && voucher.trangThai == null"
-                    />
-                    <small v-if="submitted && voucher.trangThai == null" class="text-red-500">
-                        Trạng thái là bắt buộc.
-                    </small>
-                </div>
-            </div>
-
-            <template #footer>
-                <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
-                <Button 
-                    label="Lưu" 
-                    icon="pi pi-check" 
-                    @click="saveVoucher" 
-                    :loading="uploading || loading"
-                    :disabled="uploading || loading"
-                />
-            </template>
-        </Dialog>
-
-        <!-- DIALOG XEM HÌNH ẢNH FULL SIZE -->
-        <Dialog v-model:visible="imagePreviewDialog" :style="{ width: '800px' }" header="Xem hình ảnh voucher" :modal="true">
-            <div class="text-center">
-                <img :src="previewImageSrc" :alt="previewImageName" class="max-h-96 max-w-full rounded object-contain shadow" />
-                <div class="mt-4 text-sm text-gray-600">
-                    <p><strong>Voucher:</strong> {{ previewImageName }}</p>
-                    <p><strong>Đường dẫn:</strong> {{ previewImagePath }}</p>
-                </div>
-            </div>
-        </Dialog>
-
-        <!-- Delete confirmation dialogs -->
-        <Dialog v-model:visible="deleteVoucherDialog" :style="{ width: '450px' }" header="Xác nhận" :modal="true">
-            <div class="flex items-center gap-4">
-                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
-                <span v-if="voucher"
-                    >Bạn có chắc muốn xóa voucher <b>{{ voucher.tenVoucher }}</b
-                    >?</span
-                >
-            </div>
-            <template #footer>
-                <Button label="Không" icon="pi pi-times" text @click="deleteVoucherDialog = false" :disabled="loading" />
-                <Button label="Có" icon="pi pi-check" severity="danger" @click="deleteVoucher" :loading="loading" />
-            </template>
-        </Dialog>
-
-        <Dialog v-model:visible="deleteVouchersDialog" :style="{ width: '450px' }" header="Xác nhận" :modal="true">
-            <div class="flex items-center gap-4">
-                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
-                <span>Bạn có chắc muốn xóa các voucher đã chọn?</span>
-            </div>
-            <template #footer>
-                <Button label="Không" icon="pi pi-times" text @click="deleteVouchersDialog = false" :disabled="loading" />
-                <Button label="Có" icon="pi pi-check" severity="danger" @click="deleteSelectedVouchers" :loading="loading" />
-            </template>
-        </Dialog>
-    </div>
-</template>
-
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
 import { InputText } from 'primevue';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 // ===== REACTIVE VARIABLES =====
 const toast = useToast();
@@ -501,6 +51,24 @@ const discountTypes = ref([
     { label: 'Số tiền cố định', value: 'SO_TIEN_CO_DINH' }
 ]);
 
+// ===== THÊM CÁC VARIABLES CHO FILTER =====
+const selectedDiscountType = ref(null);
+const selectedStatus = ref(null);
+const filteredVouchers = ref([]);
+
+// Options cho dropdown filter
+const discountTypeOptions = ref([
+    { label: 'Phần trăm', value: 'PHAN_TRAM' },
+    { label: 'Số tiền cố định', value: 'SO_TIEN_CO_DINH' }
+]);
+
+const statusOptions = ref([
+    { label: 'Chưa diễn ra', value: 'CHUA_DIEN_RA' },
+    { label: 'Đang diễn ra', value: 'DANG_DIEN_RA' },
+    { label: 'Đã hết hạn', value: 'DA_KET_THUC' },
+    { label: 'Không hoạt động', value: 'VO_HIEU_HOA' }
+]);
+
 // ===== HÀM TÍNH TOÁN TRẠNG THÁI DỰA TRÊN THỜI GIAN =====
 function getVoucherStatus(voucherData) {
     if (!voucherData.ngayBatDau || !voucherData.ngayKetThuc) {
@@ -533,40 +101,90 @@ function getVoucherStatus(voucherData) {
 
 function getVoucherStatusDisplay(voucherData) {
     const status = getVoucherStatus(voucherData);
-    
+
     switch (status) {
         case 'CHUA_DIEN_RA':
-            return { 
-                label: 'Chưa diễn ra', 
-                severity: 'info', 
-                icon: 'pi pi-clock' 
+            return {
+                label: 'Chưa diễn ra',
+                severity: 'info',
+                icon: 'pi pi-clock'
             };
         case 'DANG_DIEN_RA':
-            return { 
-                label: 'Đang diễn ra', 
-                severity: 'success', 
-                icon: 'pi pi-check-circle' 
+            return {
+                label: 'Đang diễn ra',
+                severity: 'success',
+                icon: 'pi pi-check-circle'
             };
         case 'DA_KET_THUC':
-            return { 
-                label: 'Đã hết hạn', 
-                severity: 'danger', 
-                icon: 'pi pi-times-circle' 
+            return {
+                label: 'Đã hết hạn',
+                severity: 'danger',
+                icon: 'pi pi-times-circle'
             };
         case 'VO_HIEU_HOA':
-            return { 
-                label: 'Không hoạt động', 
-                severity: 'secondary', 
-                icon: 'pi pi-ban' 
+            return {
+                label: 'Không hoạt động',
+                severity: 'secondary',
+                icon: 'pi pi-ban'
             };
         default:
-            return { 
-                label: 'Không xác định', 
-                severity: 'secondary', 
-                icon: 'pi pi-question-circle' 
+            return {
+                label: 'Không xác định',
+                severity: 'secondary',
+                icon: 'pi pi-question-circle'
             };
     }
 }
+
+// ===== FILTER FUNCTIONS =====
+function applyFilters() {
+    let filtered = [...vouchers.value];
+
+    // Lọc theo loại giảm giá
+    if (selectedDiscountType.value) {
+        filtered = filtered.filter((voucher) => voucher.loaiGiamGia === selectedDiscountType.value);
+    }
+
+    // Lọc theo trạng thái
+    if (selectedStatus.value) {
+        filtered = filtered.filter((voucher) => getVoucherStatus(voucher) === selectedStatus.value);
+    }
+
+    filteredVouchers.value = filtered;
+}
+
+function clearFilters() {
+    selectedDiscountType.value = null;
+    selectedStatus.value = null;
+    filteredVouchers.value = [...vouchers.value];
+
+    // Reset global search
+    filters.value.global.value = null;
+
+    toast.add({
+        severity: 'info',
+        summary: 'Thông báo',
+        detail: 'Đã xóa tất cả bộ lọc',
+        life: 2000
+    });
+}
+
+// Computed property để trả về danh sách voucher đã lọc
+const displayedVouchers = computed(() => {
+    if (selectedDiscountType.value || selectedStatus.value) {
+        return filteredVouchers.value;
+    }
+    return vouchers.value;
+});
+
+// Watch để tự động apply filter khi vouchers thay đổi
+watch(
+    vouchers,
+    () => {
+        applyFilters();
+    },
+    { deep: true }
+);
 
 // ===== LIFECYCLE =====
 onMounted(() => {
@@ -585,20 +203,14 @@ function checkDuplicate() {
     }
 
     if (voucher.value.maVoucher) {
-        const existingMa = vouchers.value.find(item => 
-            item.maVoucher === voucher.value.maVoucher && 
-            item.id !== voucher.value.id
-        );
+        const existingMa = vouchers.value.find((item) => item.maVoucher === voucher.value.maVoucher && item.id !== voucher.value.id);
         if (existingMa) {
             duplicateErrors.value.maVoucher = 'Mã voucher đã tồn tại';
         }
     }
 
     if (voucher.value.tenVoucher) {
-        const existingTen = vouchers.value.find(item => 
-            item.tenVoucher.toLowerCase().trim() === voucher.value.tenVoucher.toLowerCase().trim() && 
-            item.id !== voucher.value.id
-        );
+        const existingTen = vouchers.value.find((item) => item.tenVoucher.toLowerCase().trim() === voucher.value.tenVoucher.toLowerCase().trim() && item.id !== voucher.value.id);
         if (existingTen) {
             duplicateErrors.value.tenVoucher = 'Tên voucher đã tồn tại';
         }
@@ -614,92 +226,75 @@ function validateVoucherDuplicates() {
 // ===== VALIDATION FUNCTIONS =====
 function validateVoucherForm() {
     const errors = [];
-    
+
     const isValidNumber = (value) => {
         return value !== null && value !== undefined && value !== '' && !isNaN(value);
     };
-    
+
     if (!voucher.value.tenVoucher || !voucher.value.tenVoucher.trim()) {
         errors.push('Tên voucher là bắt buộc');
     }
-    
+
     if (!voucher.value.loaiGiamGia) {
         errors.push('Loại giảm giá là bắt buộc');
     }
-    
+
     if (voucher.value.loaiGiamGia === 'PHAN_TRAM') {
-        if ( voucher.value.giaTriGiam <= 0 || voucher.value.giaTriGiam > 100) {
+        if (voucher.value.giaTriGiam <= 0 || voucher.value.giaTriGiam > 100) {
             errors.push('Phần trăm giảm phải từ 1% đến 100% và phải là số');
-        }else if(!isValidNumber(voucher.value.giaTriGiam)){
+        } else if (!isValidNumber(voucher.value.giaTriGiam)) {
             errors.push('Phần trăm giảm phải là số');
         }
-    } else if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
-        if ( voucher.value.giaTriGiam <= 0) {
-            errors.push('Số tiền giảm phải lớn hơn 0');
-        } 
-        else if(!isValidNumber(voucher.value.giaTriGiam)){
-            errors.push('Số tiền giảm phải là số');
-        }
-        else if (voucher.value.giaTriGiam >= 100000000) {
-            errors.push('Số tiền giảm phải < 100,000,000 VND');
-        }
     }
-    
+
     if (voucher.value.giaTriGiamToiThieu < 0) {
         errors.push('Giá trị đơn hàng tối thiểu là bắt buộc và phải ≥ 0');
-    }
-    else if (!isValidNumber(voucher.value.giaTriGiamToiThieu)){
+    } else if (!isValidNumber(voucher.value.giaTriGiamToiThieu)) {
         errors.push('Giá trị đơn hàng tối thiểu phải là số');
-    }
-    else if (voucher.value.giaTriGiamToiThieu >= 100000000) {
+    } else if (voucher.value.giaTriGiamToiThieu >= 100000000) {
         errors.push('Giá trị đơn hàng tối thiểu phải < 100,000,000 VND');
     }
-    
+
     if (voucher.value.giaTriGiamToiDa <= 0) {
         errors.push('Giá trị giảm tối đa là bắt buộc và phải > 0');
-    } 
-    else if(!isValidNumber(voucher.value.giaTriGiamToiDa)){
+    } else if (!isValidNumber(voucher.value.giaTriGiamToiDa)) {
         errors.push('Giá trị giảm tối đa phải là số');
-    }
-    else if (voucher.value.giaTriGiamToiDa >= 100000000) {
+    } else if (voucher.value.giaTriGiamToiDa >= 100000000) {
         errors.push('Giá trị giảm tối đa phải < 100,000,000 VND');
     }
-    
+
     if (voucher.value.loaiGiamGia === 'SO_TIEN_CO_DINH') {
-        if (isValidNumber(voucher.value.giaTriGiamToiDa) && isValidNumber(voucher.value.giaTriGiamToiThieu) && 
-            voucher.value.giaTriGiamToiDa > voucher.value.giaTriGiamToiThieu && voucher.value.giaTriGiamToiThieu > 0) {
+        if (isValidNumber(voucher.value.giaTriGiamToiDa) && isValidNumber(voucher.value.giaTriGiamToiThieu) && voucher.value.giaTriGiamToiDa > voucher.value.giaTriGiamToiThieu && voucher.value.giaTriGiamToiThieu > 0) {
             errors.push('Số tiền giảm cố định không được lớn hơn giá trị đơn hàng tối thiểu');
         }
     }
-    
+
     if (voucher.value.soLuong <= 0) {
         errors.push('Số lượng là bắt buộc và phải > 0');
-    }
-    else if (!isValidNumber(voucher.value.soLuong)){
+    } else if (!isValidNumber(voucher.value.soLuong)) {
         errors.push('Số lượng phải là số');
-    }
-    else if (voucher.value.soLuong >= 100000) {
+    } else if (voucher.value.soLuong >= 100000) {
         errors.push('Số lượng phải < 100,000');
     }
-    
+
     if (!voucher.value.ngayBatDau) {
         errors.push('Ngày bắt đầu là bắt buộc');
     }
-    
+
     if (!voucher.value.ngayKetThuc) {
         errors.push('Ngày kết thúc là bắt buộc');
     }
-    
+
     if (voucher.value.ngayBatDau && voucher.value.ngayKetThuc) {
         if (new Date(voucher.value.ngayBatDau) >= new Date(voucher.value.ngayKetThuc)) {
             errors.push('Ngày bắt đầu phải trước ngày kết thúc');
         }
     }
-    
+
     if (voucher.value.trangThai == null) {
         errors.push('Trạng thái là bắt buộc');
     }
-    
+
     return errors;
 }
 
@@ -724,6 +319,14 @@ function validateField(fieldName) {
     }
 }
 
+// Hàm tính toán số thứ tự với pagination
+function getRowIndex(index) {
+    // Lấy thông tin pagination từ DataTable
+    const currentPage = dt.value ? dt.value.d_first / dt.value.d_rows : 0;
+    const rowsPerPage = dt.value ? dt.value.d_rows : 10;
+    return currentPage * rowsPerPage + index + 1;
+}
+
 // ===== API FUNCTIONS =====
 async function fetchData() {
     try {
@@ -737,6 +340,9 @@ async function fetchData() {
             ngayBatDau: item.ngayBatDau ? new Date(item.ngayBatDau) : null,
             ngayKetThuc: item.ngayKetThuc ? new Date(item.ngayKetThuc) : null
         }));
+
+        // 🆕 THÊM DÒNG NÀY
+        filteredVouchers.value = [...vouchers.value];
 
         console.log('✅ Processed vouchers:', vouchers.value);
     } catch (error) {
@@ -929,16 +535,14 @@ async function saveVoucher() {
     submitted.value = true;
 
     const formErrors = validateVoucherForm();
-    
+
     if (!validateVoucherDuplicates()) {
         formErrors.push('Voucher đã tồn tại');
     }
 
     if (formErrors.length > 0) {
-        const errorMessage = formErrors.length === 1 
-            ? formErrors[0] 
-            : `Vui lòng kiểm tra lại:\n• ${formErrors.join('\n• ')}`;
-            
+        const errorMessage = formErrors.length === 1 ? formErrors[0] : `Vui lòng kiểm tra lại:\n• ${formErrors.join('\n• ')}`;
+
         toast.add({
             severity: 'warn',
             summary: 'Không để trống thông tin ',
@@ -997,7 +601,7 @@ async function saveVoucher() {
         clearFile();
     } catch (error) {
         console.error('💥 Save error:', error);
-        
+
         let errorMessage = 'Lưu voucher thất bại';
         if (error.response?.data?.message) {
             errorMessage = error.response.data.message;
@@ -1006,7 +610,7 @@ async function saveVoucher() {
         } else if (error.response?.data) {
             errorMessage = error.response.data;
         }
-        
+
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
@@ -1024,8 +628,8 @@ async function saveVoucher() {
 async function deactivateVoucher(voucherData) {
     try {
         loading.value = true;
-        const updatedVoucher = { 
-            ...voucherData, 
+        const updatedVoucher = {
+            ...voucherData,
             trangThai: 0,
             ngayBatDau: new Date(voucherData.ngayBatDau).toISOString().split('T')[0],
             ngayKetThuc: new Date(voucherData.ngayKetThuc).toISOString().split('T')[0]
@@ -1144,10 +748,11 @@ function exportCSV() {
             return;
         }
 
-        const headers = ['ID', 'Mã Voucher', 'Tên Voucher', 'Hình Ảnh', 'Loại giảm giá', 'Giá trị giảm', 'Đơn hàng tối thiểu', 'Giảm tối đa', 'Số lượng', 'Ngày Bắt Đầu', 'Ngày Kết Thúc', 'Trạng Thái'];
+        const headers = ['STT', 'Mã Voucher', 'Tên Voucher', 'Hình Ảnh', 'Loại giảm giá', 'Giá trị giảm', 'Đơn hàng tối thiểu', 'Giảm tối đa', 'Số lượng', 'Ngày Bắt Đầu', 'Ngày Kết Thúc', 'Trạng Thái'];
 
-        const csvData = vouchers.value.map((item) => [
-            item.id || '',
+        const csvData = vouchers.value.map((item, ind) => [
+            // item.id || '',
+            ind + 1,
             item.maVoucher || '',
             item.tenVoucher || '',
             item.duongDanHinhAnh || '',
@@ -1209,6 +814,399 @@ function exportCSV() {
     }
 }
 </script>
+
+<template>
+    <div class="card">
+        <Toast />
+        <Toolbar class="mb-4">
+            <template #start>
+                <Button label="Thêm mới" icon="pi pi-plus" severity="secondary" class="mr-2" @click="openNew" :loading="loading" />
+                <Button label="Xóa" icon="pi pi-trash" severity="secondary" @click="confirmDeleteSelected" :disabled="!selectedVouchers || !selectedVouchers.length" :loading="loading" />
+            </template>
+            <template #end>
+                <Button label="Xuất CSV" icon="pi pi-upload" severity="primary" @click="exportCSV" :loading="loading" />
+            </template>
+        </Toolbar>
+
+        <DataTable
+            ref="dt"
+            v-model:selection="selectedVouchers"
+            :value="displayedVouchers"
+            dataKey="id"
+            :paginator="true"
+            :rows="10"
+            :filters="filters"
+            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+            :rowsPerPageOptions="[5, 10, 25]"
+            currentPageReportTemplate="Hiển thị {first} đến {last} của {totalRecords} voucher"
+        >
+            <template #header>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="m-1">🎫 Quản lý Voucher</h2>
+                </div>
+            </template>
+            <!-- 🆕 THÊM BỘ LỌC VÀO ĐÂY -->
+            <div class="mb-4 rounded-lg border bg-white p-4 shadow-sm">
+                <div class="mb-3 flex items-center gap-2">
+                    <i class="pi pi-filter text-blue-600"></i>
+                    <h5 class="m-0 font-semibold">Bộ lọc</h5>
+                </div>
+                <div class="grid grid-cols-12 gap-4">
+                    <!-- Lọc theo Loại giảm giá -->
+                    <div class="col-span-6 md:col-span-4">
+                        <label class="mb-2 block text-sm font-medium">Loại giảm giá</label>
+                        <Select v-model="selectedDiscountType" :options="discountTypeOptions" optionLabel="label" optionValue="value" placeholder="Tất cả loại giảm giá" showClear fluid @change="applyFilters" />
+                    </div>
+
+                    <!-- Lọc theo Trạng thái -->
+                    <div class="col-span-6 md:col-span-4">
+                        <label class="mb-2 block text-sm font-medium">Trạng thái</label>
+                        <Select v-model="selectedStatus" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Tất cả trạng thái" showClear fluid @change="applyFilters" />
+                    </div>
+
+                    <!-- Nút reset filter -->
+                    <div class="col-span-12 md:col-span-4">
+                        <label class="mb-2 block text-sm font-medium">Tìm kiếm</label>
+                        <IconField>
+                            <InputIcon>
+                                <i class="pi pi-search" />
+                            </InputIcon>
+                            <InputText v-model="filters['global'].value" placeholder="Tìm kiếm..." />
+                        </IconField>
+                    </div>
+                </div>
+            </div>
+
+            <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
+            <!-- <Column field="id" header="ID" sortable style="min-width: 8rem"></Column> -->
+            <Column field="STT" header="STT" sortable style="min-width: 8rem">
+                <template #body="slotProps">
+                    {{ getRowIndex(slotProps.index) }}
+                </template>
+            </Column>
+            <Column field="maVoucher" header="Mã Voucher" sortable style="min-width: 12rem"></Column>
+            <Column field="tenVoucher" header="Tên Voucher" sortable style="min-width: 16rem"></Column>
+
+            <!-- CỘT HÌNH ẢNH (FIXED) -->
+            <Column header="Hình ảnh" style="min-width: 12rem">
+                <template #body="slotProps">
+                    <div class="flex justify-center">
+                        <img
+                            v-if="slotProps.data.duongDanHinhAnh"
+                            :src="`http://localhost:8080${slotProps.data.duongDanHinhAnh}`"
+                            :alt="slotProps.data.tenVoucher"
+                            class="h-16 w-16 cursor-pointer rounded border object-cover shadow-sm transition-transform hover:scale-105"
+                            @click="previewImage(slotProps.data)"
+                            @error="handleImageError($event)"
+                        />
+                        <div v-else class="flex h-16 w-16 items-center justify-center rounded border bg-gray-100">
+                            <i class="pi pi-image text-gray-400"></i>
+                        </div>
+                    </div>
+                </template>
+            </Column>
+
+            <Column field="loaiGiamGia" header="Loại giảm giá" sortable style="min-width: 12rem"></Column>
+            <Column field="giaTriGiam" header="Giá trị giảm" sortable style="min-width: 12rem">
+                <template #body="slotProps">
+                    <span v-if="slotProps.data.loaiGiamGia === 'PHAN_TRAM'">{{ slotProps.data.giaTriGiam }}%</span>
+                    <span v-else>{{ formatCurrency(slotProps.data.giaTriGiam) }}</span>
+                </template>
+            </Column>
+            <Column field="giaTriGiamToiThieu" header="Đơn hàng tối thiểu" sortable style="min-width: 12rem">
+                <template #body="slotProps">{{ formatCurrency(slotProps.data.giaTriGiamToiThieu) }}</template>
+            </Column>
+            <Column field="giaTriGiamToiDa" header="Giảm tối đa" sortable style="min-width: 12rem">
+                <template #body="slotProps">{{ formatCurrency(slotProps.data.giaTriGiamToiDa) }}</template>
+            </Column>
+            <Column field="soLuong" header="Số lượng" sortable style="min-width: 10rem"></Column>
+            <Column field="ngayBatDau" header="Ngày bắt đầu" sortable style="min-width: 12rem">
+                <template #body="slotProps">{{ formatDate(slotProps.data.ngayBatDau) }}</template>
+            </Column>
+            <Column field="ngayKetThuc" header="Ngày kết thúc" sortable style="min-width: 12rem">
+                <template #body="slotProps">{{ formatDate(slotProps.data.ngayKetThuc) }}</template>
+            </Column>
+
+            <!-- CỘT TRẠNG THÁI ĐÃ CẬP NHẬT -->
+            <Column field="trangThai" header="Trạng thái" sortable style="min-width: 12rem">
+                <template #body="slotProps">
+                    <Tag :severity="getVoucherStatusDisplay(slotProps.data).severity">
+                        <div class="flex items-center gap-2">
+                            <i :class="getVoucherStatusDisplay(slotProps.data).icon"></i>
+                            <span>{{ getVoucherStatusDisplay(slotProps.data).label }}</span>
+                        </div>
+                    </Tag>
+                </template>
+            </Column>
+
+            <Column :exportable="false" style="width: 10rem">
+                <template #body="slotProps">
+                    <div class="flex justify-center gap-2">
+                        <Button icon="pi pi-pencil" outlined rounded size="small" @click="editVoucher(slotProps.data)" :disabled="loading" />
+                        <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteVoucher(slotProps.data)" :disabled="loading" />
+                        <!-- CHỈ CHO PHÉP THAY ĐỔI TRẠNG THÁI KHI ĐANG ACTIVE -->
+                        <Button
+                            icon="pi pi-ban"
+                            outlined
+                            rounded
+                            severity="warning"
+                            size="small"
+                            @click="deactivateVoucher(slotProps.data)"
+                            :disabled="loading || getVoucherStatus(slotProps.data) !== 'DANG_DIEN_RA' || slotProps.data.trangThai === 0"
+                            v-tooltip.top="'Đặt không hoạt động'"
+                        />
+                    </div>
+                </template>
+            </Column>
+        </DataTable>
+
+        <!-- DIALOG THÊM/SỬA VOUCHER với validation cải thiện -->
+        <Dialog v-model:visible="voucherDialog" :style="{ width: '600px' }" header="Chi tiết Voucher" :modal="true">
+            <div class="flex flex-col gap-6">
+                <!-- Mã Voucher -->
+                <div>
+                    <label for="maVoucher" class="mb-3 block font-bold">Mã Voucher</label>
+                    <InputText id="maVoucher" v-model.trim="voucher.maVoucher" fluid readonly="true" class="bg-gray-50" />
+                </div>
+
+                <!-- Tên Voucher -->
+                <div>
+                    <label for="tenVoucher" class="mb-3 block font-bold"> Tên Voucher <span class="text-red-500">*</span> </label>
+                    <InputText
+                        id="tenVoucher"
+                        v-model.trim="voucher.tenVoucher"
+                        required="true"
+                        :invalid="submitted && (!voucher.tenVoucher || duplicateErrors.tenVoucher)"
+                        fluid
+                        @blur="validateField('tenVoucher')"
+                        @input="
+                            () => {
+                                if (submitted) validateField('tenVoucher');
+                            }
+                        "
+                        placeholder="Nhập tên voucher..."
+                    />
+                    <small v-if="submitted && !voucher.tenVoucher" class="text-red-500"> Tên voucher là bắt buộc. </small>
+                    <small v-else-if="submitted && duplicateErrors.tenVoucher" class="text-red-500">
+                        {{ duplicateErrors.tenVoucher }}
+                    </small>
+                </div>
+
+                <!-- PHẦN UPLOAD FILE -->
+                <div>
+                    <label class="mb-3 block font-bold">Hình ảnh voucher</label>
+                    <div class="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition-colors hover:border-blue-400" @click="$refs.fileInput.click()">
+                        <input type="file" ref="fileInput" @change="handleFileSelect" accept="image/*" class="hidden" />
+
+                        <!-- Hiển thị hình ảnh preview -->
+                        <div v-if="imagePreview" class="mb-4">
+                            <img :src="imagePreview" alt="Preview" class="mx-auto max-h-48 max-w-full rounded border shadow-sm" />
+                            <p class="mt-2 text-sm text-gray-600">{{ selectedFileName }}</p>
+                        </div>
+
+                        <!-- Nút chọn file -->
+                        <div v-else class="mb-4">
+                            <i class="pi pi-cloud-upload mb-4 text-4xl text-gray-400"></i>
+                            <p class="text-gray-600">Nhấn để chọn hình ảnh</p>
+                            <p class="text-sm text-gray-400">JPG, PNG, GIF, WEBP (Tối đa 5MB)</p>
+                        </div>
+
+                        <div class="flex justify-center gap-2" @click.stop>
+                            <Button label="Chọn file" icon="pi pi-upload" @click="$refs.fileInput.click()" severity="secondary" />
+                            <Button v-if="imagePreview" label="Xóa" icon="pi pi-times" @click="clearFile" severity="danger" outlined />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loại Giảm Giá -->
+                <div>
+                    <label for="loaiGiamGia" class="mb-3 block font-bold"> Loại giảm giá <span class="text-red-500">*</span> </label>
+                    <Select
+                        id="loaiGiamGia"
+                        v-model="voucher.loaiGiamGia"
+                        :options="discountTypes"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Chọn loại giảm giá..."
+                        fluid
+                        :invalid="submitted && !voucher.loaiGiamGia"
+                        @change="validateField('loaiGiamGia')"
+                    />
+                    <small v-if="submitted && !voucher.loaiGiamGia" class="text-red-500"> Loại giảm giá là bắt buộc. </small>
+                </div>
+
+                <!-- Giá Trị Giảm (theo loại) -->
+                <div v-if="voucher.loaiGiamGia === 'PHAN_TRAM'">
+                    <label for="giaTriGiam" class="mb-3 block font-bold"> Phần trăm giảm (1% - 100%) <span class="text-red-500">*</span> </label>
+                    <InputText
+                        id="giaTriGiam"
+                        v-model="voucher.giaTriGiam"
+                        fluid
+                        :min="1"
+                        :max="100"
+                        suffix="%"
+                        :invalid="submitted && (!isValidNumber(voucher.giaTriGiam) || voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)"
+                        @blur="validateField('giaTriGiam')"
+                        placeholder="Nhập % giảm..."
+                    />
+                    <small v-if="submitted && (voucher.giaTriGiam <= 0 || voucher.giaTriGiam > 100)" class="text-red-500"> Phần trăm giảm là bắt buộc phải từ 1% đến 100%. </small>
+                    <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiam)" class="text-red-500"> Phần trăm giảm phải là số. </small>
+                </div>
+
+                <!-- <div v-else-if="voucher.loaiGiamGia === 'SO_TIEN_CO_DINH'">
+                    <label for="giaTriGiam" class="mb-3 block font-bold">
+                        Số tiền giảm (VND) <span class="text-red-500">*</span>
+                    </label>
+                    <InputText
+                        id="giaTriGiam" 
+                        v-model="voucher.giaTriGiam" 
+                        fluid 
+                        :min="1000"
+                        :max="99999999"
+                        mode="currency"
+                        currency="VND"
+                        locale="vi-VN"
+                        :invalid="submitted && (!isValidNumber(voucher.giaTriGiam) || voucher.giaTriGiam <= 0 || voucher.giaTriGiam >= 100000000)"
+                        @blur="validateField('giaTriGiam')"
+                        placeholder="Nhập số tiền giảm..."
+                    />
+                    <small v-if="submitted && ( voucher.giaTriGiam <= 0)" class="text-red-500">
+                        Số tiền giảm phải lớn hơn 0.
+                    </small>
+                    <small v-else-if="submitted && voucher.giaTriGiam >= 100000000" class="text-red-500">
+                        Số tiền giảm phải < 100,000,000 VND.
+                    </small>
+                    <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiam)" class="text-red-500">
+                        Số tiền giảm phải là số.
+                    </small>
+                </div> -->
+
+                <!-- Đơn hàng tối thiểu và Giảm tối đa -->
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-6">
+                        <label for="giaTriGiamToiThieu" class="mb-3 block font-bold"> Đơn hàng tối thiểu (VND) <span class="text-red-500">*</span> </label>
+                        <InputText
+                            id="giaTriGiamToiThieu"
+                            v-model="voucher.giaTriGiamToiThieu"
+                            fluid
+                            :min="0"
+                            :max="99999999"
+                            mode="currency"
+                            currency="VND"
+                            locale="vi-VN"
+                            :invalid="submitted && (!isValidNumber(voucher.giaTriGiamToiThieu) || voucher.giaTriGiamToiThieu < 0 || voucher.giaTriGiamToiThieu >= 100000000)"
+                            @blur="validateField('giaTriGiamToiThieu')"
+                            placeholder="Nhập giá trị đơn hàng tối thiểu..."
+                        />
+                        <small v-if="submitted && voucher.giaTriGiamToiThieu <= 0" class="text-red-500"> Giá trị đơn hàng tối thiểu là bắt buộc và phải > 0. </small>
+                        <small v-else-if="submitted && voucher.giaTriGiamToiThieu >= 100000000" class="text-red-500"> Giá trị phải < 100,000,000 VND. </small>
+                        <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiamToiThieu)" class="text-red-500"> Giá trị đơn hàng tối thiểu phải là số. </small>
+                    </div>
+                    <div class="col-span-6">
+                        <label for="giaTriGiamToiDa" class="mb-3 block font-bold"> Giảm tối đa (VND) <span class="text-red-500">*</span> </label>
+                        <InputText
+                            id="giaTriGiamToiDa"
+                            v-model="voucher.giaTriGiamToiDa"
+                            fluid
+                            :min="1000"
+                            :max="99999999"
+                            mode="currency"
+                            currency="VND"
+                            locale="vi-VN"
+                            :invalid="submitted && (!isValidNumber(voucher.giaTriGiamToiDa) || voucher.giaTriGiamToiDa <= 0 || voucher.giaTriGiamToiDa >= 100000000)"
+                            @blur="validateField('giaTriGiamToiDa')"
+                            placeholder="Nhập giá trị giảm tối đa..."
+                        />
+                        <small v-if="submitted && voucher.giaTriGiamToiDa <= 0" class="text-red-500"> Giá trị giảm tối đa là bắt buộc và phải > 0. </small>
+                        <small v-else-if="submitted && voucher.giaTriGiamToiDa >= 100000000" class="text-red-500"> Giá trị phải < 100,000,000 VND. </small>
+                        <small v-else-if="submitted && !isValidNumber(voucher.giaTriGiamToiDa)" class="text-red-500"> Giá trị giảm tối đa phải là số. </small>
+                    </div>
+                </div>
+
+                <!-- Số Lượng -->
+                <div>
+                    <label for="soLuong" class="mb-3 block font-bold"> Số lượng <span class="text-red-500">*</span> </label>
+                    <InputText
+                        id="soLuong"
+                        v-model="voucher.soLuong"
+                        fluid
+                        :min="1"
+                        :max="99999"
+                        :invalid="submitted && (!isValidNumber(voucher.soLuong) || voucher.soLuong <= 0 || voucher.soLuong >= 100000)"
+                        @blur="validateField('soLuong')"
+                        placeholder="Nhập số lượng voucher (1-99,999)..."
+                    />
+                    <small v-if="submitted && voucher.soLuong <= 0" class="text-red-500"> Số lượng là bắt buộc và phải > 0. </small>
+                    <small v-else-if="submitted && voucher.soLuong >= 100000" class="text-red-500"> Số lượng phải < 100,000. </small>
+                    <small v-else-if="submitted && !isValidNumber(voucher.soLuong)" class="text-red-500"> Số lượng phải là số. </small>
+                </div>
+
+                <!-- Ngày bắt đầu và Ngày kết thúc -->
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-6">
+                        <label for="ngayBatDau" class="mb-3 block font-bold"> Ngày bắt đầu <span class="text-red-500">*</span> </label>
+                        <Calendar id="ngayBatDau" v-model="voucher.ngayBatDau" showIcon fluid dateFormat="dd/mm/yy" :invalid="submitted && !voucher.ngayBatDau" @date-select="validateField('ngayBatDau')" placeholder="Chọn ngày bắt đầu..." />
+                        <small v-if="submitted && !voucher.ngayBatDau" class="text-red-500"> Ngày bắt đầu là bắt buộc. </small>
+                    </div>
+                    <div class="col-span-6">
+                        <label for="ngayKetThuc" class="mb-3 block font-bold"> Ngày kết thúc <span class="text-red-500">*</span> </label>
+                        <Calendar id="ngayKetThuc" v-model="voucher.ngayKetThuc" showIcon fluid dateFormat="dd/mm/yy" :invalid="submitted && !voucher.ngayKetThuc" @date-select="validateField('ngayKetThuc')" placeholder="Chọn ngày kết thúc..." />
+                        <small v-if="submitted && !voucher.ngayKetThuc" class="text-red-500"> Ngày kết thúc là bắt buộc. </small>
+                    </div>
+                </div>
+
+                <!-- TRẠNG THÁI CHỈ CHO SỬA KHI ĐANG ACTIVE -->
+                <div>
+                    <label for="trangThai" class="mb-3 block font-bold"> Trạng thái thủ công <span class="text-red-500">*</span> </label>
+                    <Select id="trangThai" v-model="voucher.trangThai" :options="manualStatuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái..." fluid :invalid="submitted && voucher.trangThai == null" />
+                    <small v-if="submitted && voucher.trangThai == null" class="text-red-500"> Trạng thái là bắt buộc. </small>
+                </div>
+            </div>
+
+            <template #footer>
+                <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
+                <Button label="Lưu" icon="pi pi-check" @click="saveVoucher" :loading="uploading || loading" :disabled="uploading || loading" />
+            </template>
+        </Dialog>
+
+        <!-- DIALOG XEM HÌNH ẢNH FULL SIZE -->
+        <Dialog v-model:visible="imagePreviewDialog" :style="{ width: '800px' }" header="Xem hình ảnh voucher" :modal="true">
+            <div class="text-center">
+                <img :src="previewImageSrc" :alt="previewImageName" class="max-h-96 max-w-full rounded object-contain shadow" />
+                <div class="mt-4 text-sm text-gray-600">
+                    <p><strong>Voucher:</strong> {{ previewImageName }}</p>
+                    <p><strong>Đường dẫn:</strong> {{ previewImagePath }}</p>
+                </div>
+            </div>
+        </Dialog>
+
+        <!-- Delete confirmation dialogs -->
+        <Dialog v-model:visible="deleteVoucherDialog" :style="{ width: '450px' }" header="Xác nhận" :modal="true">
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <span v-if="voucher"
+                    >Bạn có chắc muốn xóa voucher <b>{{ voucher.tenVoucher }}</b
+                    >?</span
+                >
+            </div>
+            <template #footer>
+                <Button label="Không" icon="pi pi-times" text @click="deleteVoucherDialog = false" :disabled="loading" />
+                <Button label="Có" icon="pi pi-check" severity="danger" @click="deleteVoucher" :loading="loading" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="deleteVouchersDialog" :style="{ width: '450px' }" header="Xác nhận" :modal="true">
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <span>Bạn có chắc muốn xóa các voucher đã chọn?</span>
+            </div>
+            <template #footer>
+                <Button label="Không" icon="pi pi-times" text @click="deleteVouchersDialog = false" :disabled="loading" />
+                <Button label="Có" icon="pi pi-check" severity="danger" @click="deleteSelectedVouchers" :loading="loading" />
+            </template>
+        </Dialog>
+    </div>
+</template>
 
 <style scoped>
 .card {

@@ -1,5 +1,5 @@
-<script setup></script>
-import * as THREE from 'three';
+<script setup>import * as THREE from 'three';</script>
+
 <template>
     <router-view />
 </template>

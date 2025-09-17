@@ -1,117 +1,3 @@
-<script setup>
-import ProductCard from "@/components/user/PopularProductsCard.vue";
-import ProductService from "@/services/ProductService";
-import "swiper/css";
-import { Keyboard } from "swiper/modules";
-import { Swiper, SwiperSlide } from "swiper/vue";
-import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
-
-const router = useRouter();
-const slidesPerViewVar = ref(4);
-const products = ref([]);
-const loading = ref(true);
-
-// Responsive slides
-const updateSlidesPerView = () => {
-  const width = window.innerWidth;
-  slidesPerViewVar.value = width >= 1440 ? 4 : width >= 1024 ? 3 : width >= 500 ? 2 : 1;
-};
-
-window.addEventListener("resize", updateSlidesPerView);
-
-// Lấy 4 sản phẩm phổ biến từ API
-const fetchPopularProducts = async () => {
-  try {
-    loading.value = true;
-    console.log('🔄 Starting fetchPopularProducts...');
-    
-    // Kiểm tra ProductService
-    if (!ProductService) {
-      throw new Error('ProductService is not available');
-    }
-    
-    // Khởi tạo ProductService
-    console.log('📡 Initializing ProductService...');
-    await ProductService.initialize();
-    
-    // Lấy tất cả sản phẩm từ service
-    console.log('📦 Getting products from service...');
-    const allProducts = ProductService.getProductsForList();
-    console.log('📊 Total products from service:', allProducts.length);
-    
-    if (allProducts.length === 0) {
-      console.warn('⚠️ No products returned from service');
-      products.value = [];
-      return;
-    }
-    
-    // Lọc sản phẩm có giá > 0 và có hình ảnh
-    const validProducts = allProducts.filter(p => p.price > 0);
-    console.log('✅ Valid products (price > 0):', validProducts.length);
-    
-    if (validProducts.length === 0) {
-      console.warn('⚠️ No valid products found');
-      products.value = [];
-      return;
-    }
-    
-    // Shuffle ngẫu nhiên để tạo cảm giác "phổ biến"
-    const shuffledProducts = validProducts.sort(() => 0.5 - Math.random());
-    
-    // Lấy 4 sản phẩm đầu tiên
-    const selectedProducts = shuffledProducts.slice(0, 4);
-    console.log('🎯 Selected products:', selectedProducts.length);
-    
-    products.value = selectedProducts.map(product => ({
-      id: product.id,
-      firstDetailId: product.firstDetailId,
-      imgURL: product.imgUrl || '/placeholder-shoe.png',
-      name: product.label,
-      price: product.price,
-      originalPrice: product.originalPrice,
-      rating: product.rating,
-      brand: product.brandName,
-      category: product.categoryName
-    }));
-    
-    console.log('✅ Popular products loaded:', products.value.length);
-    console.log('📋 Products data:', products.value);
-    
-  } catch (error) {
-    console.error('❌ Error fetching popular products:', error);
-    console.error('📊 Error details:', {
-      message: error.message,
-      stack: error.stack
-    });
-    products.value = [];
-  } finally {
-    loading.value = false;
-  }
-};
-
-// Xử lý click vào sản phẩm
-const handleProductClick = (product) => {
-  // Chuyển đến trang chi tiết sản phẩm
-  if (product.firstDetailId) {
-    router.push(`/product/${product.firstDetailId}`);
-  } else {
-    // Fallback: chuyển đến trang danh sách sản phẩm
-    router.push('/products');
-  }
-};
-
-// Xử lý click vào "Xem tất cả"
-const viewAllProducts = () => {
-  router.push('/products');
-};
-
-onMounted(() => {
-  updateSlidesPerView();
-  fetchPopularProducts();
-});
-</script>
-
 <template>
   <section class="flex flex-col max-container popular-products-section">
     <div class="flex flex-col gap-5 justify-start">
@@ -227,6 +113,209 @@ onMounted(() => {
     </div>
   </section>
 </template>
+
+<script setup>
+import ProductCard from "@/components/user/PopularProductsCard.vue";
+import axios from 'axios';
+import "swiper/css";
+import { Keyboard } from "swiper/modules";
+import { Swiper, SwiperSlide } from "swiper/vue";
+import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+const slidesPerViewVar = ref(4);
+const products = ref([]);
+const loading = ref(true);
+
+// Responsive slides
+const updateSlidesPerView = () => {
+  const width = window.innerWidth;
+  slidesPerViewVar.value = width >= 1440 ? 4 : width >= 1024 ? 3 : width >= 500 ? 2 : 1;
+};
+
+window.addEventListener("resize", updateSlidesPerView);
+
+// Method để lấy URL hình ảnh với fallback
+const getImageUrl = (product) => {
+  // Kiểm tra nếu có imgURL trực tiếp và hợp lệ
+  if (product.imgURL && 
+      product.imgURL.trim() !== '' && 
+      product.imgURL !== 'null' && 
+      product.imgURL !== 'undefined' &&
+      !product.imgURL.includes('null')) {
+    return product.imgURL;
+  }
+  
+  // Fallback sang SVG placeholder ngay
+  return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4=';
+};
+
+// FETCH POPULAR PRODUCTS ĐÃ SỬA HOÀN TOÀN
+const fetchPopularProducts = async () => {
+  try {
+    loading.value = true;
+    console.log('🔄 Starting fetchPopularProducts...');
+    
+    // Lấy danh sách từ API
+    const [productsResponse, detailsResponse, imagesResponse] = await Promise.all([
+      axios.get('http://localhost:8080/api/san-pham'),
+      axios.get('http://localhost:8080/api/san-pham-chi-tiet'),
+      axios.get('http://localhost:8080/hinh-anh')
+    ]);
+    
+    console.log('📦 Products API Response:', productsResponse.data.length, 'products');
+    console.log('📋 Details API Response:', detailsResponse.data.length, 'details');
+    console.log('🖼️ Images API Response:', imagesResponse.data.length, 'images');
+    
+    if (!productsResponse.data || productsResponse.data.length === 0) {
+      console.warn('⚠️ No products data received from API');
+      products.value = [];
+      return;
+    }
+    
+    // Tạo map hình ảnh theo ID
+    const imageMap = new Map();
+    imagesResponse.data.forEach(image => {
+      imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
+    });
+    
+    const firstDetailMap = new Map();
+    const priceMap = new Map();
+    const productImageMap = new Map();
+    
+    // Xử lý từng detail để extract thông tin
+    detailsResponse.data.forEach((detail) => {
+      if (detail.sanPham?.id) {
+        const productId = detail.sanPham.id;
+        
+        // Map first detail ID
+        if (!firstDetailMap.has(productId)) {
+          firstDetailMap.set(productId, detail.id);
+        }
+        
+        // Map price info
+        if (detail.giaBan && (!priceMap.has(productId) || detail.giaBan < priceMap.get(productId).giaBan)) {
+          priceMap.set(productId, {
+            giaBan: detail.giaBan,
+            giaGoc: detail.giaGoc
+          });
+        }
+        
+        // XỬ LÝ HÌNH ẢNH THEO ENTITY MỚI
+        if (!productImageMap.has(productId) && detail.hinhAnh) {
+          console.log(`🎨 Processing image for detail ${detail.id}:`, detail.hinhAnh);
+          
+          let finalImageUrl = null;
+          
+          if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
+            // Trường hợp API trả về object với id
+            if (detail.hinhAnh.id) {
+              finalImageUrl = imageMap.get(detail.hinhAnh.id);
+              console.log(`✅ Found image by ID ${detail.hinhAnh.id}:`, finalImageUrl);
+            }
+            // Trường hợp API trả về object đầy đủ
+            else if (detail.hinhAnh.fullUrl) {
+              finalImageUrl = detail.hinhAnh.fullUrl;
+              console.log(`✅ Using fullUrl:`, finalImageUrl);
+            } else if (detail.hinhAnh.duongDan) {
+              const duongDan = detail.hinhAnh.duongDan;
+              if (duongDan.startsWith('http')) {
+                finalImageUrl = duongDan;
+              } else if (duongDan.startsWith('/hinh-anh/')) {
+                finalImageUrl = 'http://localhost:8080' + duongDan;
+              } else {
+                finalImageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
+              }
+              console.log(`✅ Built URL from duongDan:`, finalImageUrl);
+            }
+          } else if (typeof detail.hinhAnh === 'number') {
+            // Trường hợp API trả về ID number trực tiếp
+            finalImageUrl = imageMap.get(detail.hinhAnh);
+            console.log(`✅ Found image by number ID ${detail.hinhAnh}:`, finalImageUrl);
+          }
+          
+          if (finalImageUrl) {
+            productImageMap.set(productId, finalImageUrl);
+            console.log(`🎯 Final image URL for product ${productId}:`, finalImageUrl);
+          } else {
+            console.log(`❌ No valid image URL found for detail ${detail.id}`);
+          }
+        }
+      }
+    });
+    
+    // Map sản phẩm với thông tin từ chi tiết
+    const allProducts = productsResponse.data.map((p) => {
+      const priceInfo = priceMap.get(p.id) || { giaBan: 0, giaGoc: 0 };
+      const imageUrl = productImageMap.get(p.id);
+      const firstDetailId = firstDetailMap.get(p.id);
+      
+      return {
+        id: p.id,
+        firstDetailId: firstDetailId,
+        imgURL: imageUrl, // SỬ DỤNG imgURL để match với template
+        name: p.tenSanPham || 'Sản phẩm không tên',
+        price: priceInfo.giaBan,
+        originalPrice: priceInfo.giaGoc,
+        rating: 4.5 + (Math.random() * 0.5),
+        brand: p.thuongHieu?.tenThuongHieu || '',
+        category: p.danhMuc?.tenDanhMuc || ''
+      };
+    });
+    
+    // Lọc sản phẩm có giá > 0 và shuffle
+    const validProducts = allProducts.filter(p => p.price > 0);
+    console.log('✅ Valid products (price > 0):', validProducts.length);
+    
+    if (validProducts.length === 0) {
+      console.warn('⚠️ No valid products found');
+      products.value = [];
+      return;
+    }
+    
+    // Shuffle ngẫu nhiên để tạo cảm giác "phổ biến"
+    const shuffledProducts = validProducts.sort(() => 0.5 - Math.random());
+    
+    // Lấy 4 sản phẩm đầu tiên cho swiper
+    products.value = shuffledProducts.slice(0, 4);
+    
+    console.log('🎯 Popular products loaded:', products.value.length);
+    console.log('📊 Products with images:', products.value.filter(p => p.imgURL).length);
+    console.log('📋 Products data:', products.value);
+    
+  } catch (error) {
+    console.error('❌ Error fetching popular products:', error);
+    console.error('📊 Error details:', {
+      message: error.message,
+      stack: error.stack
+    });
+    products.value = [];
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Xử lý click vào sản phẩm
+const handleProductClick = (product) => {
+  if (product.firstDetailId) {
+    router.push(`/product/${product.firstDetailId}`);
+  } else {
+    console.warn('No firstDetailId found for product:', product);
+    router.push('/products');
+  }
+};
+
+// Xử lý click vào "Xem tất cả"
+const viewAllProducts = () => {
+  router.push('/products');
+};
+
+onMounted(() => {
+  updateSlidesPerView();
+  fetchPopularProducts();
+});
+</script>
 
 <style lang="scss" scoped>
 .popular-products-section {

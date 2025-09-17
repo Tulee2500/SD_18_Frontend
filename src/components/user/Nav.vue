@@ -1,14 +1,15 @@
 <script setup>
-import headerLogo from '@/assets/images/header-logo.svg';
 import { navLinks } from '@/constants/index.js';
+import headerLogo from '@/layout/composables/logo.png';
+import axios from 'axios';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const router = useRouter();
 const route = useRoute();
-
+const API_BASE_URL = 'http://localhost:8080';
 // State
-const cartItemCount = ref(3);
+const cartItemCount = ref(0);
 const secondNavOpen = ref(false);
 const user = ref(null);
 const isUserDropdownOpen = ref(false);
@@ -30,9 +31,9 @@ const userInitial = computed(() => {
 const userRole = computed(() => {
     if (!user.value) return '';
     const roles = {
-        'ADMIN': 'Quản trị viên',
-        'NHANVIEN': 'Nhân viên',
-        'USER': 'Khách hàng'
+        ADMIN: 'Quản trị viên',
+        NHANVIEN: 'Nhân viên',
+        USER: 'Khách hàng'
     };
     return roles[user.value.vaiTro] || user.value.vaiTro;
 });
@@ -44,7 +45,6 @@ const isActiveRoute = (href) => {
 // Methods
 const navToggler = () => {
     secondNavOpen.value = !secondNavOpen.value;
-    // Prevent body scroll when mobile menu is open
     document.body.style.overflow = secondNavOpen.value ? 'hidden' : '';
 };
 
@@ -72,6 +72,69 @@ const loadUserData = () => {
     }
 };
 
+// Hàm đếm số lượng sản phẩm trong giỏ hàng
+const updateCartCount = async () => {
+    const token = localStorage.getItem('auth_token');
+
+    // Nếu chưa đăng nhập, set về 0
+    if (!token) {
+        cartItemCount.value = 0;
+        return;
+    }
+
+    try {
+        console.log('📦 Fetching cart count from backend...');
+
+        const response = await axios.get(`${API_BASE_URL}/api/gio-hang/current`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Response.data là array của CartItemResponse
+        if (Array.isArray(response.data)) {
+            // Tính tổng số lượng từ backend response
+            const totalQuantity = response.data.reduce((total, item) => total + (item.quantity || 0), 0);
+            cartItemCount.value = totalQuantity;
+            console.log('✅ Cart count from backend:', totalQuantity);
+        } else {
+            cartItemCount.value = 0;
+        }
+    } catch (error) {
+        console.error('❌ Error fetching cart count:', error);
+
+        // Nếu lỗi 401 (unauthorized), clear token và set count = 0
+        if (error.response?.status === 401) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user_info');
+            cartItemCount.value = 0;
+            user.value = null;
+        } else {
+            // Các lỗi khác, giữ nguyên count hiện tại
+            console.log('Keeping current cart count due to error');
+        }
+    }
+};
+
+const handleCartUpdated = async () => {
+    console.log('📦 Cart updated event received');
+    await updateCartCount();
+};
+
+watch(
+    () => user.value,
+    async (newUser) => {
+        if (newUser) {
+            // User vừa đăng nhập, load cart count
+            await updateCartCount();
+        } else {
+            // User vừa đăng xuất, reset cart count
+            cartItemCount.value = 0;
+        }
+    }
+);
+
 const handleSearch = () => {
     if (searchQuery.value.trim()) {
         router.push({
@@ -88,16 +151,16 @@ const goToLogin = () => {
 };
 
 const goToCart = () => {
-    router.push('/cart');
+    router.push('/card');
 };
 
 const goToProfile = () => {
-    router.push('/profile');
+    router.push('/profileInfo');
     isUserDropdownOpen.value = false;
 };
 
 const goToOrders = () => {
-    router.push('/orders');
+    router.push('/profileOrders');
     isUserDropdownOpen.value = false;
 };
 
@@ -132,11 +195,13 @@ const logout = async () => {
         localStorage.removeItem('savedEmail');
 
         user.value = null;
+        cartItemCount.value = 0; // Reset cart count khi logout
         router.push('/');
     } catch (error) {
         console.error('Logout error:', error);
         localStorage.clear();
         user.value = null;
+        cartItemCount.value = 0; // Reset cart count
         router.push('/');
     }
 };
@@ -155,70 +220,58 @@ const handleClickOutside = (event) => {
 };
 
 // Close mobile menu on route change
-watch(() => route.path, () => {
-    secondNavOpen.value = false;
-    document.body.style.overflow = '';
-});
+watch(
+    () => route.path,
+    () => {
+        secondNavOpen.value = false;
+        document.body.style.overflow = '';
+    }
+);
 
-onMounted(() => {
+// Update onMounted
+onMounted(async () => {
     handleResize();
     loadUserData();
+
+    // Load cart count từ backend nếu user đã đăng nhập
+    if (user.value) {
+        await updateCartCount();
+    }
+
+    // Lắng nghe sự kiện
     window.addEventListener('resize', handleResize);
     window.addEventListener('scroll', handleScroll);
+    window.addEventListener('cartUpdated', handleCartUpdated);
     document.addEventListener('click', handleClickOutside);
 });
 
+// Update onUnmounted (remove handleStorageChange)
 onUnmounted(() => {
     window.removeEventListener('resize', handleResize);
     window.removeEventListener('scroll', handleScroll);
+    window.removeEventListener('cartUpdated', handleCartUpdated);
     document.removeEventListener('click', handleClickOutside);
     document.body.style.overflow = '';
 });
 </script>
 
 <template>
-    <header 
-        class="fixed top-0 z-50 w-full transition-all duration-300"
-        :class="[
-            isScrolled ? 'bg-white shadow-lg' : 'bg-white/90 backdrop-blur-md',
-            'border-b border-gray-100'
-        ]"
-    >
+    <header class="fixed top-0 z-50 w-full transition-all duration-300" :class="[isScrolled ? 'bg-white shadow-lg' : 'bg-white/90 backdrop-blur-md', 'border-b border-gray-100']">
         <nav class="container mx-auto px-4 lg:px-8">
             <div class="flex h-20 items-center justify-between">
                 <!-- Logo -->
-                <router-link 
-                    to="/" 
-                    class="relative z-50 flex items-center space-x-2 transition-transform duration-300 hover:scale-105"
-                >
-                    <img 
-                        :src="headerLogo" 
-                        alt="Logo" 
-                        class="h-12 w-auto"
-                    />
+                <router-link to="/" class="relative z-50 flex items-center space-x-2 transition-transform duration-300 hover:scale-105">
+                    <img :src="headerLogo" alt="Logo1" class="img-fluid" style="width: 50px" />
+                    <span>BEE SHOES</span>
                 </router-link>
 
                 <!-- Desktop Navigation -->
                 <div class="hidden lg:flex lg:flex-1 lg:items-center lg:justify-center">
                     <ul class="flex items-center space-x-8">
-                        <li 
-                            v-for="navLink in navLinks" 
-                            :key="navLink.label"
-                        >
-                            <router-link
-                                :to="navLink.href"
-                                class="nav-link group relative py-2 text-base font-medium transition-colors"
-                                :class="[
-                                    isActiveRoute(navLink.href) 
-                                        ? 'text-coral-red' 
-                                        : 'text-gray-700 hover:text-coral-red'
-                                ]"
-                            >
+                        <li v-for="navLink in navLinks" :key="navLink.label">
+                            <router-link :to="navLink.href" class="nav-link group relative py-2 text-base font-medium transition-colors" :class="[isActiveRoute(navLink.href) ? 'text-coral-red' : 'text-gray-700 hover:text-coral-red']">
                                 {{ navLink.label }}
-                                <span 
-                                    class="absolute bottom-0 left-0 h-0.5 w-0 bg-coral-red transition-all duration-300 group-hover:w-full"
-                                    :class="{ 'w-full': isActiveRoute(navLink.href) }"
-                                ></span>
+                                <span class="absolute bottom-0 left-0 h-0.5 w-0 bg-coral-red transition-all duration-300 group-hover:w-full" :class="{ 'w-full': isActiveRoute(navLink.href) }"></span>
                             </router-link>
                         </li>
                     </ul>
@@ -228,10 +281,7 @@ onUnmounted(() => {
                 <div class="flex items-center space-x-4">
                     <!-- Search Bar (Desktop) -->
                     <div class="hidden lg:block">
-                        <div 
-                            class="search-container relative transition-all duration-300"
-                            :class="isSearchFocused ? 'w-64' : 'w-48'"
-                        >
+                        <div class="search-container relative transition-all duration-300" :class="isSearchFocused ? 'w-64' : 'w-48'">
                             <input
                                 v-model="searchQuery"
                                 @keyup.enter="handleSearch"
@@ -241,10 +291,7 @@ onUnmounted(() => {
                                 placeholder="Tìm kiếm..."
                                 class="w-full rounded-full border border-gray-200 bg-gray-50 px-4 py-2 pr-10 text-sm outline-none transition-all duration-300 focus:border-coral-red focus:bg-white focus:shadow-md"
                             />
-                            <button
-                                @click="handleSearch"
-                                class="absolute right-0 top-0 flex h-full items-center px-3 text-gray-400 transition-colors hover:text-coral-red"
-                            >
+                            <button @click="handleSearch" class="absolute right-0 top-0 flex h-full items-center px-3 text-gray-400 transition-colors hover:text-coral-red">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
@@ -253,17 +300,11 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Cart -->
-                    <button
-                        @click="goToCart"
-                        class="relative flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 hover:bg-gray-100"
-                    >
+                    <button @click="goToCart" class="relative flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 hover:bg-gray-100">
                         <svg class="h-6 w-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                         </svg>
-                        <span 
-                            v-if="cartItemCount > 0" 
-                            class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-coral-red text-xs font-semibold text-white"
-                        >
+                        <span v-if="cartItemCount > 0" class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-coral-red text-xs font-semibold text-white">
                             {{ cartItemCount }}
                         </span>
                     </button>
@@ -271,11 +312,7 @@ onUnmounted(() => {
                     <!-- User Menu -->
                     <div class="relative">
                         <!-- Not Logged In -->
-                        <button
-                            v-if="!isLoggedIn"
-                            @click="goToLogin"
-                            class="flex h-10 items-center space-x-2 rounded-full bg-coral-red px-4 py-2 text-sm font-medium text-white transition-all duration-300 hover:bg-red-600 hover:shadow-lg"
-                        >
+                        <button v-if="!isLoggedIn" @click="goToLogin" class="flex h-10 items-center space-x-2 rounded-full bg-coral-red px-4 py-2 text-sm font-medium text-white transition-all duration-300 hover:bg-red-600 hover:shadow-lg">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
@@ -284,50 +321,27 @@ onUnmounted(() => {
 
                         <!-- Logged In -->
                         <div v-else>
-                            <button
-                                @click="toggleUserDropdown"
-                                class="user-button flex h-10 items-center space-x-2 rounded-full border border-gray-200 bg-white px-3 py-2 transition-all duration-300 hover:border-gray-300 hover:shadow-md"
-                            >
-                                <div 
-                                    class="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold text-white"
-                                    :class="[
-                                        user.vaiTro === 'ADMIN' ? 'bg-purple-500' :
-                                        user.vaiTro === 'NHANVIEN' ? 'bg-blue-500' :
-                                        'bg-green-500'
-                                    ]"
-                                >
+                            <button @click="toggleUserDropdown" class="user-button flex h-10 items-center space-x-2 rounded-full border border-gray-200 bg-white px-3 py-2 transition-all duration-300 hover:border-gray-300 hover:shadow-md">
+                                <div class="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold text-white" :class="[user.vaiTro === 'ADMIN' ? 'bg-purple-500' : user.vaiTro === 'NHANVIEN' ? 'bg-blue-500' : 'bg-green-500']">
                                     {{ userInitial }}
                                 </div>
                                 <span class="hidden text-sm font-medium text-gray-700 sm:inline">
                                     {{ userName }}
                                 </span>
-                                <svg 
-                                    class="h-4 w-4 text-gray-400 transition-transform duration-200" 
-                                    :class="{ 'rotate-180': isUserDropdownOpen }"
-                                    fill="none" 
-                                    stroke="currentColor" 
-                                    viewBox="0 0 24 24"
-                                >
+                                <svg class="h-4 w-4 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': isUserDropdownOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                 </svg>
                             </button>
 
                             <!-- Dropdown Menu -->
                             <Transition name="dropdown">
-                                <div 
-                                    v-if="isUserDropdownOpen" 
-                                    class="user-dropdown absolute right-0 mt-2 w-72 overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-black ring-opacity-5"
-                                >
+                                <div v-if="isUserDropdownOpen" class="user-dropdown absolute right-0 mt-2 w-72 overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-black ring-opacity-5">
                                     <!-- User Info Header -->
                                     <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-4">
                                         <div class="flex items-center space-x-3">
-                                            <div 
+                                            <div
                                                 class="flex h-12 w-12 items-center justify-center rounded-full text-lg font-bold text-white shadow-md"
-                                                :class="[
-                                                    user.vaiTro === 'ADMIN' ? 'bg-purple-500' :
-                                                    user.vaiTro === 'NHANVIEN' ? 'bg-blue-500' :
-                                                    'bg-green-500'
-                                                ]"
+                                                :class="[user.vaiTro === 'ADMIN' ? 'bg-purple-500' : user.vaiTro === 'NHANVIEN' ? 'bg-blue-500' : 'bg-green-500']"
                                             >
                                                 {{ userInitial }}
                                             </div>
@@ -335,13 +349,9 @@ onUnmounted(() => {
                                                 <div class="font-semibold text-gray-900">{{ userName }}</div>
                                                 <div class="text-sm text-gray-600">{{ user.email }}</div>
                                                 <div class="mt-1">
-                                                    <span 
+                                                    <span
                                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                                        :class="[
-                                                            user.vaiTro === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
-                                                            user.vaiTro === 'NHANVIEN' ? 'bg-blue-100 text-blue-700' :
-                                                            'bg-green-100 text-green-700'
-                                                        ]"
+                                                        :class="[user.vaiTro === 'ADMIN' ? 'bg-purple-100 text-purple-700' : user.vaiTro === 'NHANVIEN' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700']"
                                                     >
                                                         {{ userRole }}
                                                     </span>
@@ -352,10 +362,7 @@ onUnmounted(() => {
 
                                     <!-- Menu Items -->
                                     <div class="py-2">
-                                        <button
-                                            @click="goToProfile"
-                                            class="flex w-full items-center space-x-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50"
-                                        >
+                                        <button @click="goToProfile" class="flex w-full items-center space-x-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50">
                                             <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
                                                 <svg class="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -367,13 +374,15 @@ onUnmounted(() => {
                                             </div>
                                         </button>
 
-                                        <button
-                                            @click="goToOrders"
-                                            class="flex w-full items-center space-x-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50"
-                                        >
+                                        <button @click="goToOrders" class="flex w-full items-center space-x-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50">
                                             <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
                                                 <svg class="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                                    />
                                                 </svg>
                                             </div>
                                             <div>
@@ -383,14 +392,15 @@ onUnmounted(() => {
                                         </button>
 
                                         <!-- Admin/Staff Dashboard -->
-                                        <button
-                                            v-if="user.vaiTro === 'ADMIN' || user.vaiTro === 'NHANVIEN'"
-                                            @click="goToDashboard"
-                                            class="flex w-full items-center space-x-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50"
-                                        >
+                                        <button v-if="user.vaiTro === 'ADMIN' || user.vaiTro === 'NHANVIEN'" @click="goToDashboard" class="flex w-full items-center space-x-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50">
                                             <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100">
                                                 <svg class="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                                                    />
                                                 </svg>
                                             </div>
                                             <div>
@@ -402,10 +412,7 @@ onUnmounted(() => {
                                         <div class="my-2 border-t border-gray-100"></div>
 
                                         <!-- Logout -->
-                                        <button
-                                            @click="logout"
-                                            class="flex w-full items-center space-x-3 px-4 py-2.5 text-left transition-colors hover:bg-red-50"
-                                        >
+                                        <button @click="logout" class="flex w-full items-center space-x-3 px-4 py-2.5 text-left transition-colors hover:bg-red-50">
                                             <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100">
                                                 <svg class="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -423,28 +430,10 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Mobile Menu Button -->
-                    <button
-                        @click="navToggler"
-                        class="relative z-50 flex h-10 w-10 flex-col items-center justify-center rounded-lg transition-colors hover:bg-gray-100 lg:hidden"
-                    >
-                        <span
-                            class="absolute h-0.5 w-5 transform bg-gray-700 transition-all duration-300"
-                            :class="[
-                                secondNavOpen ? 'rotate-45' : '-translate-y-1.5'
-                            ]"
-                        ></span>
-                        <span
-                            class="absolute h-0.5 w-5 bg-gray-700 transition-all duration-300"
-                            :class="[
-                                secondNavOpen ? 'opacity-0' : 'opacity-100'
-                            ]"
-                        ></span>
-                        <span
-                            class="absolute h-0.5 w-5 transform bg-gray-700 transition-all duration-300"
-                            :class="[
-                                secondNavOpen ? '-rotate-45' : 'translate-y-1.5'
-                            ]"
-                        ></span>
+                    <button @click="navToggler" class="relative z-50 flex h-10 w-10 flex-col items-center justify-center rounded-lg transition-colors hover:bg-gray-100 lg:hidden">
+                        <span class="absolute h-0.5 w-5 transform bg-gray-700 transition-all duration-300" :class="[secondNavOpen ? 'rotate-45' : '-translate-y-1.5']"></span>
+                        <span class="absolute h-0.5 w-5 bg-gray-700 transition-all duration-300" :class="[secondNavOpen ? 'opacity-0' : 'opacity-100']"></span>
+                        <span class="absolute h-0.5 w-5 transform bg-gray-700 transition-all duration-300" :class="[secondNavOpen ? '-rotate-45' : 'translate-y-1.5']"></span>
                     </button>
                 </div>
             </div>
@@ -452,11 +441,7 @@ onUnmounted(() => {
 
         <!-- Mobile Navigation -->
         <Transition name="mobile-menu">
-            <div
-                v-if="secondNavOpen"
-                class="fixed inset-0 z-40 bg-white lg:hidden"
-                style="top: 80px"
-            >
+            <div v-if="secondNavOpen" class="fixed inset-0 z-40 bg-white lg:hidden" style="top: 80px">
                 <div class="h-full overflow-y-auto px-4 pb-20 pt-8">
                     <!-- Mobile Search -->
                     <div class="mb-8">
@@ -468,10 +453,7 @@ onUnmounted(() => {
                                 placeholder="Tìm kiếm sản phẩm..."
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 pr-10 outline-none transition-all focus:border-coral-red focus:bg-white"
                             />
-                            <button
-                                @click="handleSearch"
-                                class="absolute right-0 top-0 flex h-full items-center px-4 text-gray-400"
-                            >
+                            <button @click="handleSearch" class="absolute right-0 top-0 flex h-full items-center px-4 text-gray-400">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
@@ -486,11 +468,7 @@ onUnmounted(() => {
                             :key="navLink.label"
                             :to="navLink.href"
                             class="mobile-nav-link block rounded-lg px-4 py-3 text-base font-medium transition-colors"
-                            :class="[
-                                isActiveRoute(navLink.href)
-                                    ? 'bg-coral-red text-white'
-                                    : 'text-gray-700 hover:bg-gray-100'
-                            ]"
+                            :class="[isActiveRoute(navLink.href) ? 'bg-coral-red text-white' : 'text-gray-700 hover:bg-gray-100']"
                         >
                             {{ navLink.label }}
                         </router-link>
@@ -499,31 +477,12 @@ onUnmounted(() => {
                     <!-- Mobile User Menu (if logged in) -->
                     <div v-if="isLoggedIn" class="mt-8 border-t border-gray-200 pt-8">
                         <div class="space-y-1">
-                            <router-link
-                                to="/profile"
-                                class="block rounded-lg px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100"
-                            >
-                                Thông tin cá nhân
-                            </router-link>
-                            <router-link
-                                to="/orders"
-                                class="block rounded-lg px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100"
-                            >
-                                Đơn hàng của tôi
-                            </router-link>
-                            <router-link
-                                v-if="user.vaiTro === 'ADMIN' || user.vaiTro === 'NHANVIEN'"
-                                to="/dashboard"
-                                class="block rounded-lg px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100"
-                            >
+                            <router-link to="/profile" class="block rounded-lg px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100"> Thông tin cá nhân </router-link>
+                            <router-link to="/orders" class="block rounded-lg px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100"> Đơn hàng của tôi </router-link>
+                            <router-link v-if="user.vaiTro === 'ADMIN' || user.vaiTro === 'NHANVIEN'" to="/dashboard" class="block rounded-lg px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100">
                                 Trang quản trị
                             </router-link>
-                            <button
-                                @click="logout"
-                                class="block w-full rounded-lg px-4 py-3 text-left text-base font-medium text-red-600 transition-colors hover:bg-red-50"
-                            >
-                                Đăng xuất
-                            </button>
+                            <button @click="logout" class="block w-full rounded-lg px-4 py-3 text-left text-base font-medium text-red-600 transition-colors hover:bg-red-50">Đăng xuất</button>
                         </div>
                     </div>
                 </div>
@@ -583,18 +542,18 @@ onUnmounted(() => {
 
 /* Coral red color */
 .text-coral-red {
-    color: #FF6452;
+    color: #ff6452;
 }
 
 .bg-coral-red {
-    background-color: #FF6452;
+    background-color: #ff6452;
 }
 
 .border-coral-red {
-    border-color: #FF6452;
+    border-color: #ff6452;
 }
 
 .focus\:border-coral-red:focus {
-    border-color: #FF6452;
+    border-color: #ff6452;
 }
 </style>

@@ -1,17 +1,3 @@
-<script setup>
-import Hero from '@/views/user/Hero.vue';
-import Services from '@/views/user/Services.vue';
-//import SpecialOffers from '@/views/user/SpecialOffers.vue';
-import Nav from '@/components/user/Nav.vue';
-import ScrollToggler from '@/components/user/ScrollToggler.vue';
-import CustomerReviews from '@/views/user/CustomerReviews.vue';
-import Footer from '@/views/user/Footer.vue';
-import PopularProducts from '@/views/user/PopularProducts.vue';
-import SuperQuality from '@/views/user/SuperQuality.vue';
-// ===== ĐÃ THÊM CHATBOT IMPORT =====
-import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
-</script>
-
 <template>
     <main class="relative">
         <Nav />
@@ -43,6 +29,23 @@ import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
         <ChatBot />
     </main>
 </template>
+
+<script setup>
+import Hero from '@/views/user/Hero.vue';
+import Services from '@/views/user/Services.vue';
+//import SpecialOffers from '@/views/user/SpecialOffers.vue';
+import Nav from '@/components/user/Nav.vue';
+import ScrollToggler from '@/components/user/ScrollToggler.vue';
+import CustomerReviews from '@/views/user/CustomerReviews.vue';
+import Footer from '@/views/user/Footer.vue';
+import PopularProducts from '@/views/user/PopularProducts.vue';
+import SuperQuality from '@/views/user/SuperQuality.vue';
+// ===== ĐÃ THÊM CHATBOT IMPORT =====
+import ChatBot from '@/components/ChatBotAndReview/ChatBot.vue';
+
+// Log để debug
+console.log('userHome component loaded');
+</script>
 
 <style scoped>
 /* ===== THÊM CSS ĐỂ ĐẢM BẢO CHATBOT HIỂN THỊ ĐÚNG ===== */

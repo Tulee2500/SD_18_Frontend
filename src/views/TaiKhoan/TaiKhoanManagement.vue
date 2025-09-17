@@ -53,7 +53,6 @@
                     showClear
                 />
 
-                <!-- Select lọc trạng thái -->
                 <Select 
                     v-model="statusFilter" 
                     :options="STATUS_OPTIONS" 
@@ -65,7 +64,6 @@
                     showClear
                 />
 
-                <!-- DatePicker từ ngày -->
                 <DatePicker
                     v-model="dateFilters.startDate"
                     placeholder="Từ ngày"
@@ -78,7 +76,6 @@
                     :maxDate="dateFilters.endDate || new Date()"
                 />
 
-                <!-- DatePicker đến ngày -->
                 <DatePicker
                     v-model="dateFilters.endDate"
                     placeholder="Đến ngày"
@@ -358,8 +355,30 @@
                             </small>
                         </div>
                     </div>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+     
+<!-- Đoạn code cần sửa trong template (dòng 360-376) -->
+<div class="grid grid-cols-2 gap-4 mt-4">
+    <div>
+        <label for="addNgaySinh" class="mb-3 block font-bold">Ngày sinh</label>
+        <Calendar
+            id="addNgaySinh"
+            v-model="personalInfo.ngaySinh"
+            dateFormat="dd/mm/yy"
+            :maxDate="new Date()"
+            showIcon
+            showClear
+            fluid
+            placeholder="Chọn ngày sinh"
+        />
+        <small class="text-gray-500">Tùy chọn - để trống nếu không có</small>
+    </div>
+</div>
+</div>
+
+
+
+                    <div class="grid grid-cols-1 gap-4 mb-4">
                         <div>
                             <label for="personalEmail" class="mb-3 block font-bold">Email *</label>
                             <InputText 
@@ -374,27 +393,6 @@
                             <small v-if="hasValidationError('email')" class="text-red-500">
                                 {{ getValidationError('email') }}
                             </small>
-                        </div>
-                        <div v-if="newAccount.vaiTro === 'USER'">
-                            <label for="ngaySinh" class="mb-3 block font-bold">Ngày sinh</label>
-                            <DatePicker 
-                                id="ngaySinh" 
-                                v-model="personalInfo.ngaySinh" 
-                                dateFormat="dd/mm/yy" 
-                                fluid 
-                                placeholder="Chọn ngày sinh"
-                                :maxDate="new Date()"
-                                showIcon
-                            />
-                        </div>
-                        <div v-if="newAccount.vaiTro === 'NHANVIEN'">
-                            <label for="chucVu" class="mb-3 block font-bold">Chức vụ</label>
-                            <InputText 
-                                id="chucVu" 
-                                v-model.trim="personalInfo.chucVu" 
-                                fluid 
-                                placeholder="Nhập chức vụ"
-                            />
                         </div>
                     </div>
 
@@ -417,13 +415,9 @@
                                     placeholder="Chọn Tỉnh/TP"
                                     :loading="loadingProvinces"
                                     @change="onProvinceChange"
-                                    :invalid="hasValidationError('maTinh')"
                                     fluid
                                     showClear
                                 />
-                                <small v-if="hasValidationError('maTinh')" class="text-red-500">
-                                    {{ getValidationError('maTinh') }}
-                                </small>
                             </div>
                             
                             <!-- Xã/Phường -->
@@ -438,13 +432,9 @@
                                     :disabled="!personalInfo.maTinh"
                                     :loading="loadingWards"
                                     @change="onWardChange"
-                                    :invalid="hasValidationError('maPhuong')"
                                     fluid
                                     showClear
                                 />
-                                <small v-if="hasValidationError('maPhuong')" class="text-red-500">
-                                    {{ getValidationError('maPhuong') }}
-                                </small>
                             </div>
                         </div>
                         
@@ -527,10 +517,8 @@
                                     <Divider />
                                     <p class="mt-2">Yêu cầu</p>
                                     <ul class="ml-2 mt-0 pl-2" style="line-height: 1.5">
-                                        <li>Ít nhất một chữ thường</li>
-                                        <li>Ít nhất một chữ hoa</li>
-                                        <li>Ít nhất một số</li>
-                                        <li>Tối thiểu 8 ký tự</li>
+                                        <li>Tối thiểu 6 ký tự</li>
+                                        <li>Tối đa 50 ký tự</li>
                                     </ul>
                                 </template>
                             </Password>
@@ -592,22 +580,36 @@
             </template>
         </Dialog>
 
-        <!-- Edit Account Dialog -->
-        <Dialog v-model:visible="editDialog" :style="{ width: DIALOG_SIZES.MEDIUM }" header="Cập nhật tài khoản" :modal="true">
+        <!-- Edit Account Dialog - CHỈ EMAIL VÀ MẬT KHẨU -->
+        <Dialog v-model:visible="editDialog" :style="{ width: DIALOG_SIZES.MEDIUM }" header="Cập nhật thông tin đăng nhập" :modal="true">
             <div class="flex flex-col gap-4">
+                <!-- THÔNG BÁO GIỚI HẠN -->
+                <div class="bg-amber-50 p-3 rounded border border-amber-200 mb-4">
+                    <div class="flex items-center gap-2 text-amber-700">
+                        <i class="pi pi-info-circle"></i>
+                        <span class="font-semibold text-sm">Lưu ý:</span>
+                    </div>
+                    <p class="text-sm text-amber-600 mt-1 mb-0">
+                        Chỉ có thể chỉnh sửa Email và Mật khẩu. Vai trò và trạng thái được quản lý bằng các chức năng khác.
+                    </p>
+                </div>
+
                 <div>
-                    <label for="editEmail" class="mb-3 block font-bold">Email *</label>
+                    <label for="editEmail" class="mb-3 block font-bold">Email đăng nhập *</label>
                     <InputText 
                         id="editEmail" 
                         v-model.trim="editAccountData.email" 
                         required="true" 
                         :invalid="hasValidationError('editEmail')" 
                         fluid 
+                        placeholder="Nhập email mới"
+                        @input="clearFieldError('editEmail')"
                     />
                     <small v-if="hasValidationError('editEmail')" class="text-red-500">
                         {{ getValidationError('editEmail') }}
                     </small>
                 </div>
+                
                 <div>
                     <label for="editMatKhau" class="mb-3 block font-bold">Mật khẩu mới</label>
                     <Password 
@@ -616,39 +618,37 @@
                         placeholder="Để trống nếu không đổi" 
                         toggleMask 
                         fluid 
+                        @input="clearFieldError('editMatKhau')"
                     />
-                    <small class="text-muted">Để trống nếu không muốn thay đổi mật khẩu</small>
-                </div>
-                <div>
-                    <label for="editVaiTro" class="mb-3 block font-bold">Vai trò *</label>
-                    <Select 
-                        id="editVaiTro" 
-                        v-model="editAccountData.vaiTro" 
-                        :options="ROLE_OPTIONS_FOR_FORM" 
-                        optionLabel="label" 
-                        optionValue="value" 
-                        placeholder="Chọn vai trò" 
-                        :invalid="hasValidationError('editVaiTro')" 
-                        fluid 
-                    />
-                    <small v-if="hasValidationError('editVaiTro')" class="text-red-500">
-                        {{ getValidationError('editVaiTro') }}
+                    <small v-if="hasValidationError('editMatKhau')" class="text-red-500">
+                        {{ getValidationError('editMatKhau') }}
                     </small>
+                    <small v-else class="text-muted">Để trống nếu không muốn thay đổi mật khẩu</small>
                 </div>
-                <div>
-                    <label for="editTrangThai" class="mb-3 block font-bold">Trạng thái *</label>
-                    <Select
-                        id="editTrangThai"
-                        v-model="editAccountData.trangThai"
-                        :options="STATUS_OPTIONS_FOR_FORM"
-                        optionLabel="label"
-                        optionValue="value"
-                        placeholder="Chọn trạng thái"
-                        :invalid="hasValidationError('editTrangThai')"
-                        fluid
-                    />
-                    <small v-if="hasValidationError('editTrangThai')" class="text-red-500">
-                        {{ getValidationError('editTrangThai') }}
+
+                <!-- HIỂN THỊ THÔNG TIN KHÔNG ĐƯỢC SỬA -->
+                <div class="bg-gray-50 p-3 rounded border">
+                    <h6 class="mb-2 text-gray-700 font-semibold">Thông tin chỉ đọc:</h6>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <strong>Vai trò:</strong>
+                            <Tag 
+                                :value="getRoleLabel(editAccountData.vaiTro)" 
+                                :severity="getRoleSeverity(editAccountData.vaiTro)" 
+                                class="ml-2"
+                            />
+                        </div>
+                        <div>
+                            <strong>Trạng thái:</strong>
+                            <Tag
+                                :value="getStatusLabel(editAccountData.trangThai)"
+                                :severity="getStatusSeverity(editAccountData.trangThai)"
+                                class="ml-2"
+                            />
+                        </div>
+                    </div>
+                    <small class="text-gray-500 mt-2 block">
+                        Sử dụng nút "Đổi trạng thái" ở bảng chính để thay đổi trạng thái hoạt động.
                     </small>
                 </div>
             </div>
@@ -658,7 +658,7 @@
             </template>
         </Dialog>
 
-        <!-- View Account Dialog với hiển thị mật khẩu cho Admin -->
+        <!-- View Account Dialog - KHÔNG HIỂN THỊ MẬT KHẨU -->
         <Dialog v-model:visible="viewDialog" :style="{ width: DIALOG_SIZES.LARGE }" :header="`Chi tiết tài khoản - ${viewingAccount?.email || 'N/A'}`" :modal="true">
             <div v-if="viewingAccount" class="flex flex-col gap-6">
                 <!-- Thông tin tài khoản -->
@@ -689,25 +689,6 @@
                         </div>
                         <div><strong>Ngày tạo:</strong> {{ formatDate(viewingAccount.ngayTao) }}</div>
                         <div><strong>Cập nhật:</strong> {{ formatDate(viewingAccount.ngayCapNhat) }}</div>
-                        <!-- Hiển thị mật khẩu cho Admin -->
-                        <div v-if="isAdmin" class="col-span-2">
-                            <strong>Mật khẩu:</strong> 
-                            <div class="flex items-center gap-2 mt-1">
-                                <InputText 
-                                    :value="showPassword ? viewingAccount.matKhau || 'Không có dữ liệu' : '••••••••'" 
-                                    readonly 
-                                    class="flex-1"
-                                />
-                                <Button 
-                                    :icon="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"
-                                    size="small"
-                                    text
-                                    @click="togglePassword"
-                                    :title="showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
-                                />
-                            </div>
-                            <small class="text-gray-500">Chỉ Admin mới được xem mật khẩu</small>
-                        </div>
                     </div>
                 </div>
 
@@ -729,10 +710,21 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Thông báo bảo mật -->
+                <div class="rounded-lg bg-yellow-50 p-4 border border-yellow-200">
+                    <div class="flex items-center gap-2 text-yellow-700">
+                        <i class="pi pi-shield"></i>
+                        <span class="font-semibold">Bảo mật:</span>
+                    </div>
+                    <p class="text-sm text-yellow-600 mt-1 mb-0">
+                        Mật khẩu được mã hóa và không hiển thị vì lý do bảo mật. Sử dụng chức năng "Sửa" để thay đổi mật khẩu.
+                    </p>
+                </div>
             </div>
             <template #footer>
                 <Button label="Đóng" icon="pi pi-times" text @click="viewDialog = false" />
-                <Button label="Sửa" icon="pi pi-pencil" @click="editFromView" />
+                <Button label="Sửa thông tin đăng nhập" icon="pi pi-pencil" @click="editFromView" />
             </template>
         </Dialog>
 
@@ -782,7 +774,6 @@ const STATUS_OPTIONS = [
     { label: 'Ngưng hoạt động', value: 0 }
 ]
 
-// FIXED: Thêm STATUS_OPTIONS_FOR_FORM
 const STATUS_OPTIONS_FOR_FORM = [
     { label: 'Hoạt động', value: 1 },
     { label: 'Ngưng hoạt động', value: 0 }
@@ -831,21 +822,16 @@ const viewDialog = ref(false)
 const deleteAccountDialog = ref(false)
 const deleteAccountsDialog = ref(false)
 
-// FIXED: Thêm state cho hiển thị mật khẩu
-const showPassword = ref(false)
-const isAdmin = ref(true) // Giả sử user hiện tại là admin
-
 const newAccount = ref({})
 const personalInfo = ref({
     hoTen: '',
     email: '',
     sdt: '',
+    ngaySinh: null, // THÊM NGÀY SINH
     maTinh: '',
     maPhuong: '',
     diaChiChiTiet: '',
-    fullAddress: '',
-    ngaySinh: null,
-    chucVu: ''
+    fullAddress: ''
 })
 const editAccountData = ref({})
 const viewingAccount = ref(null)
@@ -893,11 +879,6 @@ const formatDate = (date) => {
         console.error('❌ Error formatting date:', error)
         return 'Lỗi định dạng ngày'
     }
-}
-
-// FIXED: Thêm function toggle password
-const togglePassword = () => {
-    showPassword.value = !showPassword.value
 }
 
 const getStatusLabel = (status) => {
@@ -1131,8 +1112,7 @@ const fetchProvinces = async () => {
             provinces.value = [
                 { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
                 { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
-                { code: '48', name: 'Đà Nẵng', codename: 'da_nang' },
-                { code: '92', name: 'Cần Thơ', codename: 'can_tho' }
+                { code: '48', name: 'Đà Nẵng', codename: 'da_nang' }
             ]
         }
     } catch (error) {
@@ -1164,21 +1144,19 @@ const fetchWards = async (provinceCode) => {
                 codename: item.codename
             }))
         } else {
-            wards.value = getFallbackWards()
+            wards.value = [
+                { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
+                { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' }
+            ]
         }
     } catch (error) {
-        wards.value = getFallbackWards()
+        wards.value = [
+            { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
+            { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' }
+        ]
     } finally {
         loadingWards.value = false
     }
-}
-
-const getFallbackWards = () => {
-    return [
-        { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
-        { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' },
-        { code: '3', name: 'Phường/Xã 3', codename: 'phuong_xa_3' }
-    ]
 }
 
 const onProvinceChange = async () => {
@@ -1275,18 +1253,16 @@ const resetForms = () => {
         hoTen: '',
         email: '',
         sdt: '',
+        ngaySinh: null, // RESET ngày sinh
         maTinh: '',
         maPhuong: '',
         diaChiChiTiet: '',
-        fullAddress: '',
-        ngaySinh: null,
-        chucVu: ''
+        fullAddress: ''
     }
     
     wards.value = []
     submitted.value = false
     validationErrors.value = {}
-    showPassword.value = false
 }
 
 const refreshFormAfterError = () => {
@@ -1302,9 +1278,7 @@ const onRoleChange = () => {
         maTinh: '',
         maPhuong: '',
         diaChiChiTiet: '',
-        fullAddress: '',
-        ngaySinh: null,
-        chucVu: ''
+        fullAddress: ''
     }
     
     wards.value = []
@@ -1345,7 +1319,6 @@ const hideEditDialog = () => {
 
 const viewAccount = (account) => {
     viewingAccount.value = { ...account }
-    showPassword.value = false
     viewDialog.value = true
 }
 
@@ -1383,6 +1356,15 @@ const checkEmailExists = (email, excludeId = null) => {
     )
 }
 
+const checkPhoneExists = (phone) => {
+    // Kiểm tra trong danh sách khách hàng và nhân viên
+    const customerPhones = customers.value.map(c => c.sdt?.replace(/\s/g, '') || '')
+    const employeePhones = employees.value.map(e => e.sdt?.replace(/\s/g, '') || '')
+    const allPhones = [...customerPhones, ...employeePhones]
+    
+    return allPhones.includes(phone)
+}
+
 const validateForm = () => {
     validationErrors.value = {}
     
@@ -1391,7 +1373,7 @@ const validateForm = () => {
         validationErrors.value.vaiTro = 'Vui lòng chọn vai trò'
     }
     
-    // Validate email với kiểm tra nâng cao
+    // Validate email
     if (!newAccount.value.email?.trim()) {
         validationErrors.value.accountEmail = 'Email không được để trống'
     } else {
@@ -1403,7 +1385,7 @@ const validateForm = () => {
         }
     }
     
-    // Validate mật khẩu với kiểm tra độ mạnh
+    // Validate mật khẩu
     if (!newAccount.value.matKhau?.trim()) {
         validationErrors.value.matKhau = 'Mật khẩu không được để trống'
     } else if (newAccount.value.matKhau.length < 6) {
@@ -1419,18 +1401,14 @@ const validateForm = () => {
     
     // Validate thông tin cá nhân cho các vai trò không phải admin
     if (newAccount.value.vaiTro && newAccount.value.vaiTro !== 'ADMIN') {
-        // Validate họ tên với pattern tiếng Việt
         if (!personalInfo.value.hoTen?.trim()) {
             validationErrors.value.hoTen = 'Họ tên không được để trống'
         } else if (personalInfo.value.hoTen.trim().length < 2) {
             validationErrors.value.hoTen = 'Họ tên phải có ít nhất 2 ký tự'
         } else if (personalInfo.value.hoTen.trim().length > 100) {
             validationErrors.value.hoTen = 'Họ tên không được quá 100 ký tự'
-        } else if (!/^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼẾỀỂưăạảấầẩẫậắằẳẵặẹẻẽếềểỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸửữựỳỵýỷỹ\s]+$/.test(personalInfo.value.hoTen.trim())) {
-            validationErrors.value.hoTen = 'Họ tên chỉ được chứa chữ cái và khoảng trắng'
         }
         
-        // Validate email cá nhân
         if (!personalInfo.value.email?.trim()) {
             validationErrors.value.email = 'Email không được để trống'
         } else {
@@ -1440,7 +1418,6 @@ const validateForm = () => {
             }
         }
         
-        // Validate số điện thoại Việt Nam
         if (!personalInfo.value.sdt?.trim()) {
             validationErrors.value.sdt = 'Số điện thoại không được để trống'
         } else {
@@ -1448,14 +1425,30 @@ const validateForm = () => {
             const cleanPhone = personalInfo.value.sdt.replace(/\s/g, '')
             if (!phoneRegex.test(cleanPhone)) {
                 validationErrors.value.sdt = 'Số điện thoại không hợp lệ (10-11 số, bắt đầu bằng 0)'
+            } else if (checkPhoneExists(cleanPhone)) {
+                validationErrors.value.sdt = 'Số điện thoại đã tồn tại trong hệ thống'
+            }
+        }
+        
+        // Validate ngày sinh nếu có
+        if (personalInfo.value.ngaySinh) {
+            const today = new Date()
+            const birthDate = new Date(personalInfo.value.ngaySinh)
+            if (birthDate > today) {
+                validationErrors.value.ngaySinh = 'Ngày sinh không thể lớn hơn ngày hiện tại'
+            }
+            
+            // Kiểm tra tuổi hợp lý (ít nhất 16 tuổi)
+            const age = today.getFullYear() - birthDate.getFullYear()
+            if (age < 16) {
+                validationErrors.value.ngaySinh = 'Người dùng phải ít nhất 16 tuổi'
             }
         }
     }
     
     return Object.keys(validationErrors.value).length === 0
 }
-
-// ===== CRUD OPERATIONS =====
+// ===== ENHANCED SAVE ACCOUNT METHOD =====
 const handleSaveAccount = async () => {
     submitted.value = true
     saving.value = true
@@ -1474,11 +1467,11 @@ const handleSaveAccount = async () => {
         updateFullAddress()
         lastCreatedAccountRole.value = newAccount.value.vaiTro
         
-        // Chuẩn bị dữ liệu theo format backend mong đợi
+        // SỬA: Chuẩn bị dữ liệu đúng format backend
         const accountData = {
             email: newAccount.value.email.trim(),
             matKhau: newAccount.value.matKhau,
-            vaiTroString: newAccount.value.vaiTro,
+            vaiTro: newAccount.value.vaiTro,
             trangThai: newAccount.value.trangThai
         }
         
@@ -1487,36 +1480,30 @@ const handleSaveAccount = async () => {
             accountData.maTaiKhoan = newAccount.value.maTaiKhoan.trim()
         }
         
-        // Thêm thông tin cá nhân cho non-admin
+        // SỬA: Thêm thông tin cá nhân đầy đủ cho non-admin
         if (newAccount.value.vaiTro !== 'ADMIN') {
             accountData.hoTen = personalInfo.value.hoTen.trim()
-            accountData.sdt = personalInfo.value.sdt.replace(/\s/g, '') // Remove spaces from phone
+            accountData.sdt = personalInfo.value.sdt.replace(/\s/g, '')
             
-            // Thêm thông tin địa chỉ
-            if (personalInfo.value.maTinh) {
-                accountData.maTinh = personalInfo.value.maTinh
-                accountData.tenTinh = provinces.value.find(p => p.code === personalInfo.value.maTinh)?.name || ''
-            }
-            if (personalInfo.value.maPhuong) {
-                accountData.maPhuong = personalInfo.value.maPhuong
-                accountData.tenPhuong = wards.value.find(w => w.code === personalInfo.value.maPhuong)?.name || ''
-            }
-            if (personalInfo.value.diaChiChiTiet) {
-                accountData.diaChiChiTiet = personalInfo.value.diaChiChiTiet.trim()
-            }
-            
-            // Thêm ngày sinh cho USER
-            if (newAccount.value.vaiTro === 'USER' && personalInfo.value.ngaySinh) {
+            // THÊM: Ngày sinh nếu có
+            if (personalInfo.value.ngaySinh) {
                 accountData.ngaySinh = personalInfo.value.ngaySinh.toISOString().split('T')[0]
             }
             
-            // Thêm chức vụ cho NHANVIEN
-            if (newAccount.value.vaiTro === 'NHANVIEN' && personalInfo.value.chucVu) {
-                accountData.chucVu = personalInfo.value.chucVu.trim()
+            // SỬA: Chỉ thêm địa chỉ nếu đã chọn đầy đủ
+            if (personalInfo.value.maTinh && personalInfo.value.maPhuong) {
+                accountData.maTinh = personalInfo.value.maTinh
+                accountData.tenTinh = provinces.value.find(p => p.code === personalInfo.value.maTinh)?.name || ''
+                accountData.maPhuong = personalInfo.value.maPhuong
+                accountData.tenPhuong = wards.value.find(w => w.code === personalInfo.value.maPhuong)?.name || ''
+                
+                if (personalInfo.value.diaChiChiTiet && personalInfo.value.diaChiChiTiet.trim()) {
+                    accountData.diaChiChiTiet = personalInfo.value.diaChiChiTiet.trim()
+                }
             }
         }
         
-        console.log('Sending account data:', accountData)
+        console.log('🚀 Sending account data:', accountData)
         
         const response = await axios.post('http://localhost:8080/api/tai-khoan', accountData, {
             headers: { 
@@ -1527,13 +1514,7 @@ const handleSaveAccount = async () => {
         })
         
         if (response.status === 201 || response.status === 200) {
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: `Tài khoản ${getRoleLabel(newAccount.value.vaiTro).toLowerCase()} đã được tạo thành công`,
-                life: 4000
-            })
-            
+            handleSuccessResponse(response)
             await fetchData()
             hideAddDialog()
             
@@ -1571,12 +1552,279 @@ const handleSaveAccount = async () => {
         }
         
     } catch (error) {
-        console.error('Lỗi tạo tài khoản:', error)
+        console.error('❌ Lỗi tạo tài khoản:', error)
         handleApiError(error, 'Không thể tạo tài khoản')
     } finally {
         saving.value = false
     }
 }
+// ===== SUCCESS HANDLING =====
+const handleSuccessResponse = (response) => {
+    console.log('✅ Tạo tài khoản thành công:', response.data)
+    
+    // Phân tích response để hiển thị thông tin chi tiết
+    if (response.data && response.data.data) {
+        const result = response.data.data
+        
+        let successDetail = 'Tài khoản đã được tạo thành công'
+        
+        if (result.taiKhoan) {
+            successDetail += `. Mã tài khoản: ${result.taiKhoan.maTaiKhoan}`
+        }
+        
+        if (result.khachHang) {
+            successDetail += `. Mã khách hàng: ${result.khachHang.maKhachHang}`
+        }
+        
+        if (result.nhanVien) {
+            successDetail += `. Mã nhân viên: ${result.nhanVien.maNhanVien}`
+            }
+        
+        if (result.warning) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Cảnh báo',
+                detail: result.warning,
+                life: 4000
+            })
+        }
+        
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: successDetail,
+            life: 5000
+        })
+    } else {
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Tài khoản ${getRoleLabel(newAccount.value.vaiTro).toLowerCase()} đã được tạo thành công`,
+            life: 4000
+        })
+    }
+}
+
+// ===== ENHANCED API ERROR HANDLING =====
+const handleApiError = (error, defaultMessage) => {
+    let errorMessage = defaultMessage
+    let errorDetail = ''
+    let severity = 'error'
+    
+    console.error('API Error Details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+    })
+    
+    if (error.response) {
+        const { status, data } = error.response
+        
+        switch (status) {
+            case 400:
+                errorMessage = 'Dữ liệu không hợp lệ'
+                severity = 'warn'
+                
+                // Xử lý lỗi validation chi tiết
+                if (data.errors && typeof data.errors === 'object') {
+                    Object.keys(data.errors).forEach(field => {
+                        validationErrors.value[field] = data.errors[field]
+                    })
+                    errorDetail = 'Vui lòng sửa các lỗi được đánh dấu màu đỏ'
+                } else if (data.message) {
+                    // Xử lý các lỗi cụ thể từ backend
+                    if (data.message.includes('Số điện thoại đã tồn tại')) {
+                        errorMessage = 'Số điện thoại đã được sử dụng'
+                        errorDetail = 'Vui lòng sử dụng số điện thoại khác'
+                        validationErrors.value.sdt = 'Số điện thoại này đã tồn tại trong hệ thống'
+                    } else if (data.message.includes('Email đã tồn tại')) {
+                        errorMessage = 'Email đã được sử dụng'
+                        errorDetail = 'Vui lòng sử dụng email khác'
+                        validationErrors.value.email = 'Email này đã tồn tại trong hệ thống'
+                        validationErrors.value.accountEmail = 'Email này đã tồn tại trong hệ thống'
+                    } else if (data.message.includes('Mã tài khoản đã tồn tại')) {
+                        errorMessage = 'Mã tài khoản đã được sử dụng'
+                        errorDetail = 'Vui lòng để trống để hệ thống tự tạo mã'
+                        validationErrors.value.maTaiKhoan = 'Mã tài khoản này đã tồn tại'
+                    } else {
+                        errorDetail = data.message
+                    }
+                } else {
+                    errorDetail = 'Vui lòng kiểm tra lại thông tin nhập vào'
+                }
+                break
+                
+            case 409:
+                errorMessage = 'Dữ liệu bị trùng lặp'
+                severity = 'warn'
+                
+                if (data.errorCode === 'EMAIL_EXISTS') {
+                    errorDetail = 'Email đã tồn tại trong hệ thống'
+                    validationErrors.value.email = 'Email đã tồn tại'
+                    validationErrors.value.accountEmail = 'Email đã tồn tại'
+                } else if (data.errorCode === 'PHONE_EXISTS' || data.message.includes('Số điện thoại')) {
+                    errorDetail = 'Số điện thoại đã tồn tại trong hệ thống'
+                    validationErrors.value.sdt = 'Số điện thoại đã tồn tại'
+                } else {
+                    errorDetail = data.message || 'Dữ liệu đã tồn tại trong hệ thống'
+                }
+                break
+                
+            case 403:
+                errorMessage = 'Không có quyền truy cập'
+                errorDetail = 'Bạn không có quyền thực hiện thao tác này'
+                severity = 'warn'
+                break
+                
+            case 404:
+                errorMessage = 'Không tìm thấy tài nguyên'
+                errorDetail = 'Endpoint API không tồn tại hoặc đã bị thay đổi'
+                break
+                
+            case 422:
+                errorMessage = 'Dữ liệu không thể xử lý'
+                severity = 'warn'
+                
+                if (data.message && data.message.includes('Transaction')) {
+                    errorDetail = 'Có lỗi trong quá trình xử lý. Vui lòng thử lại sau.'
+                } else {
+                    errorDetail = data.message || 'Dữ liệu không phù hợp với yêu cầu hệ thống'
+                }
+                break
+                
+            case 500:
+                errorMessage = 'Lỗi hệ thống'
+                errorDetail = 'Có lỗi xảy ra trên máy chủ. Vui lòng thử lại sau hoặc liên hệ quản trị viên.'
+                
+                // Phân tích thêm lỗi 500
+                if (data && data.message) {
+                    if (data.message.includes('Transaction silently rolled back')) {
+                        errorDetail = 'Giao dịch bị hủy do vi phạm ràng buộc dữ liệu. Vui lòng kiểm tra lại thông tin.'
+                        severity = 'warn'
+                    } else if (data.message.includes('constraint')) {
+                        errorDetail = 'Vi phạm ràng buộc dữ liệu. Có thể do email hoặc số điện thoại đã tồn tại.'
+                        severity = 'warn'
+                    } else if (data.message.includes('foreign key')) {
+                        errorDetail = 'Lỗi liên kết dữ liệu. Vui lòng thử lại.'
+                        severity = 'warn'
+                    }
+                }
+                break
+                
+            case 503:
+                errorMessage = 'Dịch vụ không khả dụng'
+                errorDetail = 'Hệ thống đang bảo trì hoặc quá tải. Vui lòng thử lại sau.'
+                break
+                
+            default:
+                errorMessage = `Lỗi HTTP ${status}`
+                errorDetail = data?.message || data?.error || error.message || 'Lỗi không xác định từ máy chủ'
+        }
+    } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+        errorMessage = 'Lỗi kết nối'
+        errorDetail = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.'
+        severity = 'warn'
+    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'Hết thời gian chờ'
+        errorDetail = 'Quá trình xử lý mất quá nhiều thời gian. Vui lòng thử lại.'
+        severity = 'warn'
+    } else {
+        errorMessage = 'Lỗi không xác định'
+        errorDetail = error.message || defaultMessage
+    }
+
+    // Hiển thị thông báo lỗi
+    toast.add({
+        severity: severity,
+        summary: errorMessage,
+        detail: errorDetail,
+        life: severity === 'error' ? 8000 : 6000
+    })
+    
+    // Log chi tiết cho debug
+    console.error('🔍 Error Analysis:', {
+        originalError: error,
+        processedMessage: errorMessage,
+        processedDetail: errorDetail,
+        validationErrors: validationErrors.value
+    })
+}
+
+// ===== UPDATE ACCOUNT METHOD =====
+const handleUpdateAccount = async () => {
+    submitted.value = true
+    saving.value = true
+    
+    try {
+        validationErrors.value = {}
+        
+        // CHỈ VALIDATE EMAIL VÀ MẬT KHẨU
+        if (!editAccountData.value.email?.trim()) {
+            validationErrors.value.editEmail = 'Email không được để trống'
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAccountData.value.email)) {
+            validationErrors.value.editEmail = 'Email không hợp lệ'
+        } else if (checkEmailExists(editAccountData.value.email, editAccountData.value.id)) {
+            validationErrors.value.editEmail = 'Email đã tồn tại'
+        }
+        
+        // VALIDATE MẬT KHẨU NẾU CÓ NHẬP
+        if (editAccountData.value.matKhau && editAccountData.value.matKhau.trim()) {
+            if (editAccountData.value.matKhau.length < 6) {
+                validationErrors.value.editMatKhau = 'Mật khẩu phải có ít nhất 6 ký tự'
+            } else if (editAccountData.value.matKhau.length > 50) {
+                validationErrors.value.editMatKhau = 'Mật khẩu không được quá 50 ký tự'
+            }
+        }
+        
+        if (Object.keys(validationErrors.value).length > 0) {
+            return
+        }
+        
+        // CHỈ GỬI EMAIL VÀ MẬT KHẨU (NẾU CÓ)
+        const updateData = {
+            email: editAccountData.value.email.trim()
+        }
+        
+        // Chỉ thêm mật khẩu nếu có nhập
+        if (editAccountData.value.matKhau && editAccountData.value.matKhau.trim()) {
+            updateData.matKhau = editAccountData.value.matKhau.trim()
+        }
+        
+        console.log('🔧 Updating account (email/password only):', updateData)
+        
+        const response = await axios.put(
+            `http://localhost:8080/api/tai-khoan/${editAccountData.value.id}`, 
+            updateData,
+            {
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                timeout: 10000
+            }
+        )
+        
+        if (response.status === 200) {
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Thông tin đăng nhập đã được cập nhật',
+                life: 3000
+            })
+            
+            hideEditDialog()
+            await fetchData()
+        }
+        
+    } catch (error) {
+        console.error('❌ Update error:', error)
+        handleApiError(error, 'Không thể cập nhật thông tin đăng nhập')
+    } finally {
+        saving.value = false
+    }
+}
+
+// ===== DELETE METHODS =====
 const handleDeleteSelectedAccounts = async () => {
     deleting.value = true
     
@@ -1629,7 +1877,7 @@ const handleDeleteSelectedAccounts = async () => {
         await fetchData()
         
     } catch (error) {
-        console.error('Lỗi xóa nhiều tài khoản:', error)
+        console.error('❌ Lỗi xóa nhiều tài khoản:', error)
         toast.add({
             severity: 'error',
             summary: 'Lỗi hệ thống',
@@ -1641,151 +1889,15 @@ const handleDeleteSelectedAccounts = async () => {
     }
 }
 
-const handleUpdateAccount = async () => {
-    submitted.value = true
-    saving.value = true
-    
-    try {
-        validationErrors.value = {}
-        
-        if (!editAccountData.value.email?.trim()) {
-            validationErrors.value.editEmail = 'Email không được để trống'
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAccountData.value.email)) {
-            validationErrors.value.editEmail = 'Email không hợp lệ'
-        } else if (checkEmailExists(editAccountData.value.email, editAccountData.value.id)) {
-            validationErrors.value.editEmail = 'Email đã tồn tại'
-        }
-        
-        if (!editAccountData.value.vaiTro) {
-            validationErrors.value.editVaiTro = 'Vui lòng chọn vai trò'
-        }
-        
-        if (editAccountData.value.trangThai === undefined || editAccountData.value.trangThai === null) {
-            validationErrors.value.editTrangThai = 'Vui lòng chọn trạng thái'
-        }
-        
-        if (Object.keys(validationErrors.value).length > 0) {
-            return
-        }
-        
-        // FIXED: Gửi object đơn giản, không phải DTO
-        const updateData = {
-            email: editAccountData.value.email.trim(),
-            vaiTroString: editAccountData.value.vaiTro, // Dùng vaiTroString
-            trangThai: parseInt(editAccountData.value.trangThai)
-        }
-        
-        // Chỉ thêm mật khẩu nếu có nhập
-        if (editAccountData.value.matKhau && editAccountData.value.matKhau.trim()) {
-            updateData.matKhau = editAccountData.value.matKhau.trim()
-        }
-        
-        console.log('=== UPDATE ACCOUNT DEBUG ===')
-        console.log('Account ID:', editAccountData.value.id)
-        console.log('Update payload:', JSON.stringify(updateData, null, 2))
-        
-        const response = await axios.put(
-            `http://localhost:8080/api/tai-khoan/${editAccountData.value.id}`, 
-            updateData,
-            {
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                timeout: 10000
-            }
-        )
-        
-        console.log('✅ Update response:', response.data)
-        
-        if (response.status === 200) {
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: 'Tài khoản đã được cập nhật',
-                life: 3000
-            })
-            
-            hideEditDialog()
-            await fetchData()
-        }
-        
-    } catch (error) {
-        console.error('❌ Update error details:')
-        console.error('Status:', error.response?.status)
-        console.error('Data:', error.response?.data)
-        console.error('Headers:', error.response?.headers)
-        console.error('Full error:', error)
-        
-        // Xử lý lỗi cụ thể
-        if (error.response) {
-            const { status, data } = error.response
-            
-            switch (status) {
-                case 400:
-                    let errorMsg = 'Dữ liệu không hợp lệ'
-                    if (data?.message) {
-                        errorMsg = data.message
-                    } else if (data?.error) {
-                        errorMsg = data.error
-                    }
-                    
-                    toast.add({
-                        severity: 'error',
-                        summary: 'Lỗi dữ liệu',
-                        detail: errorMsg,
-                        life: 5000
-                    })
-                    break
-                    
-                case 404:
-                    toast.add({
-                        severity: 'error',
-                        summary: 'Không tìm thấy',
-                        detail: 'Tài khoản không tồn tại',
-                        life: 5000
-                    })
-                    break
-                    
-                case 409:
-                    toast.add({
-                        severity: 'error',
-                        summary: 'Email trùng lặp',
-                        detail: 'Email đã được sử dụng bởi tài khoản khác',
-                        life: 5000
-                    })
-                    break
-                    
-                default:
-                    toast.add({
-                        severity: 'error',
-                        summary: 'Lỗi server',
-                        detail: `Mã lỗi: ${status}`,
-                        life: 5000
-                    })
-            }
-        } else {
-            toast.add({
-                severity: 'error',
-                summary: 'Lỗi kết nối',
-                detail: 'Không thể kết nối đến server',
-                life: 5000
-            })
-        }
-    } finally {
-        saving.value = false
-    }
-}
-
 const handleDeleteAccount = async () => {
     deleting.value = true
     try {
-        console.log('Đang xóa tài khoản:', selectedAccountForDelete.value.id)
+        console.log('🗑️ Đang xóa tài khoản:', selectedAccountForDelete.value.id)
         
         const response = await axios.delete(
             `http://localhost:8080/api/tai-khoan/${selectedAccountForDelete.value.id}`,
             {
-                timeout: 30000, // Tăng timeout cho operation xóa
+                timeout: 30000,
                 headers: {
                     'Content-Type': 'application/json'
                 }
@@ -1806,149 +1918,37 @@ const handleDeleteAccount = async () => {
         }
         
     } catch (error) {
-        console.error('Lỗi xóa tài khoản:', error)
-        
-        // XỬ LÝ LỖI CỤ THỂ CHO VIỆC XÓA
-        if (error.response) {
-            const { status, data } = error.response
-            
-            switch (status) {
-                case 400:
-                    if (data.errorCode === 'LAST_ADMIN') {
-                        toast.add({
-                            severity: 'warn',
-                            summary: 'Không thể xóa',
-                            detail: 'Không thể xóa admin cuối cùng trong hệ thống',
-                            life: 5000
-                        })
-                    } else if (data.errorCode === 'DELETE_FORBIDDEN') {
-                        toast.add({
-                            severity: 'warn',
-                            summary: 'Không thể xóa',
-                            detail: data.message || 'Tài khoản này không thể bị xóa',
-                            life: 5000
-                        })
-                    } else if (data.errorCode === 'INVALID_ID') {
-                        toast.add({
-                            severity: 'error',
-                            summary: 'Lỗi dữ liệu',
-                            detail: 'ID tài khoản không hợp lệ',
-                            life: 5000
-                        })
-                    } else {
-                        toast.add({
-                            severity: 'error',
-                            summary: 'Lỗi xóa',
-                            detail: data.message || 'Dữ liệu không hợp lệ',
-                            life: 5000
-                        })
-                    }
-                    break
-                    
-                case 404:
-                    toast.add({
-                        severity: 'warn',
-                        summary: 'Không tìm thấy',
-                        detail: 'Tài khoản không tồn tại hoặc đã bị xóa',
-                        life: 4000
-                    })
-                    // Refresh data vì có thể tài khoản đã bị xóa bởi user khác
-                    await fetchData()
-                    break
-                    
-                case 409:
-                    if (data.errorCode === 'CONSTRAINT_VIOLATION') {
-                        toast.add({
-                            severity: 'error',
-                            summary: 'Không thể xóa',
-                            detail: 'Tài khoản đang có dữ liệu liên quan (khách hàng, nhân viên, đơn hàng...)',
-                            life: 6000
-                        })
-                    } else {
-                        toast.add({
-                            severity: 'error',
-                            summary: 'Xung đột dữ liệu',
-                            detail: data.message || 'Không thể xóa do xung đột dữ liệu',
-                            life: 5000
-                        })
-                    }
-                    break
-                    
-                case 500:
-                    toast.add({
-                        severity: 'error',
-                        summary: 'Lỗi server',
-                        detail: 'Có lỗi xảy ra khi xóa tài khoản. Vui lòng thử lại sau.',
-                        life: 5000
-                    })
-                    break
-                    
-                default:
-                    toast.add({
-                        severity: 'error',
-                        summary: 'Lỗi xóa',
-                        detail: `Lỗi ${status}: ${data.message || 'Không thể xóa tài khoản'}`,
-                        life: 5000
-                    })
-            }
-        } else {
-            toast.add({
-                severity: 'error',
-                summary: 'Lỗi kết nối',
-                detail: 'Không thể kết nối đến server để xóa tài khoản',
-                life: 5000
-            })
-        }
+        console.error('❌ Lỗi xóa tài khoản:', error)
+        handleApiError(error, 'Không thể xóa tài khoản')
     } finally {
         deleting.value = false
     }
 }
+
 const handleChangeStatus = async (account) => {
     try {
         const newStatus = account.trangThai === 1 ? 0 : 1
         
-        console.log('Thay đổi trạng thái:', {
+        console.log('🔄 Thay đổi trạng thái:', {
             accountId: account.id,
             currentStatus: account.trangThai,
             newStatus: newStatus
         })
         
-        // Thử PATCH method trước (đã sửa CORS)
-        let response
-        try {
-            response = await axios.patch(
-                `http://localhost:8080/api/tai-khoan/${account.id}/trang-thai?trangThai=${newStatus}`,
-                {},
-                {
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    timeout: 10000
-                }
-            )
-        } catch (patchError) {
-            console.warn('PATCH thất bại, thử PUT method:', patchError.response?.status)
-            
-            // Fallback to PUT method
-            const putData = {
-                email: account.email,
-                vaiTroString: account.vaiTro,
-                trangThai: newStatus
+        // SỬA: Gửi trong request body thay vì query param
+        const response = await axios.patch(
+            `http://localhost:8080/api/tai-khoan/${account.id}/trang-thai`,
+            { 
+                trangThai: newStatus  // Gửi trong body
+            },
+            {
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                timeout: 10000
             }
-            
-            response = await axios.put(
-                `http://localhost:8080/api/tai-khoan/${account.id}`,
-                putData,
-                {
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    timeout: 10000
-                }
-            )
-        }
+        )
         
         if (response.status === 200) {
             toast.add({
@@ -1961,50 +1961,32 @@ const handleChangeStatus = async (account) => {
         }
         
     } catch (error) {
-        console.error('Lỗi thay đổi trạng thái:', error)
+        console.error('❌ Lỗi thay đổi trạng thái:', error)
         
+        // Xử lý lỗi chi tiết
         if (error.response) {
             const { status, data } = error.response
-            let errorMsg = 'Không thể thay đổi trạng thái'
+            let errorMessage = 'Không thể thay đổi trạng thái'
             
-            switch (status) {
-                case 400:
-                    if (data.errorCode === 'LAST_ADMIN') {
-                        errorMsg = 'Không thể vô hiệu hóa admin cuối cùng trong hệ thống'
-                    } else if (data.errorCode === 'INVALID_STATUS') {
-                        errorMsg = 'Trạng thái không hợp lệ'
-                    } else {
-                        errorMsg = data.message || 'Dữ liệu không hợp lệ'
-                    }
-                    break
-                case 403:
-                    errorMsg = 'Không có quyền thay đổi trạng thái'
-                    break
-                case 404:
-                    errorMsg = 'Tài khoản không tồn tại'
-                    await fetchData() // Refresh data
-                    break
-                default:
-                    errorMsg = `Lỗi server (${status}): ${data.message || 'Lỗi không xác định'}`
+            if (status === 400 && data.message) {
+                errorMessage = data.message
+            } else if (status === 404) {
+                errorMessage = 'Không tìm thấy tài khoản'
+            } else if (data.message) {
+                errorMessage = data.message
             }
             
             toast.add({
                 severity: 'error',
-                summary: 'Lỗi đổi trạng thái',
-                detail: errorMsg,
+                summary: 'Lỗi',
+                detail: errorMessage,
                 life: 5000
             })
         } else {
-            toast.add({
-                severity: 'error',
-                summary: 'Lỗi kết nối',
-                detail: 'Không thể kết nối đến server',
-                life: 5000
-            })
+            handleApiError(error, 'Không thể thay đổi trạng thái')
         }
     }
-}
-// ===== EXPORT FUNCTION =====
+}// ===== EXPORT FUNCTION =====
 const handleExportCSV = () => {
     exporting.value = true
     try {
@@ -2030,87 +2012,11 @@ const handleExportCSV = () => {
     }
 }
 
-
-// ===== ERROR HANDLING =====
-const handleApiError = (error, defaultMessage) => {
-    let errorMessage = defaultMessage
-    let errorDetail = ''
-    
-    console.error('API Error Details:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
-    })
-    
-    if (error.response) {
-        const { status, data } = error.response
-        
-        switch (status) {
-            case 400:
-                errorMessage = 'Dữ liệu không hợp lệ'
-                // XỬ LÝ VALIDATION ERRORS TỪ BACKEND
-                if (data.errors && typeof data.errors === 'object') {
-                    Object.keys(data.errors).forEach(field => {
-                        validationErrors.value[field] = data.errors[field]
-                    })
-                    errorDetail = 'Vui lòng sửa các lỗi được đánh dấu'
-                } else {
-                    errorDetail = data.message || data.error || 'Vui lòng kiểm tra lại thông tin'
-                }
-                break
-                
-            case 409:
-                errorMessage = 'Dữ liệu trùng lặp'
-                if (data.errorCode === 'EMAIL_EXISTS') {
-                    errorDetail = 'Email đã tồn tại trong hệ thống'
-                    validationErrors.value.email = 'Email đã tồn tại'
-                    validationErrors.value.accountEmail = 'Email đã tồn tại'
-                } else {
-                    errorDetail = data.message || 'Dữ liệu đã tồn tại'
-                }
-                break
-                
-            case 403:
-                errorMessage = 'Không có quyền'
-                errorDetail = data.message || 'Bạn không có quyền thực hiện thao tác này'
-                break
-                
-            case 404:
-                errorMessage = 'Không tìm thấy'
-                errorDetail = data.message || 'Tài khoản không tồn tại'
-                break
-                
-            case 500:
-                errorMessage = 'Lỗi server'
-                errorDetail = 'Có lỗi xảy ra trên server. Vui lòng thử lại sau.'
-                break
-                
-            default:
-                errorMessage = `Lỗi HTTP ${status}`
-                errorDetail = data.message || data.error || error.message || 'Lỗi không xác định'
-        }
-    } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
-        errorMessage = 'Lỗi kết nối'
-        errorDetail = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.'
-    } else {
-        errorMessage = 'Lỗi không xác định'
-        errorDetail = error.message || defaultMessage
-    }
-
-    toast.add({
-        severity: 'error',
-        summary: errorMessage,
-        detail: errorDetail,
-        life: 6000
-    })
-}
-
 // ===== LIFECYCLE =====
 onMounted(() => {
     fetchData()
 })
 </script>
-
 <style scoped>
 .card {
     border: none;
@@ -2187,178 +2093,5 @@ onMounted(() => {
 :deep(.p-paginator) {
     background: #f8fafc;
     border-top: 1px solid #e2e8f0;
-}
-
-/* Tag Styling */
-:deep(.p-tag) {
-    font-weight: 500;
-    padding: 0.25rem 0.75rem;
-}
-
-:deep(.p-tag.p-tag-success) {
-    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-    color: #065f46;
-    border: 1px solid #10b981;
-}
-
-:deep(.p-tag.p-tag-danger) {
-    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-    color: #991b1b;
-    border: 1px solid #ef4444;
-}
-
-:deep(.p-tag.p-tag-warn) {
-    background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
-    color: #92400e;
-    border: 1px solid #f59e0b;
-}
-
-:deep(.p-tag.p-tag-primary) {
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-    color: #1e40af;
-    border: 1px solid #3b82f6;
-}
-
-:deep(.p-tag.p-tag-info) {
-    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-    color: #0c4a6e;
-    border: 1px solid #0ea5e9;
-}
-
-/* Button Styling */
-:deep(.p-button.p-button-outlined) {
-    transition: all 0.2s ease;
-}
-
-:deep(.p-button.p-button-outlined:hover) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-/* Dialog Styling */
-:deep(.p-dialog) {
-    border-radius: 1rem;
-    overflow: hidden;
-}
-
-:deep(.p-dialog-header) {
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    border-bottom: 2px solid #e2e8f0;
-    padding: 1.5rem;
-}
-
-:deep(.p-dialog-content) {
-    padding: 1.5rem;
-}
-
-:deep(.p-dialog-footer) {
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
-    padding: 1rem 1.5rem;
-}
-
-/* Form Styling */
-:deep(.p-inputtext:focus) {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-:deep(.p-select:focus) {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-:deep(.p-datepicker:focus) {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .search-filter-section {
-        padding: 1rem;
-    }
-    
-    .search-filter-section .flex {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 1rem;
-    }
-    
-    :deep(.p-datatable-responsive-demo .p-datatable-tbody tr td) {
-        font-size: 0.875rem;
-        padding: 0.5rem;
-    }
-    
-    :deep(.p-dialog) {
-        width: 95% !important;
-        margin: 1rem;
-    }
-    
-    .stats-summary {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-}
-
-@media (max-width: 640px) {
-    :deep(.p-datatable-header h4) {
-        font-size: 1.25rem;
-    }
-    
-    .search-filter-section {
-        padding: 0.75rem;
-    }
-    
-    :deep(.p-toolbar) {
-        flex-direction: column;
-        gap: 1rem;
-    }
-    
-    :deep(.p-toolbar .p-toolbar-group-left),
-    :deep(.p-toolbar .p-toolbar-group-right) {
-        flex-direction: column;
-        gap: 0.5rem;
-        width: 100%;
-    }
-}
-
-/* Animation */
-@keyframes slideInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.card {
-    animation: slideInUp 0.5s ease-out;
-}
-
-/* Loading state */
-:deep(.p-datatable-loading-overlay) {
-    background: rgba(255, 255, 255, 0.9);
-}
-
-/* Scrollbar styling */
-:deep(.p-datatable-wrapper::-webkit-scrollbar) {
-    height: 8px;
-}
-
-:deep(.p-datatable-wrapper::-webkit-scrollbar-track) {
-    background: #f1f5f9;
-}
-
-:deep(.p-datatable-wrapper::-webkit-scrollbar-thumb) {
-    background: #cbd5e1;
-    border-radius: 4px;
-}
-
-:deep(.p-datatable-wrapper::-webkit-scrollbar-thumb:hover) {
-    background: #94a3b8;
 }
 </style>

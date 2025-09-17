@@ -1020,31 +1020,32 @@ const saveCustomer = async () => {
             return
         }
 
-        if (!customer.value.hoTen?.trim() || 
-            !customer.value.sdt?.trim() || 
-            !isValidPhone(customer.value.sdt) || 
-            customer.value.trangThai === undefined) {
+        const validationErrors = validateCustomerData()
+        if (validationErrors.length > 0) {
             toast.add({
                 severity: 'warn',
-                summary: 'Cảnh báo',
-                detail: 'Vui lòng điền đầy đủ và đúng định dạng thông tin bắt buộc',
+                summary: 'Dữ liệu không hợp lệ',
+                detail: validationErrors[0],
                 life: 3000
             })
             return
         }
 
-        // Process addresses - FIXED TO USE API DATA
-        const processedAddresses = customer.value.danhSachDiaChi?.map(addr => ({
-            diaChiChiTiet: addr.diaChiChiTiet?.trim(),
-            tenPhuong: addr.tenPhuong?.trim(),
-            tenTinh: addr.tenTinh?.trim(),
+        // Xử lý địa chỉ - CHỈ LẤY ĐỊA CHỈ HOÀN CHỈNH
+        const processedAddresses = customer.value.danhSachDiaChi?.filter(addr => {
+            return addr.maTinh && addr.maPhuong && addr.tenTinh && addr.tenPhuong
+        }).map(addr => ({
+            diaChiChiTiet: addr.diaChiChiTiet?.trim() || '',
+            tenPhuong: addr.tenPhuong.trim(),
+            tenTinh: addr.tenTinh.trim(),
             diaChiDayDu: formatFullAddressEdit(addr),
             isDefault: addr.isDefault || false,
-            maPhuong: addr.maPhuong || null,
-            maTinh: addr.maTinh || null
-        })).filter(addr => addr.diaChiChiTiet && addr.tenPhuong && addr.tenTinh) || []
+            maPhuong: addr.maPhuong,
+            maTinh: addr.maTinh,
+            trangThai: 1
+        })) || []
 
-        // Ensure we have at least one default address if any addresses exist
+        // Đảm bảo có địa chỉ mặc định
         if (processedAddresses.length > 0) {
             const hasDefault = processedAddresses.some(addr => addr.isDefault)
             if (!hasDefault) {
@@ -1056,10 +1057,11 @@ const saveCustomer = async () => {
             hoTen: customer.value.hoTen.trim(),
             sdt: customer.value.sdt.trim(),
             trangThai: customer.value.trangThai,
+            ngaySinh: customer.value.ngaySinh ? customer.value.ngaySinh.toISOString().split('T')[0] : null,
             danhSachDiaChi: processedAddresses
         }
 
-        const response = await axios.put(`http://localhost:8080/api/khach-hang/${customer.value.id}`, customerData)
+        await axios.put(`http://localhost:8080/api/khach-hang/${customer.value.id}`, customerData)
         
         toast.add({
             severity: 'success',
@@ -1077,14 +1079,34 @@ const saveCustomer = async () => {
         saving.value = false
     }
 }
-
+const formatDateOnly = (date) => {
+    if (!date) return 'Chưa có'
+    return new Date(date).toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    })
+}
 const changeStatus = async (customerData) => {
     try {
         const newStatus = customerData.trangThai === 1 ? 0 : 1
         
-        const response = await axios.patch(`http://localhost:8080/api/khach-hang/${customerData.id}/status`, { 
+        await axios.patch(`http://localhost:8080/api/khach-hang/${customerData.id}/status`, { 
             trangThai: newStatus 
         })
+
+        // SỬA: Đồng bộ trạng thái tài khoản nếu có
+        if (customerData.idTaiKhoan) {
+            try {
+                await axios.patch(`http://localhost:8080/api/tai-khoan/${customerData.idTaiKhoan}/trang-thai`, {
+                    trangThai: newStatus
+                }, {
+                    headers: { 'Content-Type': 'application/json' }
+                })
+            } catch (error) {
+                console.warn('Không thể đồng bộ trạng thái tài khoản:', error)
+            }
+        }
 
         toast.add({
             severity: 'success',
@@ -1099,7 +1121,6 @@ const changeStatus = async (customerData) => {
         handleApiError(error, 'Không thể thay đổi trạng thái')
     }
 }
-
 const confirmBatchStatusChange = () => {
     if (!selectedCustomers.value || !selectedCustomers.value.length) return
 
@@ -1161,6 +1182,8 @@ const viewCustomer = (customerData) => {
 const editCustomer = (customerData) => {
     customer.value = { 
         ...customerData,
+        originalMaKhachHang: customerData.maKhachHang, // Lưu mã gốc
+        ngaySinh: customerData.ngaySinh ? new Date(customerData.ngaySinh) : null,
         danhSachDiaChi: customerData.danhSachDiaChi ? 
             customerData.danhSachDiaChi.map(addr => ({
                 ...addr,
@@ -1168,19 +1191,19 @@ const editCustomer = (customerData) => {
             })) : []
     }
     
-    // Initialize address data if needed
+    // Khởi tạo địa chỉ nếu cần
     if (!customer.value.danhSachDiaChi || customer.value.danhSachDiaChi.length === 0) {
         customer.value.danhSachDiaChi = [{
             diaChiChiTiet: '',
             tenPhuong: '',
             tenTinh: '',
-            maPhuong: null,
-            maTinh: null,
+            maPhuong: '',
+            maTinh: '',
             availableWards: [],
             isDefault: true
         }]
     } else {
-        // Load wards for existing addresses
+        // Load wards cho địa chỉ hiện có
         customer.value.danhSachDiaChi.forEach((addr, index) => {
             if (addr.maTinh) {
                 fetchWardsForAddress(addr.maTinh, index)
@@ -1192,7 +1215,6 @@ const editCustomer = (customerData) => {
     customerDialog.value = true
     fetchProvinces()
 }
-
 const editFromView = () => {
     editCustomer(viewingCustomer.value)
     viewDialog.value = false
@@ -1267,8 +1289,46 @@ const downloadExcel = (headers, data, filename) => {
     link.click()
     document.body.removeChild(link)
 }
-
-// ===== ERROR HANDLING =====
+const validateCustomerData = () => {
+    const errors = []
+    
+    // SỬA: Ngăn sửa mã khách hàng
+    if (customer.value.id && customer.value.maKhachHang && 
+        customer.value.originalMaKhachHang && 
+        customer.value.maKhachHang !== customer.value.originalMaKhachHang) {
+        errors.push('Không thể thay đổi mã khách hàng đã được tạo')
+    }
+    
+    // Validate họ tên
+    if (!customer.value.hoTen || !customer.value.hoTen.trim()) {
+        errors.push('Họ tên không được để trống')
+    } else if (customer.value.hoTen.length > 100) {
+        errors.push('Họ tên không được quá 100 ký tự')
+    }
+    
+    // Validate số điện thoại
+    if (!customer.value.sdt || !customer.value.sdt.trim()) {
+        errors.push('Số điện thoại không được để trống')
+    } else if (!isValidPhone(customer.value.sdt)) {
+        errors.push('Số điện thoại không hợp lệ')
+    }
+    
+    // Validate trạng thái
+    if (customer.value.trangThai === undefined || customer.value.trangThai === null) {
+        errors.push('Trạng thái không được để trống')
+    }
+    
+    // Validate ngày sinh nếu có
+    if (customer.value.ngaySinh) {
+        const today = new Date()
+        const birthDate = new Date(customer.value.ngaySinh)
+        if (birthDate > today) {
+            errors.push('Ngày sinh không thể lớn hơn ngày hiện tại')
+        }
+    }
+    
+    return errors
+}// ===== ERROR HANDLING =====
 const handleApiError = (error, defaultMessage) => {
     let errorMessage = defaultMessage
     

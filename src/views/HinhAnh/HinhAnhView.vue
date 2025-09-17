@@ -38,6 +38,14 @@ onMounted(() => {
     fetchData();
 });
 
+// Hàm tính toán số thứ tự với pagination
+function getRowIndex(index) {
+    // Lấy thông tin pagination từ DataTable
+    const currentPage = dt.value ? dt.value.d_first / dt.value.d_rows : 0;
+    const rowsPerPage = dt.value ? dt.value.d_rows : 10;
+    return currentPage * rowsPerPage + index + 1;
+}
+
 async function fetchData() {
     try {
         const res = await axios.get('http://localhost:8080/hinh-anh');
@@ -376,10 +384,16 @@ function exportCSV() {
             return;
         }
 
-        const headers = ['ID', 'Mã Hình Ảnh', 'Tên File', 'Trạng Thái'];
+        const headers = ['STT', 'Mã Hình Ảnh', 'Tên File', 'Trạng Thái'];
 
-        const csvData = ListHinhAnh.value.map((item) => {
-            return [item.id || '', item.maHinhAnh || '', item.tenHinhAnh || '', item.trangThai === 1 ? 'Đã load' : 'Đang load'];
+        const csvData = ListHinhAnh.value.map((item, index) => {
+            return [
+                // item.id || '',
+                index + 1,
+                item.maHinhAnh || '',
+                item.tenHinhAnh || '',
+                item.trangThai === 1 ? 'Đã load' : 'Đang load'
+            ];
         });
 
         const csvContent = [headers, ...csvData]
@@ -473,8 +487,13 @@ function exportCSV() {
             </template>
 
             <Column selectionMode="multiple" style="width: 3rem" :exportable="false"></Column>
-            <Column field="id" header="ID" sortable style="min-width: 6rem"></Column>
+            <!-- <Column field="id" header="ID" sortable style="min-width: 6rem"></Column> -->
 
+            <Column field="STT" header="STT" sortable style="min-width: 8rem">
+                <template #body="slotProps">
+                    {{ getRowIndex(slotProps.index) }}
+                </template>
+            </Column>
             <!-- CỘT HÌNH ẢNH -->
             <Column header="Hình ảnh" style="min-width: 11rem">
                 <template #body="slotProps">
@@ -491,17 +510,17 @@ function exportCSV() {
             </Column>
             <Column field="maHinhAnh" header="Mã Hình Ảnh" sortable style="min-width: 12rem"></Column>
             <Column field="tenHinhAnh" header="Tên File" sortable style="min-width: 20rem"></Column>
-            <!-- <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
+            <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
                 <template #body="slotProps">
                     <Tag :value="slotProps.data.trangThai === 1 ? 'Đã load' : 'Đang load'" :severity="getStatusLabel(slotProps.data.trangThai)" />
                 </template>
-            </Column> -->
+            </Column>
             <Column :exportable="false" style="width: 12rem">
                 <template #body="slotProps">
                     <div class="flex justify-center gap-2">
                         <Button icon="pi pi-pencil" outlined rounded size="small" @click="editHinhAnh(slotProps.data)" v-tooltip.top="'Chỉnh sửa'" />
                         <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteHinhAnh(slotProps.data)" v-tooltip.top="'Xóa'" />
-                        <!-- <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" v-tooltip.top="'Đổi trạng thái'" /> -->
+                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" v-tooltip.top="'Đổi trạng thái'" />
                     </div>
                 </template>
             </Column>

@@ -835,6 +835,7 @@
 </template>
 
 <script setup>
+// NhanVienView.vue - Script section
 import axios from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
@@ -853,12 +854,10 @@ const getCurrentUser = () => {
         if (userInfo) {
             return JSON.parse(userInfo)
         }
-        
         const userData = localStorage.getItem('user')
         if (userData) {
             return JSON.parse(userData)
         }
-        
         return {
             id: 1,
             email: 'admin@beeshoes.com',
@@ -875,7 +874,7 @@ const getCurrentUser = () => {
 const isAdmin = computed(() => {
     const user = getCurrentUser()
     const result = user?.vaiTro === 'ADMIN' || user?.role === 'ADMIN'
-    console.log('🔍 Admin check:', { user, result })
+    console.log('Admin check:', { user, result })
     return result
 })
 
@@ -899,16 +898,16 @@ const employee = ref({})
 const viewingEmployee = ref(null)
 const viewingAddressEmployee = ref(null)
 
-// Address Data - API
+// Address Data
 const provinces = ref([])
 const wards = ref([])
 const loadingProvinces = ref(false)
 const loadingWards = ref(false)
 
-// ===== SỬA LẠI SEARCH FILTERS =====
+// FIXED: Search and Filters
 const globalSearch = ref('')
 const advancedFilters = ref({
-    trangThai: null, // Sửa từ '' thành null để match với backend
+    trangThai: null,
     startDate: null,
     endDate: null
 })
@@ -922,9 +921,9 @@ const pagination = ref({
     totalPages: 0
 })
 
-// ===== SỬA LẠI OPTIONS =====
+// Options
 const statusOptions = ref([
-    { label: 'Tất cả trạng thái', value: null }, // Sửa từ '' thành null
+    { label: 'Tất cả trạng thái', value: null },
     { label: 'Đang làm việc', value: 1 },
     { label: 'Nghỉ việc', value: 0 }
 ])
@@ -944,18 +943,18 @@ const isFormValidComplete = computed(() => {
     return errors.length === 0
 })
 
-// ===== SỬA LẠI SEARCH FUNCTIONS =====
+// ===== SEARCH FUNCTIONS - FIXED =====
 const clearGlobalSearch = () => {
     globalSearch.value = ''
     pagination.value.page = 0
-    selectedEmployees.value = [] // Xóa selection khi search thay đổi
+    selectedEmployees.value = []
     fetchData()
 }
 
 const resetAllFilters = () => {
     globalSearch.value = ''
     advancedFilters.value = {
-        trangThai: null, // Sửa từ '' thành null
+        trangThai: null,
         startDate: null,
         endDate: null
     }
@@ -964,12 +963,15 @@ const resetAllFilters = () => {
     fetchData()
 }
 
-// ===== SỬA LẠI EVENT HANDLERS =====
 const onGlobalSearchInput = () => {
     pagination.value.page = 0
     selectedEmployees.value = []
-    debouncedGlobalSearch()
+    clearTimeout(searchTimeout.value)
+    searchTimeout.value = setTimeout(() => {
+        fetchData()
+    }, 300)
 }
+const searchTimeout = ref(null)
 
 const onStatusFilterChange = () => {
     pagination.value.page = 0
@@ -983,7 +985,7 @@ const onDateFilterChange = () => {
     fetchData()
 }
 
-// Debounced global search - SỬA LẠI
+// Debounced search
 const debounce = (func, wait) => {
     let timeout
     return function executedFunction(...args) {
@@ -998,66 +1000,50 @@ const debounce = (func, wait) => {
 
 const debouncedGlobalSearch = debounce(() => {
     fetchData()
-}, 300) // Giảm từ 500ms xuống 300ms để UX tốt hơn
+}, 300)
 
-// ===== SỬA LẠI API FUNCTIONS =====
+// ===== MAIN API FUNCTION - FIXED =====
 const fetchData = async () => {
     isLoading.value = true
     try {
         const params = {
-            page: pagination.value.page,
-            size: Math.min(pagination.value.size, 100),
+            page: Math.max(0, pagination.value.page || 0),
+            size: Math.min(Math.max(1, pagination.value.size || 10), 100),
             sortBy: pagination.value.sortField || 'id',
             sortDir: pagination.value.sortOrder === 1 ? 'asc' : 'desc'
         }
 
-        // SỬA LẠI: Xác định endpoint đúng dựa trên tiêu chí tìm kiếm
         let endpoint = 'http://localhost:8080/api/nhan-vien'
-        let hasSearchCriteria = false
-
-        // Global search - ưu tiên cao nhất
-        if (globalSearch.value && globalSearch.value.trim()) {
-            endpoint = 'http://localhost:8080/api/nhan-vien/search'
-            params.globalSearch = globalSearch.value.trim()
-            hasSearchCriteria = true
+        
+        // Global search
+         if (globalSearch.value && typeof globalSearch.value === 'string' && globalSearch.value.trim()) {
+            params.search = globalSearch.value.trim()
         }
 
-        // Advanced filters - có thể kết hợp với global search
-        if (advancedFilters.value.trangThai !== null && advancedFilters.value.trangThai !== undefined) {
-            if (!hasSearchCriteria) {
-                endpoint = 'http://localhost:8080/api/nhan-vien/search'
-            }
-            params.trangThai = advancedFilters.value.trangThai
-            hasSearchCriteria = true
+        // Advanced filters
+if (advancedFilters.value.trangThai !== null && 
+            advancedFilters.value.trangThai !== undefined && 
+            [0, 1].includes(parseInt(advancedFilters.value.trangThai))) {
+            params.trangThai = parseInt(advancedFilters.value.trangThai)
         }
         
-        if (advancedFilters.value.startDate) {
-            if (!hasSearchCriteria) {
-                endpoint = 'http://localhost:8080/api/nhan-vien/search'
-            }
+        if (advancedFilters.value.startDate && advancedFilters.value.startDate instanceof Date) {
             params.startDate = advancedFilters.value.startDate.toISOString().split('T')[0]
-            hasSearchCriteria = true
         }
         
-        if (advancedFilters.value.endDate) {
-            if (!hasSearchCriteria) {
-                endpoint = 'http://localhost:8080/api/nhan-vien/search'
-            }
+        if (advancedFilters.value.endDate && advancedFilters.value.endDate instanceof Date) {
             params.endDate = advancedFilters.value.endDate.toISOString().split('T')[0]
-            hasSearchCriteria = true
         }
 
-        console.log('📡 Fetching employees:', { endpoint, params, hasSearchCriteria })
-
-        const response = await axios.get(endpoint, { params })
-
+        const response = await axios.get('http://localhost:8080/api/nhan-vien', { 
+            params,
+            timeout: 10000 
+        })
         if (response.data && response.data.content) {
             employees.value = response.data.content
             pagination.value.totalElements = response.data.totalElements || 0
             pagination.value.totalPages = response.data.totalPages || 0
-            console.log(`✅ Loaded ${response.data.content.length} employees`)
         } else if (response.data && Array.isArray(response.data)) {
-            // Trường hợp không có pagination
             employees.value = response.data
             pagination.value.totalElements = response.data.length
             pagination.value.totalPages = 1
@@ -1070,7 +1056,7 @@ const fetchData = async () => {
         await fetchEmployeeStats()
 
     } catch (error) {
-        console.error('❌ Error fetching employees:', error)
+        console.error('Error fetching employees:', error)
         handleApiError(error, 'Không thể tải danh sách nhân viên')
         employees.value = []
         pagination.value.totalElements = 0
@@ -1097,205 +1083,14 @@ const fetchEmployeeStats = async () => {
                     return createdDate > thirtyDaysAgo
                 }).length
             }
-            console.log('📊 Employee stats calculated:', employeeStats.value)
         }
     } catch (error) {
-        console.warn('⚠️ Could not calculate employee stats:', error.message)
+        console.warn('Could not calculate employee stats:', error.message)
         employeeStats.value = { total: 0, active: 0, inactive: 0, recent: 0 }
     }
 }
 
-// ===== SỬA LẠI CRUD OPERATIONS =====
-const saveEmployeeComplete = async () => {
-    if (!isAdmin.value) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Không có quyền',
-            detail: 'Chỉ tài khoản ADMIN mới có thể chỉnh sửa thông tin nhân viên',
-            life: 3000
-        })
-        return
-    }
-
-    submitted.value = true
-    
-    // Kiểm tra dữ liệu phía client trước
-    const validationErrors = validateEmployeeData()
-    
-    if (validationErrors.length > 0) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Dữ liệu không hợp lệ', 
-            detail: validationErrors.slice(0, 3).join('; ') + (validationErrors.length > 3 ? '...' : ''),
-            life: 5000
-        })
-        
-        console.warn('Lỗi validation:', validationErrors)
-        return
-    }
-
-    if (!employee.value.id) {
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Không thể tạo nhân viên mới từ đây. Vui lòng sử dụng chức năng tạo tài khoản.',
-            life: 3000
-        })
-        return
-    }
-
-    saving.value = true
-    try {
-        // SỬA LẠI: Xử lý địa chỉ với validation nâng cao
-        const processedAddresses = employee.value.danhSachDiaChi?.map(addr => {
-            const processedAddr = {
-                diaChiChiTiet: addr.diaChiChiTiet?.trim() || '',
-                tenPhuong: addr.tenPhuong?.trim() || '',
-                tenTinh: addr.tenTinh?.trim() || '',
-                isDefault: addr.isDefault || false,
-                maPhuong: addr.maPhuong || null,
-                maTinh: addr.maTinh || null,
-                trangThai: 1
-            }
-            
-            // SỬA LẠI: Tạo địa chỉ đầy đủ
-            const parts = [
-                processedAddr.diaChiChiTiet,
-                processedAddr.tenPhuong,
-                processedAddr.tenTinh
-            ].filter(part => part && part.trim() !== '')
-            
-            processedAddr.diaChiDayDu = parts.join(', ')
-            
-            return processedAddr
-        }).filter(addr => 
-            // SỬA LẠI: Chỉ giữ địa chỉ có đủ thông tin cơ bản
-            addr.tenPhuong && addr.tenTinh
-        ) || []
-
-        // SỬA LẠI: Đảm bảo có địa chỉ mặc định
-        if (processedAddresses.length > 0) {
-            const hasDefault = processedAddresses.some(addr => addr.isDefault)
-            if (!hasDefault) {
-                processedAddresses[0].isDefault = true
-            }
-        }
-
-        // SỬA LẠI: Chuẩn bị dữ liệu gửi lên server
-        const employeeData = {
-            id: employee.value.id,
-            maNhanVien: employee.value.maNhanVien?.trim() || null,
-            hoTen: employee.value.hoTen.trim(),
-            email: employee.value.email.trim(),
-            sdt: employee.value.sdt.trim(),
-            trangThai: employee.value.trangThai,
-            idTaiKhoan: employee.value.idTaiKhoan,
-            danhSachDiaChi: processedAddresses
-        }
-
-        console.log('💾 Cập nhật nhân viên với dữ liệu đã kiểm tra:', employeeData)
-
-        const response = await axios.put(`http://localhost:8080/api/nhan-vien/${employee.value.id}`, employeeData)
-        
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Cập nhật thông tin nhân viên thành công',
-            life: 3000
-        })
-
-        await fetchData()
-        hideEmployeeDialog()
-        
-    } catch (error) {
-        console.error('❌ Lỗi cập nhật nhân viên:', error)
-        
-        // SỬA LẠI: Xử lý lỗi nâng cao
-        let errorMessage = 'Không thể cập nhật thông tin nhân viên'
-        let errorDetails = []
-        
-        if (error.response?.status === 400) {
-            if (error.response.data?.details) {
-                if (Array.isArray(error.response.data.details)) {
-                    errorDetails = error.response.data.details
-                } else if (typeof error.response.data.details === 'object') {
-                    errorDetails = Object.values(error.response.data.details)
-                } else {
-                    errorDetails = [error.response.data.details.toString()]
-                }
-                errorMessage = 'Dữ liệu không hợp lệ'
-            } else if (error.response.data?.message) {
-                errorMessage = error.response.data.message
-            }
-        } else if (error.response?.status === 409) {
-            errorMessage = error.response.data?.message || 'Email hoặc số điện thoại đã được sử dụng'
-        } else if (error.response?.status === 500) {
-            errorMessage = 'Lỗi server nội bộ'
-        }
-        
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi cập nhật',
-            detail: errorMessage,
-            life: 5000
-        })
-        
-        if (errorDetails.length > 0) {
-            console.error('Lỗi validation từ server:', errorDetails)
-            
-            errorDetails.slice(0, 3).forEach((detail, index) => {
-                setTimeout(() => {
-                    toast.add({
-                        severity: 'warn',
-                        summary: `Chi tiết lỗi ${index + 1}`,
-                        detail: detail,
-                        life: 4000
-                    })
-                }, (index + 1) * 500)
-            })
-        }
-        
-    } finally {
-        saving.value = false
-    }
-}
-
-const changeStatus = async (employeeData) => {
-    if (!isAdmin.value) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Không có quyền',
-            detail: 'Chỉ tài khoản ADMIN mới có thể thay đổi trạng thái nhân viên',
-            life: 3000
-        })
-        return
-    }
-
-    try {
-        const newStatus = employeeData.trangThai === 1 ? 0 : 1
-        
-        console.log(`🔄 Changing status for employee ${employeeData.id} to ${newStatus}`)
-        
-        await axios.patch(`http://localhost:8080/api/nhan-vien/${employeeData.id}/status`, {
-            trangThai: newStatus
-        })
-        
-        await fetchData()
-        
-        const statusText = newStatus === 1 ? 'kích hoạt' : 'cho nghỉ việc'
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: `Đã ${statusText} nhân viên ${employeeData.hoTen}`,
-            life: 3000
-        })
-    } catch (error) {
-        console.error('❌ Error changing status:', error)
-        handleApiError(error, 'Thay đổi trạng thái thất bại')
-    }
-}
-
-// ===== VALIDATION FUNCTIONS =====
+// ===== VALIDATION FUNCTIONS - FIXED =====
 const validateEmployeeData = () => {
     const errors = []
     
@@ -1324,7 +1119,13 @@ const validateEmployeeData = () => {
         errors.push('Số điện thoại không đúng định dạng Việt Nam (10-11 số, bắt đầu bằng 0)')
     }
     
-    // Kiểm tra mã nhân viên
+    // FIXED: Không cho sửa mã nhân viên nếu đã có
+    if (employee.value.id && employee.value.maNhanVien && 
+        employee.value.originalMaNhanVien && 
+        employee.value.maNhanVien !== employee.value.originalMaNhanVien) {
+        errors.push('Không thể thay đổi mã nhân viên đã được tạo')
+    }
+    // Kiểm tra mã nhân viên format
     if (employee.value.maNhanVien && employee.value.maNhanVien.trim()) {
         if (employee.value.maNhanVien.length > 25) {
             errors.push('Mã nhân viên không được quá 25 ký tự')
@@ -1336,8 +1137,23 @@ const validateEmployeeData = () => {
     // Kiểm tra trạng thái
     if (employee.value.trangThai === undefined || employee.value.trangThai === null) {
         errors.push('Trạng thái không được để trống')
-    } else if (employee.value.trangThai !== 0 && employee.value.trangThai !== 1) {
-        errors.push('Trạng thái phải là 0 hoặc 1')
+    }
+    
+    // FIXED: Validate địa chỉ - chỉ validate nếu có nhập
+    if (employee.value.danhSachDiaChi && employee.value.danhSachDiaChi.length > 0) {
+        employee.value.danhSachDiaChi.forEach((addr, index) => {
+            // Chỉ validate nếu đã bắt đầu nhập địa chỉ
+            const hasStartedAddress = addr.maTinh || addr.maPhuong || (addr.diaChiChiTiet && addr.diaChiChiTiet.trim())
+            
+            if (hasStartedAddress) {
+                if (!addr.maTinh) {
+                    errors.push(`Địa chỉ ${index + 1}: Vui lòng chọn Tỉnh/Thành phố`)
+                }
+                if (!addr.maPhuong) {
+                    errors.push(`Địa chỉ ${index + 1}: Vui lòng chọn Phường/Xã`)
+                }
+            }
+        })
     }
     
     return errors
@@ -1345,42 +1161,365 @@ const validateEmployeeData = () => {
 
 const isValidVietnameseName = (name) => {
     if (!name || !name.trim()) return false
-    
     const trimmedName = name.trim()
     if (trimmedName.length < 2 || trimmedName.length > 225) return false
-    
     const vietnameseNameRegex = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềếểỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸửữựỳỵýỷỹ\s]+$/
-    
     if (!vietnameseNameRegex.test(trimmedName)) return false
-    
     const words = trimmedName.split(/\s+/)
     return words.length >= 2 && words.length <= 10
 }
 
 const isValidEmailFormat = (email) => {
     if (!email || !email.trim()) return false
-    
     const trimmedEmail = email.trim()
     if (trimmedEmail.length > 100) return false
-    
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
-    
     if (!emailRegex.test(trimmedEmail)) return false
-    
     if (trimmedEmail.includes('..') || trimmedEmail.startsWith('.') || trimmedEmail.endsWith('.')) {
         return false
     }
-    
     return true
 }
 
 const isValidVietnamesePhone = (phone) => {
     if (!phone || !phone.trim()) return false
-    
     const cleanPhone = phone.replace(/\s+/g, '')
-    
     return /^(03|05|07|08|09)\d{8}$/.test(cleanPhone) || 
            /^02\d{8,9}$/.test(cleanPhone)
+}
+
+// ===== CRUD OPERATIONS - FIXED =====
+const saveEmployeeComplete = async () => {
+    if (!isAdmin.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không có quyền',
+            detail: 'Chỉ tài khoản ADMIN mới có thể chỉnh sửa thông tin nhân viên',
+            life: 3000
+        })
+        return
+    }
+
+    submitted.value = true
+    
+    const validationErrors = validateEmployeeData()
+    if (validationErrors.length > 0) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Dữ liệu không hợp lệ', 
+            detail: validationErrors[0],
+            life: 5000
+        })
+        return
+    }
+
+    saving.value = true
+    try {
+        // Xử lý địa chỉ - CHỈ LẤY ĐỊA CHỈ HOÀN CHỈNH
+        const processedAddresses = employee.value.danhSachDiaChi?.filter(addr => {
+            // Chỉ lấy địa chỉ đã chọn đầy đủ tỉnh và phường
+            return addr.maTinh && addr.maPhuong && addr.tenTinh && addr.tenPhuong
+        }).map(addr => {
+            const processedAddr = {
+                diaChiChiTiet: addr.diaChiChiTiet?.trim() || '',
+                tenPhuong: addr.tenPhuong.trim(),
+                tenTinh: addr.tenTinh.trim(),
+                isDefault: addr.isDefault || false,
+                maPhuong: addr.maPhuong,
+                maTinh: addr.maTinh,
+                trangThai: 1
+            }
+            
+            // Tạo địa chỉ đầy đủ
+            const parts = [
+                processedAddr.diaChiChiTiet,
+                processedAddr.tenPhuong,
+                processedAddr.tenTinh
+            ].filter(part => part && part.trim() !== '')
+            
+            processedAddr.diaChiDayDu = parts.join(', ')
+            return processedAddr
+        }) || []
+
+        // Đảm bảo có địa chỉ mặc định
+        if (processedAddresses.length > 0) {
+            const hasDefault = processedAddresses.some(addr => addr.isDefault)
+            if (!hasDefault) {
+                processedAddresses[0].isDefault = true
+            }
+        }
+
+        const employeeData = {
+            id: employee.value.id,
+            maNhanVien: employee.value.maNhanVien?.trim() || null,
+            hoTen: employee.value.hoTen.trim(),
+            email: employee.value.email.trim(),
+            sdt: employee.value.sdt.trim(),
+            trangThai: employee.value.trangThai,
+            idTaiKhoan: employee.value.idTaiKhoan,
+            danhSachDiaChi: processedAddresses
+        }
+
+        // Lưu nhân viên
+        await axios.put(`http://localhost:8080/api/nhan-vien/${employee.value.id}`, employeeData)
+        
+        // SỬA: Đồng bộ trạng thái tài khoản nếu có
+        if (employee.value.idTaiKhoan) {
+            await syncAccountStatus(employee.value.idTaiKhoan, employee.value.trangThai)
+        }
+        
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: 'Cập nhật thông tin nhân viên thành công',
+            life: 3000
+        })
+
+        await fetchData()
+        hideEmployeeDialog()
+        
+    } catch (error) {
+        console.error('Lỗi cập nhật nhân viên:', error)
+        handleApiError(error, 'Không thể cập nhật thông tin nhân viên')
+    } finally {
+        saving.value = false
+    }
+}
+// FIXED: Đồng bộ trạng thái giữa các bảng
+const syncAccountStatus = async (accountId, newStatus) => {
+    try {
+        // SỬA: Sử dụng đúng format RequestBody
+        const response = await axios.patch(`http://localhost:8080/api/tai-khoan/${accountId}/trang-thai`, {
+            trangThai: newStatus
+        }, {
+            headers: { 
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000
+        })
+        
+        if (response.status === 200) {
+            console.log('✅ Đồng bộ trạng thái tài khoản thành công:', accountId, newStatus)
+        }
+    } catch (error) {
+        console.warn('⚠️ Không thể đồng bộ trạng thái tài khoản:', error.response?.data?.error || error.message)
+        // Không throw error để không ảnh hưởng đến flow chính
+    }
+}
+
+const changeStatus = async (employeeData) => {
+    if (!isAdmin.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không có quyền',
+            detail: 'Chỉ tài khoản ADMIN mới có thể thay đổi trạng thái nhân viên',
+            life: 3000
+        })
+        return
+    }
+
+    try {
+        const newStatus = employeeData.trangThai === 1 ? 0 : 1
+        
+        // Cập nhật trạng thái nhân viên
+        await axios.patch(`http://localhost:8080/api/nhan-vien/${employeeData.id}/status`, {
+            trangThai: newStatus
+        })
+        
+        // SỬA: Đồng bộ trạng thái tài khoản
+        if (employeeData.idTaiKhoan) {
+            await syncAccountStatus(employeeData.idTaiKhoan, newStatus)
+        }
+        
+        const statusText = newStatus === 1 ? 'kích hoạt' : 'cho nghỉ việc'
+        toast.add({
+            severity: 'success',
+            summary: 'Thành công',
+            detail: `Đã ${statusText} nhân viên ${employeeData.hoTen}`,
+            life: 3000
+        })
+        
+        await fetchData()
+    } catch (error) {
+        console.error('Error changing status:', error)
+        handleApiError(error, 'Thay đổi trạng thái thất bại')
+    }
+}
+// ===== ADDRESS MANAGEMENT - FIXED =====
+const fetchProvinces = async () => {
+    if (provinces.value.length > 0) return
+    
+    loadingProvinces.value = true
+    try {
+        const response = await axios.get('http://localhost:8080/api/vietnam-address/provinces')
+        
+        if (response.data && response.data.success && response.data.data) {
+            provinces.value = response.data.data.map(item => ({
+                code: item.code.toString(),
+                name: item.name,
+                codename: item.codename
+            }))
+        } else {
+            provinces.value = [
+                { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
+                { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
+                { code: '48', name: 'Đà Nẵng', codename: 'da_nang' }
+            ]
+        }
+    } catch (error) {
+        console.error('Error fetching provinces:', error)
+        provinces.value = [
+            { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
+            { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
+            { code: '48', name: 'Đà Nẵng', codename: 'da_nang' }
+        ]
+    } finally {
+        loadingProvinces.value = false
+    }
+}
+
+const fetchWardsForAddress = async (provinceCode, addressIndex) => {
+    if (!provinceCode || !employee.value.danhSachDiaChi || !employee.value.danhSachDiaChi[addressIndex]) return
+    
+    try {
+        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
+        
+        let wardsData = []
+        if (response.data && response.data.success && response.data.data) {
+            wardsData = response.data.data.map(item => ({
+                code: item.code.toString(),
+                name: item.name,
+                codename: item.codename
+            }))
+        } else {
+            wardsData = [
+                { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
+                { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' }
+            ]
+        }
+        
+        employee.value.danhSachDiaChi[addressIndex].availableWards = wardsData
+    } catch (error) {
+        console.error('Error fetching wards for address:', error)
+        employee.value.danhSachDiaChi[addressIndex].availableWards = [
+            { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' }
+        ]
+    }
+}
+
+const onAddressProvinceChange = async (provinceCode, addressIndex) => {
+    if (!employee.value.danhSachDiaChi[addressIndex]) return
+    
+    // Clear ward selection khi đổi tỉnh
+    employee.value.danhSachDiaChi[addressIndex].maPhuong = ''
+    employee.value.danhSachDiaChi[addressIndex].tenPhuong = ''
+    employee.value.danhSachDiaChi[addressIndex].availableWards = []
+    
+    // Set province info
+    const selectedProvince = provinces.value.find(p => p.code === provinceCode)
+    if (selectedProvince) {
+        employee.value.danhSachDiaChi[addressIndex].tenTinh = selectedProvince.name
+        employee.value.danhSachDiaChi[addressIndex].maTinh = provinceCode
+        
+        // Load wards cho tỉnh này
+        await fetchWardsForAddress(provinceCode, addressIndex)
+    }
+    
+    updateAddressFullText(addressIndex)
+}
+const onAddressWardChange = (wardCode, addressIndex) => {
+    if (!employee.value.danhSachDiaChi[addressIndex]) return
+    
+    const availableWards = employee.value.danhSachDiaChi[addressIndex].availableWards || []
+    const selectedWard = availableWards.find(w => w.code === wardCode)
+    if (selectedWard) {
+        employee.value.danhSachDiaChi[addressIndex].tenPhuong = selectedWard.name
+        employee.value.danhSachDiaChi[addressIndex].maPhuong = wardCode
+    }
+    updateAddressFullText(addressIndex)
+}
+const updateAddressFullText = (index) => {
+    if (!employee.value.danhSachDiaChi || !employee.value.danhSachDiaChi[index]) return
+    
+    const address = employee.value.danhSachDiaChi[index]
+    const parts = [
+        address.diaChiChiTiet,
+        address.tenPhuong,
+        address.tenTinh
+    ].filter(part => part && part.trim() !== '')
+    
+    address.diaChiDayDu = parts.join(', ')
+}
+
+// FIXED: Add/Remove address functions
+const addNewAddress = async () => {
+    try {
+        if (!employee.value.danhSachDiaChi) {
+            employee.value.danhSachDiaChi = []
+        }
+        
+        // Đảm bảo provinces đã được load
+        if (provinces.value.length === 0) {
+            await fetchProvinces()
+        }
+        
+        const newAddress = {
+            diaChiChiTiet: '',
+            tenPhuong: '',
+            tenTinh: '',
+            maPhuong: '',
+            maTinh: '',
+            diaChiDayDu: '',
+            availableWards: [],
+            isDefault: employee.value.danhSachDiaChi.length === 0,
+            trangThai: 1
+        }
+        
+        employee.value.danhSachDiaChi.push(newAddress)
+        
+        toast.add({
+            severity: 'info',
+            summary: 'Đã thêm địa chỉ',
+            detail: 'Vui lòng chọn tỉnh/thành phố và phường/xã',
+            life: 3000
+        })
+    } catch (error) {
+        console.error('Lỗi thêm địa chỉ:', error)
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: 'Không thể thêm địa chỉ mới',
+            life: 3000
+        })
+    }
+}
+
+const removeAddress = (index) => {
+    if (!employee.value.danhSachDiaChi) {
+        return
+    }
+    
+    // Cho phép xóa hết địa chỉ
+    const isRemovedDefault = employee.value.danhSachDiaChi[index].isDefault
+    employee.value.danhSachDiaChi.splice(index, 1)
+    
+    if (isRemovedDefault && employee.value.danhSachDiaChi.length > 0) {
+        employee.value.danhSachDiaChi[0].isDefault = true
+    }
+    
+    toast.add({
+        severity: 'success',
+        summary: 'Đã xóa',
+        detail: 'Đã xóa địa chỉ',
+        life: 2000
+    })
+}
+
+const setDefaultAddress = (index) => {
+    if (!employee.value.danhSachDiaChi) return
+    
+    employee.value.danhSachDiaChi.forEach(addr => addr.isDefault = false)
+    employee.value.danhSachDiaChi[index].isDefault = true
 }
 
 // ===== UTILITY FUNCTIONS =====
@@ -1453,7 +1592,7 @@ function getDefaultAddress(item) {
     const defaultAddr = item.danhSachDiaChi.find(addr => addr.isDefault)
     if (defaultAddr) {
         return truncateAddress(defaultAddr.diaChiDayDu || formatAddressFromInfo(defaultAddr))
-    }
+        }
     
     const firstAddr = item.danhSachDiaChi[0]
     return truncateAddress(firstAddr.diaChiDayDu || formatAddressFromInfo(firstAddr))
@@ -1486,183 +1625,6 @@ const formatFullAddressEdit = (address) => {
     ].filter(part => part && part.trim() !== '')
     
     return parts.length > 0 ? parts.join(', ') : 'Chưa có địa chỉ'
-}
-
-// ===== ADDRESS MANAGEMENT - API VIỆT NAM =====
-const fetchProvinces = async () => {
-    if (provinces.value.length > 0) return
-    
-    loadingProvinces.value = true
-    try {
-        console.log('Fetching provinces from Vietnam API...')
-        const response = await axios.get('http://localhost:8080/api/vietnam-address/provinces')
-        
-        if (response.data && response.data.success && response.data.data) {
-            provinces.value = response.data.data.map(item => ({
-                code: item.code.toString(),
-                name: item.name,
-                codename: item.codename
-            }))
-            console.log('Loaded provinces from API:', provinces.value.length)
-        } else {
-            provinces.value = [
-                { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
-                { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
-                { code: '48', name: 'Đà Nẵng', codename: 'da_nang' },
-                { code: '92', name: 'Cần Thơ', codename: 'can_tho' }
-            ]
-        }
-    } catch (error) {
-        console.error('Error fetching provinces:', error)
-        provinces.value = [
-            { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
-            { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
-            { code: '48', name: 'Đà Nẵng', codename: 'da_nang' }
-        ]
-    } finally {
-        loadingProvinces.value = false
-    }
-}
-
-const fetchWards = async (provinceCode) => {
-    if (!provinceCode) {
-        wards.value = []
-        return
-    }
-    
-    loadingWards.value = true
-    try {
-        console.log('Fetching wards for province:', provinceCode)
-        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
-        
-        if (response.data && response.data.success && response.data.data) {
-            wards.value = response.data.data.map(item => ({
-                code: item.code.toString(),
-                name: item.name,
-                codename: item.codename
-            }))
-            console.log('Loaded wards from API:', wards.value.length)
-        } else {
-            wards.value = getFallbackWards()
-        }
-    } catch (error) {
-        console.error('Error loading wards:', error)
-        wards.value = getFallbackWards()
-    } finally {
-        loadingWards.value = false
-    }
-}
-
-const getFallbackWards = () => {
-    return [
-        { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' },
-        { code: '2', name: 'Phường/Xã 2', codename: 'phuong_xa_2' },
-        { code: '3', name: 'Phường/Xã 3', codename: 'phuong_xa_3' }
-    ]
-}
-
-const onAddressProvinceChange = async (provinceCode, addressIndex) => {
-    if (!employee.value.danhSachDiaChi[addressIndex]) return
-    
-    employee.value.danhSachDiaChi[addressIndex].maPhuong = ''
-    employee.value.danhSachDiaChi[addressIndex].tenPhuong = ''
-    
-    const selectedProvince = provinces.value.find(p => p.code === provinceCode)
-    if (selectedProvince) {
-        employee.value.danhSachDiaChi[addressIndex].tenTinh = selectedProvince.name
-        employee.value.danhSachDiaChi[addressIndex].maTinh = provinceCode
-    }
-    
-    await fetchWardsForAddress(provinceCode, addressIndex)
-    updateAddressFullText(addressIndex)
-}
-
-const onAddressWardChange = (wardCode, addressIndex) => {
-    if (!employee.value.danhSachDiaChi[addressIndex]) return
-    
-    const availableWards = employee.value.danhSachDiaChi[addressIndex].availableWards || []
-    const selectedWard = availableWards.find(w => w.code === wardCode)
-    if (selectedWard) {
-        employee.value.danhSachDiaChi[addressIndex].tenPhuong = selectedWard.name
-        employee.value.danhSachDiaChi[addressIndex].maPhuong = wardCode
-    }
-    updateAddressFullText(addressIndex)
-}
-
-const fetchWardsForAddress = async (provinceCode, addressIndex) => {
-    if (!provinceCode || !employee.value.danhSachDiaChi || !employee.value.danhSachDiaChi[addressIndex]) return
-    
-    try {
-        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
-        
-        let wardsData = []
-        if (response.data && response.data.success && response.data.data) {
-            wardsData = response.data.data.map(item => ({
-                code: item.code.toString(),
-                name: item.name,
-                codename: item.codename
-            }))
-        } else {
-            wardsData = getFallbackWards()
-        }
-        
-        employee.value.danhSachDiaChi[addressIndex].availableWards = wardsData
-    } catch (error) {
-        console.error('Error fetching wards for address:', error)
-        employee.value.danhSachDiaChi[addressIndex].availableWards = getFallbackWards()
-    }
-}
-
-const updateAddressFullText = (index) => {
-    if (!employee.value.danhSachDiaChi || !employee.value.danhSachDiaChi[index]) return
-    
-    const address = employee.value.danhSachDiaChi[index]
-    const parts = [
-        address.diaChiChiTiet,
-        address.tenPhuong,
-        address.tenTinh
-    ].filter(part => part && part.trim() !== '')
-    
-    address.diaChiDayDu = parts.join(', ')
-}
-
-const addNewAddress = () => {
-    if (!employee.value.danhSachDiaChi) {
-        employee.value.danhSachDiaChi = []
-    }
-    
-    const newAddress = {
-        diaChiChiTiet: '',
-        tenPhuong: '',
-        tenTinh: '',
-        maPhuong: '',
-        maTinh: '',
-        diaChiDayDu: '',
-        availableWards: [],
-        isDefault: employee.value.danhSachDiaChi.length === 0
-    }
-    
-    employee.value.danhSachDiaChi.push(newAddress)
-}
-
-const removeAddress = (index) => {
-    if (!employee.value.danhSachDiaChi || employee.value.danhSachDiaChi.length <= 1) {
-        return
-    }
-    
-    const isRemovedDefault = employee.value.danhSachDiaChi[index].isDefault
-    employee.value.danhSachDiaChi.splice(index, 1)
-    
-    if (isRemovedDefault && employee.value.danhSachDiaChi.length > 0) {
-        employee.value.danhSachDiaChi[0].isDefault = true
-    }
-}
-
-const setDefaultAddress = (index) => {
-    if (!employee.value.danhSachDiaChi) return
-    
-    employee.value.danhSachDiaChi.forEach(addr => addr.isDefault = false)
-    employee.value.danhSachDiaChi[index].isDefault = true
 }
 
 // ===== PAGINATION & SORTING =====
@@ -1714,6 +1676,7 @@ function editFromView() {
 
     employee.value = { 
         ...viewingEmployee.value,
+        originalMaNhanVien: viewingEmployee.value.maNhanVien, // Lưu mã gốc
         danhSachDiaChi: viewingEmployee.value.danhSachDiaChi ? 
             viewingEmployee.value.danhSachDiaChi.map(addr => ({
                 ...addr,
@@ -1758,6 +1721,7 @@ function editEmployee(emp) {
 
     employee.value = { 
         ...emp,
+        originalMaNhanVien: emp.maNhanVien, // Lưu mã gốc
         danhSachDiaChi: emp.danhSachDiaChi ? emp.danhSachDiaChi.map(addr => ({
             ...addr,
             availableWards: []
@@ -1878,8 +1842,6 @@ const deleteEmployee = async (employeeId) => {
     }
 
     try {
-        console.log(`Soft deleting employee ${employeeId}`)
-        
         await axios.delete(`http://localhost:8080/api/nhan-vien/${employeeId}`)
         await fetchData()
         
@@ -1908,8 +1870,6 @@ const deleteSelectedEmployees = async () => {
 
     try {
         const ids = selectedEmployees.value.map(emp => emp.id)
-        console.log('Batch deleting employees:', ids)
-        
         await axios.delete('http://localhost:8080/api/nhan-vien/batch', { data: ids })
         await fetchData()
         selectedEmployees.value = []
@@ -2058,10 +2018,10 @@ watch(() => pagination.value.size, () => {
 
 // ===== LIFECYCLE =====
 onMounted(() => {
-    console.log('🚀 NhanVien component mounted')
+    console.log('NhanVien component mounted')
     fetchData()
 })
-</script>
+        </script>
 
 <style scoped>
 .card {
