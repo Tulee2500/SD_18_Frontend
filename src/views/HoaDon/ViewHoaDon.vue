@@ -8,7 +8,7 @@ const API_ENDPOINTS = {
     hoaDon: `${API_BASE_URL}/hoa-don`,
     hoaDonPOS: `${API_BASE_URL}/hoa-don/pos`,
     hoaDonOnline: `${API_BASE_URL}/hoa-don/online`,
-    hoaDonChiTiet: `${API_BASE_URL}/hoa-don-chi-tiet`
+    hoaDonChiTiet: `${API_BASE_URL}/api/hoa-don-chi-tiet`
 };
 
 function getAuthHeaders() {
@@ -44,7 +44,8 @@ async function fetchWithErrorHandling(url, options = {}) {
             if (response.status === 401) {
                 throw new Error('Authentication failed - Token không hợp lệ hoặc đã hết hạn');
             }
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
         }
 
         return await response.json();
@@ -68,7 +69,7 @@ const loadingMessage = ref('');
 const searchKeyword = ref('');
 const statusFilter = ref('');
 const typeFilter = ref('');
-const dateFilter = ref('');
+const dateFilter = ref(null);
 const showAdvancedFilter = ref(false);
 const minAmount = ref(null);
 const maxAmount = ref(null);
@@ -122,17 +123,16 @@ async function fetchAllData() {
 
     try {
         loadingMessage.value = 'Đang tải danh sách hóa đơn...';
-        const data = await fetchWithErrorHandling(API_ENDPOINTS.hoaDon);
+        const response = await fetchWithErrorHandling(API_ENDPOINTS.hoaDon);
 
-        if (Array.isArray(data)) {
-            hoaDons.value = data;
-        } else if (data.content && Array.isArray(data.content)) {
-            hoaDons.value = data.content;
-        } else if (data.data && Array.isArray(data.data)) {
-            hoaDons.value = data.data;
-        } else {
-            hoaDons.value = [];
+        let data = [];
+        if (Array.isArray(response)) {
+            data = response;
+        } else if (response.success && response.data) {
+            data = Array.isArray(response.data) ? response.data : [];
         }
+
+        hoaDons.value = data.map(normalizeHoaDon);
 
         toast.add({
             severity: 'success',
@@ -161,7 +161,6 @@ async function fetchAllData() {
                 life: 3000
             });
 
-            // Fallback to sample data
             hoaDons.value = createSampleData();
         }
     } finally {
@@ -174,9 +173,16 @@ async function fetchChiTietHoaDon(hoaDonId) {
     isLoadingChiTiet.value = true;
     try {
         const endpoint = `${API_ENDPOINTS.hoaDonChiTiet}/by-hoa-don/${hoaDonId}`;
-        const data = await fetchWithErrorHandling(endpoint);
+        const response = await fetchWithErrorHandling(endpoint);
 
-        hoaDonChiTiets.value = Array.isArray(data) ? data : [];
+        let data = [];
+        if (response.success && response.data) {
+            data = Array.isArray(response.data) ? response.data : [];
+        } else if (Array.isArray(response)) {
+            data = response;
+        }
+
+        hoaDonChiTiets.value = data;
 
         toast.add({
             severity: 'success',
@@ -208,35 +214,49 @@ async function processNextStep(hoaDon) {
         if (currentIndex >= 0 && currentIndex < steps.length - 1) {
             const nextStep = steps[currentIndex + 1];
 
+            // ✅ FIX: Sử dụng đúng endpoint format từ backend
             const endpoint = `${API_ENDPOINTS.hoaDon}/${hoaDon.id}/trang-thai`;
             const requestData = {
                 trangThai: nextStep,
                 ghiChu: `Cập nhật trạng thái từ ${getStatusLabel(currentStep)} sang ${getStatusLabel(nextStep)}`
             };
 
-            await fetchWithErrorHandling(endpoint, {
+            const response = await fetchWithErrorHandling(endpoint, {
                 method: 'PUT',
                 body: JSON.stringify(requestData)
             });
 
-            // Update local data
-            const index = hoaDons.value.findIndex((hd) => hd.id === hoaDon.id);
-            if (index !== -1) {
-                hoaDons.value[index].trangThaiHoaDon = nextStep;
-                hoaDons.value[index].ngayCapNhat = new Date().toISOString();
+            // ✅ FIX: Xử lý response đúng cách
+            let updatedHoaDon = null;
+            if (response && response.id) {
+                // Response trả về trực tiếp HoaDonDTO
+                updatedHoaDon = normalizeHoaDon(response);
+            } else if (response && response.data) {
+                // Response có wrapper
+                updatedHoaDon = normalizeHoaDon(response.data);
             }
 
-            if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDon.id) {
-                selectedHoaDon.value.trangThaiHoaDon = nextStep;
-                selectedHoaDon.value.ngayCapNhat = new Date().toISOString();
-            }
+            if (updatedHoaDon) {
+                // ✅ FIX: Cập nhật dữ liệu trong danh sách
+                const index = hoaDons.value.findIndex((hd) => hd.id === hoaDon.id);
+                if (index !== -1) {
+                    hoaDons.value[index] = updatedHoaDon;
+                }
 
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: `Đã cập nhật trạng thái sang ${getStatusLabel(nextStep)}`,
-                life: 3000
-            });
+                // ✅ FIX: Cập nhật selectedHoaDon nếu đang xem chi tiết
+                if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDon.id) {
+                    selectedHoaDon.value = updatedHoaDon;
+                }
+
+                toast.add({
+                    severity: 'success',
+                    summary: 'Thành công',
+                    detail: `Đã cập nhật trạng thái sang ${getStatusLabel(nextStep)}`,
+                    life: 3000
+                });
+            } else {
+                throw new Error('Không nhận được dữ liệu cập nhật từ server');
+            }
         } else {
             throw new Error('Không thể chuyển sang bước tiếp theo');
         }
@@ -267,31 +287,38 @@ async function cancelInvoice(hoaDon) {
         const endpoint = `${API_ENDPOINTS.hoaDon}/${hoaDon.id}/huy`;
         const requestData = { lyDo: reason };
 
-        await fetchWithErrorHandling(endpoint, {
+        const response = await fetchWithErrorHandling(endpoint, {
             method: 'PUT',
             body: JSON.stringify(requestData)
         });
 
-        // Update local data
-        const index = hoaDons.value.findIndex((hd) => hd.id === hoaDon.id);
-        if (index !== -1) {
-            hoaDons.value[index].trangThaiHoaDon = 'CANCELLED';
-            hoaDons.value[index].ghiChu = reason;
-            hoaDons.value[index].ngayCapNhat = new Date().toISOString();
+        // ✅ FIX: Xử lý response đúng cách
+        let updatedHoaDon = null;
+        if (response && response.id) {
+            updatedHoaDon = normalizeHoaDon(response);
+        } else if (response && response.data) {
+            updatedHoaDon = normalizeHoaDon(response.data);
         }
 
-        if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDon.id) {
-            selectedHoaDon.value.trangThaiHoaDon = 'CANCELLED';
-            selectedHoaDon.value.ghiChu = reason;
-            selectedHoaDon.value.ngayCapNhat = new Date().toISOString();
-        }
+        if (updatedHoaDon) {
+            const index = hoaDons.value.findIndex((hd) => hd.id === hoaDon.id);
+            if (index !== -1) {
+                hoaDons.value[index] = updatedHoaDon;
+            }
 
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Đã hủy đơn hàng thành công',
-            life: 3000
-        });
+            if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDon.id) {
+                selectedHoaDon.value = updatedHoaDon;
+            }
+
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Đã hủy đơn hàng thành công',
+                life: 3000
+            });
+        } else {
+            throw new Error('Không nhận được dữ liệu cập nhật từ server');
+        }
     } catch (error) {
         console.error('Error cancelling invoice:', error);
         toast.add({
@@ -321,33 +348,47 @@ async function confirmStatusUpdate() {
             ghiChu: statusNote.value || `Cập nhật trạng thái sang ${getStatusLabel(newStatus.value)}`
         };
 
-        await fetchWithErrorHandling(endpoint, {
+        
+
+        const response = await fetchWithErrorHandling(endpoint, {
             method: 'PUT',
             body: JSON.stringify(requestData)
         });
 
-        // Update local data
-        const index = hoaDons.value.findIndex((hd) => hd.id === selectedInvoiceForUpdate.value.id);
-        if (index !== -1) {
-            hoaDons.value[index].trangThaiHoaDon = newStatus.value;
-            hoaDons.value[index].ghiChu = requestData.ghiChu;
-            hoaDons.value[index].ngayCapNhat = new Date().toISOString();
+        
+
+        // ✅ FIX: Xử lý response đúng cách
+        let updatedHoaDon = null;
+        if (response && response.id) {
+            updatedHoaDon = normalizeHoaDon(response);
+        } else if (response && response.data) {
+            updatedHoaDon = normalizeHoaDon(response.data);
         }
 
-        if (selectedHoaDon.value && selectedHoaDon.value.id === selectedInvoiceForUpdate.value.id) {
-            selectedHoaDon.value.trangThaiHoaDon = newStatus.value;
-            selectedHoaDon.value.ghiChu = requestData.ghiChu;
-            selectedHoaDon.value.ngayCapNhat = new Date().toISOString();
+        if (updatedHoaDon) {
+            // ✅ FIX: Cập nhật dữ liệu
+            const index = hoaDons.value.findIndex((hd) => hd.id === selectedInvoiceForUpdate.value.id);
+            if (index !== -1) {
+                hoaDons.value[index] = updatedHoaDon;
+                
+            }
+
+            if (selectedHoaDon.value && selectedHoaDon.value.id === selectedInvoiceForUpdate.value.id) {
+                selectedHoaDon.value = updatedHoaDon;
+                
+            }
+
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Cập nhật trạng thái thành công sang ${getStatusLabel(newStatus.value)}`,
+                life: 3000
+            });
+
+            closeStatusUpdateDialog();
+        } else {
+            throw new Error('Không nhận được dữ liệu cập nhật từ server');
         }
-
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: `Cập nhật trạng thái thành công sang ${getStatusLabel(newStatus.value)}`,
-            life: 3000
-        });
-
-        closeStatusUpdateDialog();
     } catch (error) {
         console.error('Error updating status:', error);
         toast.add({
@@ -362,23 +403,30 @@ async function confirmStatusUpdate() {
 async function saveQuantity(itemId) {
     try {
         const endpoint = `${API_ENDPOINTS.hoaDonChiTiet}/${itemId}/quantity`;
-        await fetchWithErrorHandling(endpoint, {
+        const response = await fetchWithErrorHandling(endpoint, {
             method: 'PUT',
             body: JSON.stringify({ soLuong: editQuantity.value })
         });
 
-        const index = hoaDonChiTiets.value.findIndex((item) => item.id === itemId);
-        if (index !== -1) {
-            hoaDonChiTiets.value[index].soLuong = editQuantity.value;
-        }
+        if (response.success) {
+            const index = hoaDonChiTiets.value.findIndex((item) => item.id === itemId);
+            if (index !== -1) {
+                if (response.data) {
+                    hoaDonChiTiets.value[index] = response.data;
+                } else {
+                    hoaDonChiTiets.value[index].soLuong = editQuantity.value;
+                    hoaDonChiTiets.value[index].thanhTien = hoaDonChiTiets.value[index].giaBan * editQuantity.value;
+                }
+            }
 
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Cập nhật số lượng thành công',
-            life: 3000
-        });
-        cancelEdit();
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: response.message || 'Cập nhật số lượng thành công',
+                life: 3000
+            });
+            cancelEdit();
+        }
     } catch (error) {
         console.error('Error updating quantity:', error);
         toast.add({
@@ -395,19 +443,21 @@ async function removeItem(itemId) {
 
     try {
         const endpoint = `${API_ENDPOINTS.hoaDonChiTiet}/remove-product/${itemId}`;
-        await fetchWithErrorHandling(endpoint, { method: 'DELETE' });
+        const response = await fetchWithErrorHandling(endpoint, { method: 'DELETE' });
 
-        const index = hoaDonChiTiets.value.findIndex((item) => item.id === itemId);
-        if (index !== -1) {
-            hoaDonChiTiets.value.splice(index, 1);
+        if (response.success) {
+            const index = hoaDonChiTiets.value.findIndex((item) => item.id === itemId);
+            if (index !== -1) {
+                hoaDonChiTiets.value.splice(index, 1);
+            }
+
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: response.message || 'Đã xóa sản phẩm',
+                life: 3000
+            });
         }
-
-        toast.add({
-            severity: 'success',
-            summary: 'Thành công',
-            detail: 'Đã xóa sản phẩm',
-            life: 3000
-        });
     } catch (error) {
         console.error('Error removing item:', error);
         toast.add({
@@ -428,10 +478,10 @@ function createSampleData() {
             tenKhachHang: 'Nguyễn Văn A',
             sdt: '0912345671',
             email: 'user1@example.com',
-            tongTien: 2400000,
+            tongTien: 2400000.0,
             trangThaiHoaDon: 'COMPLETED',
             loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T10:00:00.000Z',
+            ngayTao: new Date('2025-01-01T10:00:00.000Z'),
             phuongThucThanhToan: 'BANK_TRANSFER'
         },
         {
@@ -440,10 +490,10 @@ function createSampleData() {
             tenKhachHang: 'Trần Văn B',
             sdt: '0912345672',
             email: 'user2@example.com',
-            tongTien: 900000,
-            trangThaiHoaDon: 'Chờ xác nhận', // Vietnamese status
+            tongTien: 900000.0,
+            trangThaiHoaDon: 'PENDING',
             loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T11:00:00.000Z',
+            ngayTao: new Date('2025-01-01T11:00:00.000Z'),
             phuongThucThanhToan: 'COD'
         },
         {
@@ -451,151 +501,11 @@ function createSampleData() {
             maHoaDon: 'HD003',
             tenKhachHang: 'Lê Văn C',
             sdt: '0912345673',
-            tongTien: 1200000,
-            trangThaiHoaDon: 'PAID',
+            tongTien: 1200000.0,
+            trangThaiHoaDon: 'COMPLETED',
             loaiHoaDon: 'OFFLINE',
-            ngayTao: '2025-01-01T12:00:00.000Z',
+            ngayTao: new Date('2025-01-01T12:00:00.000Z'),
             phuongThucThanhToan: 'CASH'
-        },
-        {
-            id: 4,
-            maHoaDon: 'HD004',
-            tenKhachHang: 'Phạm Thị D',
-            sdt: '0912345674',
-            email: 'user4@example.com',
-            tongTien: 1500000,
-            trangThaiHoaDon: 'Đã xác nhận', // Vietnamese status
-            loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T13:00:00.000Z',
-            phuongThucThanhToan: 'BANK_TRANSFER'
-        },
-        {
-            id: 5,
-            maHoaDon: 'HD005',
-            tenKhachHang: 'Hoàng Văn E',
-            sdt: '0912345675',
-            tongTien: 800000,
-            trangThaiHoaDon: 'Chờ thanh toán', // Vietnamese status
-            loaiHoaDon: 'OFFLINE',
-            ngayTao: '2025-01-01T14:00:00.000Z',
-            phuongThucThanhToan: 'CASH'
-        },
-        {
-            id: 6,
-            maHoaDon: 'HD006',
-            tenKhachHang: 'Ngô Thị F',
-            sdt: '0912345676',
-            email: 'user6@example.com',
-            tongTien: 2100000,
-            trangThaiHoaDon: 'SHIPPING',
-            loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T15:00:00.000Z',
-            phuongThucThanhToan: 'E_WALLET'
-        },
-        {
-            id: 7,
-            maHoaDon: 'HD007',
-            tenKhachHang: 'Vũ Văn G',
-            sdt: '0912345677',
-            email: 'user7@example.com',
-            tongTien: 1800000,
-            trangThaiHoaDon: 'Chuẩn bị hàng', // Vietnamese status
-            loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T16:00:00.000Z',
-            phuongThucThanhToan: 'BANK_TRANSFER'
-        },
-        {
-            id: 8,
-            maHoaDon: 'HD008',
-            tenKhachHang: 'Đặng Thị H',
-            sdt: '0912345678',
-            tongTien: 650000,
-            trangThaiHoaDon: 'Đang tạo', // Vietnamese status
-            loaiHoaDon: 'OFFLINE',
-            ngayTao: '2025-01-01T17:00:00.000Z',
-            phuongThucThanhToan: 'CASH'
-        },
-        {
-            id: 9,
-            maHoaDon: 'HD009',
-            tenKhachHang: 'Bùi Văn I',
-            sdt: '0912345679',
-            email: 'user9@example.com',
-            tongTien: 3200000,
-            trangThaiHoaDon: 'DELIVERED',
-            loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T18:00:00.000Z',
-            phuongThucThanhToan: 'COD'
-        },
-        {
-            id: 10,
-            maHoaDon: 'HD010',
-            tenKhachHang: 'Cao Thị K',
-            sdt: '0912345680',
-            email: 'user10@example.com',
-            tongTien: 1400000,
-            trangThaiHoaDon: 'Đã đóng gói', // Vietnamese status
-            loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T19:00:00.000Z',
-            phuongThucThanhToan: 'E_WALLET'
-        },
-        {
-            id: 11,
-            maHoaDon: 'HD011',
-            tenKhachHang: 'Lý Văn L',
-            sdt: '0912345681',
-            tongTien: 950000,
-            trangThaiHoaDon: 'Hoàn thành', // Vietnamese status
-            loaiHoaDon: 'OFFLINE',
-            ngayTao: '2025-01-01T20:00:00.000Z',
-            phuongThucThanhToan: 'CARD'
-        },
-        {
-            id: 12,
-            maHoaDon: 'HD012',
-            tenKhachHang: 'Trương Thị M',
-            sdt: '0912345682',
-            email: 'user12@example.com',
-            tongTien: 2750000,
-            trangThaiHoaDon: 'Đã hủy', // Vietnamese status
-            loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T21:00:00.000Z',
-            phuongThucThanhToan: 'BANK_TRANSFER'
-        },
-        {
-            id: 13,
-            maHoaDon: 'HD013',
-            tenKhachHang: 'Phan Văn N',
-            sdt: '0912345683',
-            tongTien: 1100000,
-            trangThaiHoaDon: 'Giỏ hàng', // Vietnamese status
-            loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-01T22:00:00.000Z',
-            phuongThucThanhToan: 'E_WALLET'
-        },
-        {
-            id: 14,
-            maHoaDon: 'HD014',
-            tenKhachHang: 'Đinh Thị O',
-            sdt: '0912345684',
-            email: 'user14@example.com',
-            tongTien: 1650000,
-            trangThaiHoaDon: 'Đã thanh toán', // Vietnamese status
-            loaiHoaDon: 'OFFLINE',
-            ngayTao: '2025-01-01T23:00:00.000Z',
-            phuongThucThanhToan: 'CASH'
-        },
-        {
-            id: 15,
-            maHoaDon: 'HD015',
-            tenKhachHang: 'Võ Văn P',
-            sdt: '0912345685',
-            email: 'user15@example.com',
-            tongTien: 890000,
-            trangThaiHoaDon: 'PENDING',
-            loaiHoaDon: 'ONLINE',
-            ngayTao: '2025-01-02T08:00:00.000Z',
-            phuongThucThanhToan: 'COD'
         }
     ];
 }
@@ -609,8 +519,11 @@ function createSampleChiTietData(hoaDonId) {
             maSanPham: 'SP001',
             mauSac: 'Đen',
             kichThuoc: '42',
-            giaBan: 1200000,
-            soLuong: 1
+            giaBan: 1200000.0,
+            giaGoc: 1500000.0,
+            soLuong: 1,
+            thanhTien: 1200000.0,
+            tienTietKiem: 300000.0
         },
         {
             id: 2,
@@ -619,8 +532,11 @@ function createSampleChiTietData(hoaDonId) {
             maSanPham: 'SP002',
             mauSac: 'Trắng',
             kichThuoc: 'L',
-            giaBan: 600000,
-            soLuong: 2
+            giaBan: 600000.0,
+            giaGoc: 800000.0,
+            soLuong: 2,
+            thanhTien: 1200000.0,
+            tienTietKiem: 400000.0
         }
     ];
 }
@@ -629,30 +545,28 @@ function createSampleChiTietData(hoaDonId) {
 const filteredHoaDons = computed(() => {
     let filtered = [...hoaDons.value];
 
-    // Tab filter
     if (activeTab.value === 'pos') {
-        filtered = filtered.filter((hd) => hd.loaiHoaDon.toUpperCase() === 'OFFLINE');
+        filtered = filtered.filter((hd) => hd.loaiHoaDon && hd.loaiHoaDon.toUpperCase() === 'OFFLINE');
     } else if (activeTab.value === 'online') {
-        filtered = filtered.filter((hd) => hd.loaiHoaDon.toUpperCase() === 'ONLINE');
+        filtered = filtered.filter((hd) => hd.loaiHoaDon && hd.loaiHoaDon.toUpperCase() === 'ONLINE');
     } else if (activeTab.value === 'pending') {
         filtered = filtered.filter((hd) => {
             const status = normalizeStatus(hd.trangThaiHoaDon);
-            return ['PENDING', 'CONFIRMED', 'PREPARING', 'PAYMENT_PENDING', 'CART', 'PACKED', 'SHIPPING'].includes(status);
+            return ['PENDING', 'CONFIRMED', 'SHIPPING'].includes(status);
         });
     }
 
-    // Search filter
     if (searchKeyword.value.trim()) {
         const keyword = searchKeyword.value.toLowerCase();
-        filtered = filtered.filter((hd) => hd.maHoaDon?.toLowerCase().includes(keyword) || getCustomerName(hd).toLowerCase().includes(keyword) || hd.sdt?.includes(keyword) || hd.email?.toLowerCase().includes(keyword));
+        filtered = filtered.filter(
+            (hd) => (hd.maHoaDon && hd.maHoaDon.toLowerCase().includes(keyword)) || getCustomerName(hd).toLowerCase().includes(keyword) || (hd.sdt && hd.sdt.includes(keyword)) || (hd.email && hd.email.toLowerCase().includes(keyword))
+        );
     }
 
-    // Type filter
     if (typeFilter.value) {
-        filtered = filtered.filter((hd) => hd.loaiHoaDon.toUpperCase() === typeFilter.value);
+        filtered = filtered.filter((hd) => hd.loaiHoaDon && hd.loaiHoaDon.toUpperCase() === typeFilter.value);
     }
 
-    // Status filter
     if (statusFilter.value) {
         filtered = filtered.filter((hd) => {
             const status = normalizeStatus(hd.trangThaiHoaDon);
@@ -660,7 +574,6 @@ const filteredHoaDons = computed(() => {
         });
     }
 
-    // Date filter
     if (dateFilter.value) {
         const filterDate = new Date(dateFilter.value).toDateString();
         filtered = filtered.filter((hd) => {
@@ -669,7 +582,6 @@ const filteredHoaDons = computed(() => {
         });
     }
 
-    // Advanced filters
     if (minAmount.value || maxAmount.value) {
         filtered = filtered.filter((hd) => {
             const amount = parseFloat(hd.tongTien) || 0;
@@ -696,20 +608,20 @@ const filteredChiTiets = computed(() => {
     }
 
     const keyword = searchChiTietKeyword.value.toLowerCase();
-    return hoaDonChiTiets.value.filter((item) => item.id.toString().includes(keyword) || item.tenSanPham?.toLowerCase().includes(keyword) || item.maSanPham?.toLowerCase().includes(keyword));
+    return hoaDonChiTiets.value.filter((item) => (item.id && item.id.toString().includes(keyword)) || (item.tenSanPham && item.tenSanPham.toLowerCase().includes(keyword)) || (item.maSanPham && item.maSanPham.toLowerCase().includes(keyword)));
 });
 
 // Statistics
 const posInvoices = computed(() => {
     return hoaDons.value.filter((hd) => {
-        const type = hd.loaiHoaDon.toUpperCase();
+        const type = hd.loaiHoaDon ? hd.loaiHoaDon.toUpperCase() : '';
         return type === 'OFFLINE';
     });
 });
 
 const onlineInvoices = computed(() => {
     return hoaDons.value.filter((hd) => {
-        const type = hd.loaiHoaDon.toUpperCase();
+        const type = hd.loaiHoaDon ? hd.loaiHoaDon.toUpperCase() : '';
         return type === 'ONLINE';
     });
 });
@@ -718,7 +630,7 @@ const totalRevenue = computed(() => {
     return hoaDons.value
         .filter((hd) => {
             const status = normalizeStatus(hd.trangThaiHoaDon);
-            return ['COMPLETED', 'PAID'].includes(status);
+            return status === 'COMPLETED';
         })
         .reduce((sum, hd) => sum + (parseFloat(hd.tongTien) || 0), 0);
 });
@@ -727,7 +639,7 @@ const posRevenue = computed(() => {
     return posInvoices.value
         .filter((hd) => {
             const status = normalizeStatus(hd.trangThaiHoaDon);
-            return ['COMPLETED', 'PAID'].includes(status);
+            return status === 'COMPLETED';
         })
         .reduce((sum, hd) => sum + (parseFloat(hd.tongTien) || 0), 0);
 });
@@ -744,19 +656,19 @@ const onlineRevenue = computed(() => {
 const completedInvoices = computed(() => {
     return hoaDons.value.filter((hd) => {
         const status = normalizeStatus(hd.trangThaiHoaDon);
-        return ['COMPLETED', 'PAID'].includes(status);
+        return status === 'COMPLETED';
     }).length;
 });
 
 const pendingInvoices = computed(() => {
     return hoaDons.value.filter((hd) => {
         const status = normalizeStatus(hd.trangThaiHoaDon);
-        return ['PENDING', 'CONFIRMED', 'PREPARING', 'PAYMENT_PENDING', 'CART', 'PACKED', 'SHIPPING'].includes(status);
+        return ['PENDING', 'CONFIRMED', 'SHIPPING'].includes(status);
     }).length;
 });
 
 const urgentInvoices = computed(() => {
-    const urgentStatuses = ['PAYMENT_PENDING', 'PENDING'];
+    const urgentStatuses = ['PENDING'];
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     return hoaDons.value.filter((hd) => {
         const status = normalizeStatus(hd.trangThaiHoaDon);
@@ -770,6 +682,24 @@ const completionRate = computed(() => {
 });
 
 // ===== UTILITY FUNCTIONS =====
+function normalizeHoaDon(hd) {
+    let ngayTaoDate = null;
+    if (hd.ngayTao) {
+        ngayTaoDate = new Date(hd.ngayTao);
+        if (isNaN(ngayTaoDate.getTime())) {
+            ngayTaoDate = new Date();
+        }
+    } else {
+        ngayTaoDate = new Date();
+    }
+
+    return {
+        ...hd,
+        ngayTao: ngayTaoDate,
+        ngayXacNhan: hd.ngayXacNhan ? new Date(hd.ngayXacNhan) : null
+    };
+}
+
 function goToLogin() {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_info');
@@ -779,8 +709,10 @@ function goToLogin() {
 }
 
 function formatDate(date) {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('vi-VN', {
+    if (!date) return 'N/A';
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) return 'N/A';
+    return parsedDate.toLocaleDateString('vi-VN', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -808,7 +740,6 @@ function getInitials(name) {
 }
 
 function getCustomerName(hoaDon) {
-    // Try different possible field names from backend
     return hoaDon.tenKhachHang || hoaDon.tenNguoiDung || hoaDon.customerName || hoaDon.userName || (hoaDon.khachHang && hoaDon.khachHang.hoTen) || 'Khách lẻ';
 }
 
@@ -816,33 +747,15 @@ function getStatusLabel(status) {
     if (!status) return 'Không xác định';
 
     const statusMap = {
-        // Basic statuses
-        DRAFT: 'Đang tạo',
-        CART: 'Giỏ hàng',
         PENDING: 'Chờ xác nhận',
         CONFIRMED: 'Đã xác nhận',
-        PREPARING: 'Chuẩn bị hàng',
-        PACKED: 'Đã đóng gói',
-        PAYMENT_PENDING: 'Chờ thanh toán',
-        PAID: 'Đã thanh toán',
         SHIPPING: 'Đang giao',
         DELIVERED: 'Đã giao',
         COMPLETED: 'Hoàn thành',
         CANCELLED: 'Đã hủy',
-        RETURNED: 'Hoàn trả',
-
-        // Additional Vietnamese statuses that might come from backend
-        CHO_XAC_NHAN: 'Chờ xác nhận',
-        DA_XAC_NHAN: 'Đã xác nhận',
-        DANG_CHUAN_BI: 'Đang chuẩn bị',
-        DA_DONG_GOI: 'Đã đóng gói',
-        DANG_GIAO: 'Đang giao',
-        DA_GIAO: 'Đã giao',
-        HOAN_THANH: 'Hoàn thành',
-        DA_HUY: 'Đã hủy'
+        RETURNED: 'Hoàn trả'
     };
 
-    // Try to match both uppercase and as-is
     return statusMap[status.toUpperCase()] || statusMap[status] || status;
 }
 
@@ -855,16 +768,14 @@ function getStatusColor(status) {
         return 'warning';
     } else if (statusLower.includes('confirmed') || statusLower.includes('xác nhận')) {
         return 'info';
-    } else if (statusLower.includes('preparing') || statusLower.includes('chuẩn bị')) {
-        return 'primary';
     } else if (statusLower.includes('shipping') || statusLower.includes('giao')) {
         return 'dark';
-    } else if (statusLower.includes('completed') || statusLower.includes('paid') || statusLower.includes('hoàn thành')) {
+    } else if (statusLower.includes('completed') || statusLower.includes('hoàn thành')) {
         return 'success';
     } else if (statusLower.includes('cancelled') || statusLower.includes('hủy')) {
         return 'danger';
-    } else if (statusLower.includes('draft') || statusLower.includes('cart')) {
-        return 'secondary';
+    } else if (statusLower.includes('delivered')) {
+        return 'primary';
     } else {
         return 'secondary';
     }
@@ -879,16 +790,14 @@ function getStatusIcon(status) {
         return 'pi pi-clock';
     } else if (statusLower.includes('confirmed') || statusLower.includes('xác nhận')) {
         return 'pi pi-check-circle';
-    } else if (statusLower.includes('preparing') || statusLower.includes('chuẩn bị')) {
-        return 'pi pi-cog';
     } else if (statusLower.includes('shipping') || statusLower.includes('giao')) {
         return 'pi pi-truck';
-    } else if (statusLower.includes('completed') || statusLower.includes('paid') || statusLower.includes('hoàn thành')) {
+    } else if (statusLower.includes('completed') || statusLower.includes('hoàn thành')) {
         return 'pi pi-verified';
     } else if (statusLower.includes('cancelled') || statusLower.includes('hủy')) {
         return 'pi pi-times-circle';
-    } else if (statusLower.includes('draft') || statusLower.includes('cart')) {
-        return 'pi pi-file';
+    } else if (statusLower.includes('delivered')) {
+        return 'pi pi-home';
     } else {
         return 'pi pi-circle';
     }
@@ -896,11 +805,11 @@ function getStatusIcon(status) {
 
 // ===== WORKFLOW FUNCTIONS =====
 function getWorkflowSteps(loaiHoaDon) {
-    const normalizedType = loaiHoaDon.toUpperCase();
+    const normalizedType = loaiHoaDon ? loaiHoaDon.toUpperCase() : '';
     if (normalizedType === 'OFFLINE') {
-        return ['PAYMENT_PENDING', 'PAID'];
+        return ['PENDING', 'COMPLETED'];
     } else {
-        return ['CART', 'PENDING', 'CONFIRMED', 'PREPARING', 'PACKED', 'SHIPPING', 'DELIVERED', 'COMPLETED'];
+        return ['PENDING', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'COMPLETED'];
     }
 }
 
@@ -949,14 +858,8 @@ function isStepActive(hoaDon, step) {
 
 function getStepIcon(step) {
     const iconMap = {
-        DRAFT: 'pi pi-file',
-        CART: 'pi pi-shopping-cart',
         PENDING: 'pi pi-clock',
         CONFIRMED: 'pi pi-check',
-        PREPARING: 'pi pi-cog',
-        PACKED: 'pi pi-box',
-        PAYMENT_PENDING: 'pi pi-credit-card',
-        PAID: 'pi pi-money-bill',
         SHIPPING: 'pi pi-truck',
         DELIVERED: 'pi pi-home',
         COMPLETED: 'pi pi-check-circle'
@@ -966,14 +869,8 @@ function getStepIcon(step) {
 
 function getStepLabel(step) {
     const labelMap = {
-        DRAFT: 'Tạo đơn',
-        CART: 'Giỏ hàng',
         PENDING: 'Chờ xác nhận',
         CONFIRMED: 'Đã xác nhận',
-        PREPARING: 'Chuẩn bị',
-        PACKED: 'Đóng gói',
-        PAYMENT_PENDING: 'Chờ thanh toán',
-        PAID: 'Đã thanh toán',
         SHIPPING: 'Đang giao',
         DELIVERED: 'Đã giao',
         COMPLETED: 'Hoàn thành'
@@ -989,7 +886,6 @@ function canUpdateStatus(hoaDon) {
     const terminalStates = ['COMPLETED', 'CANCELLED', 'RETURNED'];
     const hasTerminalStatus = terminalStates.includes(normalizedStatus);
 
-    // Check if there are available status transitions
     const availableStatuses = getAvailableStatuses(hoaDon);
     const hasAvailableTransitions = availableStatuses.length > 0;
 
@@ -1006,14 +902,8 @@ function canProcessNextStep(hoaDon) {
 function getNextStepAction(hoaDon) {
     const normalizedStatus = normalizeStatus(hoaDon.trangThaiHoaDon);
     const actionMap = {
-        DRAFT: 'Chờ thanh toán',
-        CART: 'Đặt hàng',
         PENDING: 'Xác nhận',
-        CONFIRMED: 'Chuẩn bị hàng',
-        PREPARING: 'Đóng gói',
-        PACKED: 'Giao hàng',
-        PAYMENT_PENDING: 'Thanh toán',
-        PAID: 'Hoàn thành',
+        CONFIRMED: 'Giao hàng',
         SHIPPING: 'Đã giao',
         DELIVERED: 'Hoàn thành'
     };
@@ -1022,70 +912,41 @@ function getNextStepAction(hoaDon) {
 
 function canCancelInvoice(hoaDon) {
     const normalizedStatus = normalizeStatus(hoaDon.trangThaiHoaDon);
-    const cancelableStates = ['DRAFT', 'CART', 'PENDING', 'CONFIRMED', 'PAYMENT_PENDING'];
+    const cancelableStates = ['PENDING', 'CONFIRMED'];
     return cancelableStates.includes(normalizedStatus);
 }
 
 function canEditItems(hoaDon) {
     const normalizedStatus = normalizeStatus(hoaDon.trangThaiHoaDon);
-    const normalizedType = hoaDon.loaiHoaDon.toUpperCase();
+    const normalizedType = hoaDon.loaiHoaDon ? hoaDon.loaiHoaDon.toUpperCase() : '';
     if (normalizedType === 'OFFLINE') {
-        return ['DRAFT', 'PAYMENT_PENDING'].includes(normalizedStatus);
+        return normalizedStatus === 'PENDING';
     } else {
-        return ['CART', 'PENDING'].includes(normalizedStatus);
+        return normalizedStatus === 'PENDING';
     }
 }
 
 function getAvailableStatuses(hoaDon) {
     if (!hoaDon) return [];
 
-    // Normalize status to English for processing
     const currentStatus = normalizeStatus(hoaDon.trangThaiHoaDon);
-    const invoiceType = hoaDon.loaiHoaDon.toUpperCase(); // Normalize to uppercase
     const availableSteps = [];
 
-    // Define all possible transitions based on current status and invoice type
-    if (invoiceType === 'OFFLINE') {
-        // POS workflow transitions
-        switch (currentStatus) {
-            case 'DRAFT':
-                availableSteps.push({ value: 'PAYMENT_PENDING', label: 'Chờ thanh toán' }, { value: 'PAID', label: 'Đã thanh toán' });
-                break;
-            case 'PAYMENT_PENDING':
-                availableSteps.push({ value: 'PAID', label: 'Đã thanh toán' });
-                break;
-            case 'PAID':
-                availableSteps.push({ value: 'COMPLETED', label: 'Hoàn thành' });
-                break;
-        }
-    } else if (invoiceType === 'ONLINE') {
-        // Online workflow transitions
-        switch (currentStatus) {
-            case 'CART':
-                availableSteps.push({ value: 'PENDING', label: 'Chờ xác nhận' });
-                break;
-            case 'PENDING':
-                availableSteps.push({ value: 'CONFIRMED', label: 'Đã xác nhận' });
-                break;
-            case 'CONFIRMED':
-                availableSteps.push({ value: 'PREPARING', label: 'Chuẩn bị hàng' });
-                break;
-            case 'PREPARING':
-                availableSteps.push({ value: 'PACKED', label: 'Đã đóng gói' });
-                break;
-            case 'PACKED':
-                availableSteps.push({ value: 'SHIPPING', label: 'Đang giao hàng' });
-                break;
-            case 'SHIPPING':
-                availableSteps.push({ value: 'DELIVERED', label: 'Đã giao hàng' });
-                break;
-            case 'DELIVERED':
-                availableSteps.push({ value: 'COMPLETED', label: 'Hoàn thành' });
-                break;
-        }
+    switch (currentStatus) {
+        case 'PENDING':
+            availableSteps.push({ value: 'CONFIRMED', label: 'Đã xác nhận' });
+            break;
+        case 'CONFIRMED':
+            availableSteps.push({ value: 'SHIPPING', label: 'Đang giao' });
+            break;
+        case 'SHIPPING':
+            availableSteps.push({ value: 'DELIVERED', label: 'Đã giao' });
+            break;
+        case 'DELIVERED':
+            availableSteps.push({ value: 'COMPLETED', label: 'Hoàn thành' });
+            break;
     }
 
-    // Add cancel option for non-terminal states
     const terminalStates = ['COMPLETED', 'CANCELLED', 'RETURNED'];
     if (!terminalStates.includes(currentStatus)) {
         availableSteps.push({
@@ -1094,111 +955,27 @@ function getAvailableStatuses(hoaDon) {
         });
     }
 
-    // Add option to go back one step (for correction purposes)
-    const steps = getWorkflowSteps(invoiceType);
-    const currentIndex = steps.indexOf(currentStatus);
-    if (currentIndex > 0 && !terminalStates.includes(currentStatus)) {
-        const previousStep = steps[currentIndex - 1];
-        availableSteps.push({
-            value: previousStep,
-            label: `Quay lại: ${getStepLabel(previousStep)}`
-        });
-    }
-
     return availableSteps;
 }
 
-// Helper function to normalize Vietnamese status to English
 function normalizeStatus(status) {
     if (!status) return '';
 
-    // Convert to string and trim
-    const statusStr = status.toString().trim();
+    const statusStr = status.toString().trim().toUpperCase();
 
-    const statusMap = {
-        // Vietnamese to English mapping (case-sensitive)
-        'Đang tạo': 'DRAFT',
-        'Giỏ hàng': 'CART',
-        'Chờ xác nhận': 'PENDING',
-        'Đã xác nhận': 'CONFIRMED',
-        'Chuẩn bị hàng': 'PREPARING',
-        'Đã đóng gói': 'PACKED',
-        'Chờ thanh toán': 'PAYMENT_PENDING',
-        'Đã thanh toán': 'PAID',
-        'Đang giao': 'SHIPPING',
-        'Đã giao': 'DELIVERED',
-        'Hoàn thành': 'COMPLETED',
-        'Đã hủy': 'CANCELLED',
-        'Hoàn trả': 'RETURNED',
-
-        // Handle corrupted encoding from backend
-        'Ch? xác nh?n': 'PENDING',
-        'Ð? xác nh?n': 'CONFIRMED',
-        'Ðang giao': 'SHIPPING',
-        'Ð? giao': 'DELIVERED',
-        'Hoàn thành': 'COMPLETED',
-        'Ð? h?y': 'CANCELLED',
-
-        // Additional Vietnamese variations (uppercase)
-        'CHỜ XÁC NHẬN': 'PENDING',
-        'CH? XÁC NH?N': 'PENDING',
-        'ĐÃ XÁC NHẬN': 'CONFIRMED',
-        'Ð? XÁC NH?N': 'CONFIRMED',
-        'ĐANG CHUẨN BỊ': 'PREPARING',
-        'ĐÃ ĐÓNG GÓI': 'PACKED',
-        'CHỜ THANH TOÁN': 'PAYMENT_PENDING',
-        'ĐÃ THANH TOÁN': 'PAID',
-        'ĐANG GIAO': 'SHIPPING',
-        'ÐANG GIAO': 'SHIPPING',
-        'ĐÃ GIAO': 'DELIVERED',
-        'Ð? GIAO': 'DELIVERED',
-        'HOÀN THÀNH': 'COMPLETED',
-        'ĐÃ HỦY': 'CANCELLED',
-
-        // Underscore variations (backend format)
+    // Map các trạng thái tiếng Việt sang tiếng Anh
+    const vietnameseToEnglish = {
         CHO_XAC_NHAN: 'PENDING',
         DA_XAC_NHAN: 'CONFIRMED',
-        DANG_CHUAN_BI: 'PREPARING',
-        DA_DONG_GOI: 'PACKED',
-        DA_THANH_TOAN: 'PAID',
         DANG_GIAO: 'SHIPPING',
         DA_GIAO: 'DELIVERED',
         HOAN_THANH: 'COMPLETED',
-        DA_HUY: 'CANCELLED'
+        DA_HUY: 'CANCELLED',
+        HOAN_TRA: 'RETURNED'
     };
 
-    // First, check exact match (case-sensitive)
-    if (statusMap[statusStr]) {
-        return statusMap[statusStr];
-    }
-
-    // Check if it's already in English format
-    const englishStatuses = ['DRAFT', 'CART', 'PENDING', 'CONFIRMED', 'PREPARING', 'PACKED', 'PAYMENT_PENDING', 'PAID', 'SHIPPING', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'RETURNED'];
-    const upperStatus = statusStr.toUpperCase();
-    if (englishStatuses.includes(upperStatus)) {
-        return upperStatus;
-    }
-
-    // Try uppercase version
-    if (statusMap[upperStatus]) {
-        return statusMap[upperStatus];
-    }
-
-    // Pattern matching for corrupted text
-    if (statusStr.includes('Ch?') && statusStr.includes('xác') && statusStr.includes('nh?n')) {
-        return 'PENDING';
-    }
-
-    if (statusStr.includes('Ðang') && statusStr.includes('giao')) {
-        return 'SHIPPING';
-    }
-
-    if (statusStr.includes('DA_THANH_TOAN')) {
-        return 'PAID';
-    }
-
-    // If no mapping found, return uppercase version for consistency
-    return upperStatus;
+    // Nếu có mapping thì dùng, không thì giữ nguyên
+    return vietnameseToEnglish[statusStr] || statusStr;
 }
 
 function needsNote(status) {
@@ -1223,7 +1000,7 @@ function hideModal(modalRef) {
 }
 
 async function viewChiTiet(hoaDon) {
-    selectedHoaDon.value = hoaDon;
+    selectedHoaDon.value = { ...hoaDon };
     searchChiTietKeyword.value = '';
     showChiTietDialog.value = true;
 
@@ -1243,7 +1020,7 @@ function closeChiTietDialog() {
 }
 
 function updateInvoiceStatus(hoaDon) {
-    selectedInvoiceForUpdate.value = hoaDon;
+    selectedInvoiceForUpdate.value = { ...hoaDon };
     newStatus.value = '';
     statusNote.value = '';
     showStatusUpdateDialog.value = true;
@@ -1278,11 +1055,14 @@ function cancelEdit() {
 
 // ===== CALCULATION FUNCTIONS =====
 function getTotalQuantity() {
-    return filteredChiTiets.value.reduce((sum, item) => sum + item.soLuong, 0);
+    return filteredChiTiets.value.reduce((sum, item) => sum + (item.soLuong || 0), 0);
 }
 
 function getTotalAmount() {
-    return filteredChiTiets.value.reduce((sum, item) => sum + item.giaBan * item.soLuong, 0);
+    return filteredChiTiets.value.reduce((sum, item) => {
+        const thanhTien = item.thanhTien || (item.giaBan || 0) * (item.soLuong || 0);
+        return sum + thanhTien;
+    }, 0);
 }
 
 // ===== ENHANCED FUNCTIONS =====
@@ -1296,17 +1076,34 @@ async function processNextStepWithRefresh(hoaDon) {
 async function refreshSingleInvoice(hoaDonId) {
     try {
         const endpoint = `${API_ENDPOINTS.hoaDon}/${hoaDonId}`;
-        const updatedHoaDon = await fetchWithErrorHandling(endpoint);
+        const response = await fetchWithErrorHandling(endpoint);
 
-        const index = hoaDons.value.findIndex((hd) => hd.id === hoaDonId);
-        if (index !== -1) {
-            hoaDons.value[index] = updatedHoaDon;
+        
+
+        let updatedHoaDon = null;
+        if (response && response.id) {
+            updatedHoaDon = normalizeHoaDon(response);
+        } else if (response && response.data) {
+            updatedHoaDon = normalizeHoaDon(response.data);
         }
 
-        if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDonId) {
-            selectedHoaDon.value = updatedHoaDon;
+        if (updatedHoaDon) {
+            const index = hoaDons.value.findIndex((hd) => hd.id === hoaDonId);
+            if (index !== -1) {
+                hoaDons.value[index] = updatedHoaDon;
+                
+            }
+
+            if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDonId) {
+                selectedHoaDon.value = updatedHoaDon;
+                
+            }
+
+            // ✅ FIX: Force reactivity update
+            hoaDons.value = [...hoaDons.value];
         }
     } catch (error) {
+        console.error('Error refreshing invoice:', error);
         toast.add({
             severity: 'error',
             summary: 'Lỗi',
@@ -1315,8 +1112,6 @@ async function refreshSingleInvoice(hoaDonId) {
         });
     }
 }
-
-// ===== DEBUG FUNCTIONS =====
 
 // ===== ADDITIONAL UTILITY FUNCTIONS =====
 function printInvoice(hoaDon) {
@@ -1360,7 +1155,7 @@ function clearAllFilters() {
     searchKeyword.value = '';
     typeFilter.value = '';
     statusFilter.value = '';
-    dateFilter.value = '';
+    dateFilter.value = null;
     minAmount.value = null;
     maxAmount.value = null;
     staffFilter.value = '';
@@ -1407,7 +1202,7 @@ function exportData() {
         const csvData = filteredHoaDons.value.map((hd) => [
             hd.id,
             hd.maHoaDon || '',
-            hd.loaiHoaDon.toUpperCase() === 'OFFLINE' ? 'POS' : 'Online',
+            hd.loaiHoaDon && hd.loaiHoaDon.toUpperCase() === 'OFFLINE' ? 'POS' : 'Online',
             formatDate(hd.ngayTao),
             getCustomerName(hd),
             hd.sdt || '',
@@ -1480,7 +1275,6 @@ onMounted(() => {
     fetchAllData();
 });
 </script>
-
 <template>
     <div class="invoice-management">
         <!-- Toast Component -->
@@ -1615,9 +1409,9 @@ onMounted(() => {
                         <label class="form-label">Trạng thái</label>
                         <select v-model="statusFilter" @change="applyFilters" class="form-select">
                             <option value="">Tất cả trạng thái</option>
-                            <option value="DRAFT">Đang tạo</option>
                             <option value="PENDING">Chờ xác nhận</option>
                             <option value="CONFIRMED">Đã xác nhận</option>
+                            <option value="SHIPPING">Đang giao</option>
                             <option value="COMPLETED">Hoàn thành</option>
                             <option value="CANCELLED">Đã hủy</option>
                         </select>
@@ -1625,7 +1419,7 @@ onMounted(() => {
 
                     <div class="col-md-2">
                         <label class="form-label">Ngày tạo</label>
-                        <Calendar v-model="dateFilter" @date-select="applyFilters" placeholder="Chọn ngày" dateFormat="dd/mm/yy" class="form-control" />
+                        <Calendar v-model="dateFilter" @date-select="applyFilters" placeholder="Chọn ngày" dateFormat="dd/mm/yy" class="w-100" />
                     </div>
 
                     <div class="col-md-2">
@@ -1788,19 +1582,6 @@ onMounted(() => {
                         </template>
                     </Column>
 
-                    <!-- <Column header="Workflow" style="min-width: 20rem">
-                        <template #body="slotProps">
-                            <div class="d-flex align-items-center">
-                                <div v-for="(step, index) in getWorkflowSteps(slotProps.data.loaiHoaDon)" :key="step" class="d-flex align-items-center">
-                                    <div :class="['workflow-step', 'rounded', 'px-2', 'py-1', getStepBootstrapClass(slotProps.data, step)]" :title="getStepLabel(step)">
-                                        <i :class="getStepIcon(step)" style="font-size: 10px"></i>
-                                    </div>
-                                    <div v-if="index < getWorkflowSteps(slotProps.data.loaiHoaDon).length - 1" class="workflow-arrow mx-1"></div>
-                                </div>
-                            </div>
-                        </template>
-                    </Column> -->
-
                     <Column header="Thao tác" style="min-width: 12rem">
                         <template #body="slotProps">
                             <div class="d-flex gap-1">
@@ -1861,21 +1642,29 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <!-- Actions Bar -->
                         <div class="d-flex justify-content-end bg-light mb-3 gap-2 rounded p-3">
+
                             <button v-if="canProcessNextStep(selectedHoaDon)" @click="processNextStepWithRefresh(selectedHoaDon)" class="btn btn-success btn-sm">
                                 <i class="pi pi-arrow-right me-1"></i>
                                 {{ getNextStepAction(selectedHoaDon) }}
                             </button>
+
+                            <button v-if="canUpdateStatus(selectedHoaDon)" @click="updateInvoiceStatus(selectedHoaDon)" class="btn btn-warning btn-sm">
+                                <i class="pi pi-edit me-1"></i>
+                                Cập nhật trạng thái
+                            </button>
+
                             <button v-if="canCancelInvoice(selectedHoaDon)" @click="cancelInvoice(selectedHoaDon)" class="btn btn-danger btn-sm">
                                 <i class="pi pi-times me-1"></i>
                                 Hủy đơn
                             </button>
-                            <button v-if="selectedHoaDon.loaiHoaDon === 'OFFLINE'" @click="printInvoice(selectedHoaDon)" class="btn btn-info btn-sm">
+
+                            <button v-if="selectedHoaDon?.loaiHoaDon === 'OFFLINE'" @click="printInvoice(selectedHoaDon)" class="btn btn-info btn-sm">
                                 <i class="pi pi-print me-1"></i>
                                 In hóa đơn
                             </button>
-                            <button v-if="selectedHoaDon.loaiHoaDon === 'ONLINE'" @click="trackingInfo(selectedHoaDon)" class="btn btn-warning btn-sm">
+
+                            <button v-if="selectedHoaDon?.loaiHoaDon === 'ONLINE'" @click="trackingInfo(selectedHoaDon)" class="btn btn-warning btn-sm">
                                 <i class="pi pi-map-marker me-1"></i>
                                 Tracking
                             </button>
@@ -1999,7 +1788,7 @@ onMounted(() => {
                                                 <th>Giá bán</th>
                                                 <th>Số lượng</th>
                                                 <th>Thành tiền</th>
-                                                <!-- <th v-if="canEditItems(selectedHoaDon)">Thao tác</th> -->
+                                                <th v-if="canEditItems(selectedHoaDon)">Thao tác</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -2015,12 +1804,15 @@ onMounted(() => {
                                                 </td>
                                                 <td>
                                                     <div class="d-flex gap-1">
-                                                        <span v-if="item.mauSac" class="badge bg-info">{{ item.mauSac }}</span>
-                                                        <span v-if="item.kichThuoc" class="badge bg-success">{{ item.kichThuoc }}</span>
+                                                        <span v-if="item.mauSac && item.mauSac !== 'N/A'" class="badge bg-info">{{ item.mauSac }}</span>
+                                                        <span v-if="item.kichThuoc && item.kichThuoc !== 'N/A'" class="badge bg-success">{{ item.kichThuoc }}</span>
                                                     </div>
                                                 </td>
                                                 <td>
                                                     <span class="fw-bold text-success">{{ formatCurrency(item.giaBan) }}</span>
+                                                    <div v-if="item.giaGoc && item.giaGoc !== item.giaBan">
+                                                        <small class="text-muted text-decoration-line-through">{{ formatCurrency(item.giaGoc) }}</small>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <div v-if="isEditingItem(item.id)" class="d-flex align-items-center gap-1">
@@ -2035,7 +1827,12 @@ onMounted(() => {
                                                     <span v-else class="badge bg-primary">{{ item.soLuong }}</span>
                                                 </td>
                                                 <td>
-                                                    <span class="fw-bold text-primary">{{ formatCurrency(item.giaBan * item.soLuong) }}</span>
+                                                    <span class="fw-bold text-primary">
+                                                        {{ formatCurrency(item.thanhTien || item.giaBan * item.soLuong) }}
+                                                    </span>
+                                                    <div v-if="item.tienTietKiem && item.tienTietKiem > 0">
+                                                        <small class="text-success">Tiết kiệm: {{ formatCurrency(item.tienTietKiem) }}</small>
+                                                    </div>
                                                 </td>
                                                 <td v-if="canEditItems(selectedHoaDon)">
                                                     <div class="d-flex gap-1">
@@ -2100,6 +1897,14 @@ onMounted(() => {
                         <button type="button" class="btn-close" @click="closeStatusUpdateDialog"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="mb-3" v-if="selectedInvoiceForUpdate">
+                            <label class="form-label">Hóa đơn:</label>
+                            <div>
+                                <strong>{{ selectedInvoiceForUpdate.maHoaDon }}</strong> -
+                                {{ getCustomerName(selectedInvoiceForUpdate) }}
+                            </div>
+                        </div>
+
                         <div class="mb-3">
                             <label class="form-label">Trạng thái hiện tại:</label>
                             <div>
@@ -2118,13 +1923,14 @@ onMounted(() => {
                                 </option>
                             </select>
                         </div>
+
                         <div v-if="needsNote(newStatus)" class="mb-3">
                             <label class="form-label">Ghi chú:</label>
                             <textarea v-model="statusNote" class="form-control" rows="3" placeholder="Nhập ghi chú..."></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button @click="confirmStatusUpdate" class="btn btn-primary">
+                        <button @click="confirmStatusUpdate" class="btn btn-primary" :disabled="!newStatus">
                             <i class="pi pi-check me-1"></i>
                             Cập nhật
                         </button>
