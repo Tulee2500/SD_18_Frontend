@@ -388,11 +388,6 @@ export default {
                 }
             }
 
-            // Kiểm tra địa chỉ - chỉ yêu cầu tỉnh
-            if (!newCustomer.value.tinhId) {
-                errors.tinhId = 'Vui lòng chọn tỉnh/thành phố';
-            }
-
             // Kiểm tra địa chỉ chi tiết (nếu có)
             const diaChiChiTiet = newCustomer.value.diaChiChiTiet || '';
             if (diaChiChiTiet.trim() && diaChiChiTiet.trim().length > 500) {
