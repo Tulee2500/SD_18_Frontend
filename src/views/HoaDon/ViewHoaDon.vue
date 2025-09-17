@@ -348,14 +348,14 @@ async function confirmStatusUpdate() {
             ghiChu: statusNote.value || `Cập nhật trạng thái sang ${getStatusLabel(newStatus.value)}`
         };
 
-        console.log('Sending request:', requestData); // Debug log
+        
 
         const response = await fetchWithErrorHandling(endpoint, {
             method: 'PUT',
             body: JSON.stringify(requestData)
         });
 
-        console.log('Received response:', response); // Debug log
+        
 
         // ✅ FIX: Xử lý response đúng cách
         let updatedHoaDon = null;
@@ -370,12 +370,12 @@ async function confirmStatusUpdate() {
             const index = hoaDons.value.findIndex((hd) => hd.id === selectedInvoiceForUpdate.value.id);
             if (index !== -1) {
                 hoaDons.value[index] = updatedHoaDon;
-                console.log('Updated invoice in list:', hoaDons.value[index]); // Debug log
+                
             }
 
             if (selectedHoaDon.value && selectedHoaDon.value.id === selectedInvoiceForUpdate.value.id) {
                 selectedHoaDon.value = updatedHoaDon;
-                console.log('Updated selectedHoaDon:', selectedHoaDon.value); // Debug log
+                
             }
 
             toast.add({
@@ -1078,7 +1078,7 @@ async function refreshSingleInvoice(hoaDonId) {
         const endpoint = `${API_ENDPOINTS.hoaDon}/${hoaDonId}`;
         const response = await fetchWithErrorHandling(endpoint);
 
-        console.log('Refresh response:', response); // Debug log
+        
 
         let updatedHoaDon = null;
         if (response && response.id) {
@@ -1091,12 +1091,12 @@ async function refreshSingleInvoice(hoaDonId) {
             const index = hoaDons.value.findIndex((hd) => hd.id === hoaDonId);
             if (index !== -1) {
                 hoaDons.value[index] = updatedHoaDon;
-                console.log('Refreshed invoice:', hoaDons.value[index]);
+                
             }
 
             if (selectedHoaDon.value && selectedHoaDon.value.id === hoaDonId) {
                 selectedHoaDon.value = updatedHoaDon;
-                console.log('Refreshed selectedHoaDon:', selectedHoaDon.value);
+                
             }
 
             // ✅ FIX: Force reactivity update
@@ -1643,8 +1643,6 @@ onMounted(() => {
                         </div>
 
                         <div class="d-flex justify-content-end bg-light mb-3 gap-2 rounded p-3">
-                            <!-- ✅ DEBUG: Show status info -->
-                            <small class="text-muted me-auto"> Trạng thái: {{ selectedHoaDon?.trangThaiHoaDon }} ({{ normalizeStatus(selectedHoaDon?.trangThaiHoaDon) }}) </small>
 
                             <button v-if="canProcessNextStep(selectedHoaDon)" @click="processNextStepWithRefresh(selectedHoaDon)" class="btn btn-success btn-sm">
                                 <i class="pi pi-arrow-right me-1"></i>
@@ -1899,7 +1897,6 @@ onMounted(() => {
                         <button type="button" class="btn-close" @click="closeStatusUpdateDialog"></button>
                     </div>
                     <div class="modal-body">
-                        <!-- ✅ DEBUG: Show current status info -->
                         <div class="mb-3" v-if="selectedInvoiceForUpdate">
                             <label class="form-label">Hóa đơn:</label>
                             <div>
@@ -1914,8 +1911,6 @@ onMounted(() => {
                                 <span :class="['badge', 'bg-' + getStatusColor(selectedInvoiceForUpdate?.trangThaiHoaDon)]">
                                     {{ getStatusLabel(selectedInvoiceForUpdate?.trangThaiHoaDon) }}
                                 </span>
-                                <!-- ✅ DEBUG: Show raw status -->
-                                <small class="text-muted ms-2">({{ selectedInvoiceForUpdate?.trangThaiHoaDon }})</small>
                             </div>
                         </div>
 
@@ -1927,8 +1922,6 @@ onMounted(() => {
                                     {{ status.label }}
                                 </option>
                             </select>
-                            <!-- ✅ DEBUG: Show selected status -->
-                            <small class="text-muted" v-if="newStatus">Đã chọn: {{ newStatus }}</small>
                         </div>
 
                         <div v-if="needsNote(newStatus)" class="mb-3">
