@@ -882,10 +882,19 @@ export default {
                             chiTietSanPhamId: item.chiTietSanPhamId || item.id,
                             tenSanPham: item.tenSanPham || 'Sản phẩm không xác định',
                             maSanPham: item.maSanPham || 'SP' + item.chiTietSanPhamId,
+                            // số lượng đã chọn trong hóa đơn
                             soLuongDaChon: Number(item.soLuong) || 1,
                             giaBan: Number(item.giaBan) || 0,
                             giaGoc: Number(item.giaGoc) || Number(item.giaBan) || 0,
-                            soLuong: 999,
+                            // tồn kho hiện tại (lấy theo nhiều tên trường khả dĩ từ backend)
+                            soLuong: Number(
+                                (item.soLuongTon ??
+                                    item.soLuongTonKho ??
+                                    item.tonKho ??
+                                    item.soLuongConLai ??
+                                    item.soLuongHienTai ??
+                                    item.stock) ?? 0
+                            ),
                             mauSac: {
                                 tenMau: item.mauSac || 'N/A',
                                 maMau: getMauHex(item.mauSac)

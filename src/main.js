@@ -191,3 +191,12 @@ if (import.meta.env.DEV) {
   window.__VUE_APP__ = app
   window.__VUE_ROUTER__ = router
 }
+
+// Suppress PrimeVue Calendar deprecation warning
+const originalWarn = console.warn
+console.warn = function(...args) {
+  if (args[0] && typeof args[0] === 'string' && args[0].includes('Deprecated since v4. Use DatePicker component instead.')) {
+    return // Suppress this specific warning
+  }
+  originalWarn.apply(console, args)
+}
