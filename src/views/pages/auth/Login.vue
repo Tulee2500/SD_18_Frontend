@@ -70,7 +70,7 @@
                             </label>
                             <div class="input-wrapper">
                                 <i class="input-icon pi pi-envelope"></i>
-                                <InputText 
+                                <InputText
                                     v-model="email"
                                     type="email"
                                     placeholder="Enter your email address"
@@ -107,9 +107,9 @@
                         <!-- Options -->
                         <div class="form-options">
                             <label class="checkbox-wrapper">
-                                <Checkbox 
-                                    v-model="checked" 
-                                    binary 
+                                <Checkbox
+                                    v-model="checked"
+                                    binary
                                     class="checkbox"
                                 />
                                 <span class="checkbox-text">Remember me</span>
@@ -120,7 +120,7 @@
                         </div>
 
                         <!-- Submit -->
-                        <Button 
+                        <Button
                             type="submit"
                             class="submit-btn"
                             :disabled="isLoading"
@@ -140,7 +140,7 @@
                             <span>or</span>
                         </div>
                         <p class="signup-text">
-                            Don't have an account? 
+                            Don't have an account?
                             <button type="button" class="signup-btn" @click="goToRegister">
                                 Create one now
                             </button>
@@ -348,7 +348,7 @@ const login = async () => {
 };
 
 const forgotPassword = () => {
-    router.push('/forgot-password');
+    router.push('/auth/forgot-password');
 };
 
 const goToRegister = () => {
@@ -380,11 +380,11 @@ onMounted(() => {
     /* Fallback background */
     background: #4f46e5;
     /* Primary gradient background */
-    background: linear-gradient(135deg, 
-        #4f46e5 0%, 
-        #7c3aed 25%, 
-        #ec4899 50%, 
-        #f59e0b 75%, 
+    background: linear-gradient(135deg,
+        #4f46e5 0%,
+        #7c3aed 25%,
+        #ec4899 50%,
+        #f59e0b 75%,
         #10b981 100%);
     background-size: 400% 400%;
     animation: gradientMove 15s ease infinite;
@@ -395,14 +395,14 @@ onMounted(() => {
     .login-card {
         background: rgba(255, 255, 255, 0.95) !important;
     }
-    
+
     .brand-side {
-        background: linear-gradient(135deg, 
-            #4f46e5 0%, 
-            #7c3aed 25%, 
+        background: linear-gradient(135deg,
+            #4f46e5 0%,
+            #7c3aed 25%,
             #ec4899 50%) !important;
     }
-    
+
     .form-side {
         background: rgba(255, 255, 255, 0.98) !important;
     }
@@ -424,11 +424,11 @@ onMounted(() => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, 
-        #4f46e5 0%, 
-        #7c3aed 25%, 
-        #ec4899 50%, 
-        #f59e0b 75%, 
+    background: linear-gradient(135deg,
+        #4f46e5 0%,
+        #7c3aed 25%,
+        #ec4899 50%,
+        #f59e0b 75%,
         #10b981 100%);
     background-size: 400% 400%;
     animation: gradientMove 15s ease infinite;
@@ -468,7 +468,7 @@ onMounted(() => {
     backdrop-filter: blur(25px);
     border-radius: 24px;
     border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 
+    box-shadow:
         0 25px 50px rgba(0, 0, 0, 0.25),
         inset 0 1px 0 rgba(255, 255, 255, 0.3),
         0 0 0 1px rgba(255, 255, 255, 0.1);
@@ -477,11 +477,11 @@ onMounted(() => {
 
 /* Brand Side */
 .brand-side {
-    background: linear-gradient(135deg, 
-        rgba(79, 70, 229, 0.9) 0%, 
-        rgba(124, 58, 237, 0.9) 25%, 
-        rgba(236, 72, 153, 0.9) 50%, 
-        rgba(245, 158, 11, 0.9) 75%, 
+    background: linear-gradient(135deg,
+        rgba(79, 70, 229, 0.9) 0%,
+        rgba(124, 58, 237, 0.9) 25%,
+        rgba(236, 72, 153, 0.9) 50%,
+        rgba(245, 158, 11, 0.9) 75%,
         rgba(16, 185, 129, 0.9) 100%);
     backdrop-filter: blur(20px);
     padding: 3rem;
@@ -640,8 +640,8 @@ onMounted(() => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.9) 0%, 
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.9) 0%,
         rgba(248, 250, 252, 0.95) 100%);
     z-index: 1;
 }
@@ -985,42 +985,42 @@ onMounted(() => {
         min-height: auto;
         background: rgba(255, 255, 255, 0.95);
     }
-    
+
     .brand-side {
         display: none;
     }
-    
+
     .form-side {
         padding: 2rem 1.5rem;
         border-radius: 24px;
         background: rgba(255, 255, 255, 0.98);
         backdrop-filter: blur(25px);
     }
-    
+
     .form-side::before {
-        background: linear-gradient(135deg, 
-            rgba(255, 255, 255, 0.95) 0%, 
+        background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.95) 0%,
             rgba(248, 250, 252, 0.98) 100%);
     }
-    
+
     .toast-area {
         top: 0.5rem;
         right: 0.5rem;
         left: 0.5rem;
     }
-    
+
     .toast {
         min-width: auto;
         max-width: none;
     }
-    
+
     /* Đảm bảo background vẫn hiển thị trên mobile */
     .login-container {
-        background: linear-gradient(135deg, 
-            #4f46e5 0%, 
-            #7c3aed 25%, 
-            #ec4899 50%, 
-            #f59e0b 75%, 
+        background: linear-gradient(135deg,
+            #4f46e5 0%,
+            #7c3aed 25%,
+            #ec4899 50%,
+            #f59e0b 75%,
             #10b981 100%);
     }
 }
@@ -1028,24 +1028,24 @@ onMounted(() => {
 @media (max-width: 480px) {
     .login-container {
         padding: 0.5rem;
-        background: linear-gradient(135deg, 
-            #4f46e5 0%, 
-            #7c3aed 25%, 
-            #ec4899 50%, 
-            #f59e0b 75%, 
+        background: linear-gradient(135deg,
+            #4f46e5 0%,
+            #7c3aed 25%,
+            #ec4899 50%,
+            #f59e0b 75%,
             #10b981 100%) !important;
     }
-    
+
     .form-side {
         padding: 1.5rem 1rem;
         background: rgba(255, 255, 255, 0.98) !important;
         backdrop-filter: blur(25px) !important;
     }
-    
+
     .form-title {
         font-size: 1.75rem;
     }
-    
+
     .login-card {
         background: rgba(255, 255, 255, 0.98) !important;
         backdrop-filter: blur(25px) !important;
@@ -1055,61 +1055,61 @@ onMounted(() => {
 /* Dark Mode */
 @media (prefers-color-scheme: dark) {
     .login-container {
-        background: linear-gradient(135deg, 
-            #1e1b4b 0%, 
-            #581c87 25%, 
-            #831843 50%, 
-            #92400e 75%, 
+        background: linear-gradient(135deg,
+            #1e1b4b 0%,
+            #581c87 25%,
+            #831843 50%,
+            #92400e 75%,
             #064e3b 100%) !important;
     }
-    
+
     .form-side {
         background: rgba(15, 23, 42, 0.95) !important;
     }
-    
+
     .form-side::before {
-        background: linear-gradient(135deg, 
-            rgba(15, 23, 42, 0.9) 0%, 
+        background: linear-gradient(135deg,
+            rgba(15, 23, 42, 0.9) 0%,
             rgba(30, 41, 59, 0.95) 100%) !important;
     }
-    
+
     .form-title {
         color: #f1f5f9;
     }
-    
+
     .form-subtitle {
         color: #94a3b8;
     }
-    
+
     .field-label {
         color: #e2e8f0;
     }
-    
+
     .checkbox-text {
         color: #cbd5e1;
     }
-    
+
     .signup-text {
         color: #94a3b8;
     }
-    
+
     .field-input,
     .field-password {
         background: rgba(30, 41, 59, 0.8) !important;
         border-color: #475569 !important;
         color: #f1f5f9 !important;
     }
-    
+
     .field-input:focus,
     .field-password:focus-within {
         background: rgba(30, 41, 59, 0.95) !important;
         border-color: #4f46e5 !important;
     }
-    
+
     .divider::before {
         background: #475569;
     }
-    
+
     .divider span {
         background: rgba(15, 23, 42, 0.95);
         color: #64748b;

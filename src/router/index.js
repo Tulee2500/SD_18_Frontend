@@ -320,7 +320,12 @@ const router = createRouter({
             component: () => import('@/views/pages/NotFound.vue'),
             meta: { requiresAuth: false }
         },
-
+        {
+            path: '/auth/forgot-password',
+            name: 'forgot-password',
+            component: () => import('@/views/pages/auth/ForgotPassword.vue'),
+            meta: { requiresAuth: false }
+        },
         // AUTH ROUTES
         {
             path: '/auth/login',
