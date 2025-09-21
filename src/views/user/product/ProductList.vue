@@ -70,12 +70,16 @@ export default {
             });
         },
 
-        addToCart(product) {
-            this.cartItems++;
-            console.log('Added to cart:', product);
-            this.$emit('add-to-cart', product);
-
-            this.$toast?.success(`Đã thêm ${product.label} vào giỏ hàng!`) || alert(`Đã thêm ${product.label} vào giỏ hàng!`);
+        goToProductDetail(product) {
+            console.log('Navigating to product detail:', product);
+            
+            // Chuyển đến trang chi tiết sản phẩm
+            if (product.firstDetailId) {
+                this.$router.push(`/product/${product.firstDetailId}`);
+            } else {
+                console.warn('No firstDetailId found for product:', product);
+                this.$toast?.error('Không thể xem chi tiết sản phẩm này') || alert('Không thể xem chi tiết sản phẩm này');
+            }
         },
 
         // Method để lấy URL hình ảnh với fallback chain - ĐÃ SỬA
@@ -478,16 +482,13 @@ export default {
                                     <p class="price-label">Giá tốt nhất</p>
                                 </div>
 
-                                <!-- Add to Cart Button -->
-                                <button class="add-to-cart-btn" @click.stop="addToCart(product)">
+                                <!-- View Details Button -->
+                                <button class="view-details-btn" @click.stop="goToProductDetail(product)">
                                     <span class="btn-content">
-                                        <svg class="cart-icon" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2z" />
-                                            <path
-                                                d="M1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"
-                                            />
+                                        <svg class="view-icon" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
                                         </svg>
-                                        <span class="btn-text">Thêm vào giỏ</span>
+                                        <span class="btn-text">Xem chi tiết</span>
                                     </span>
                                     <div class="btn-background"></div>
                                 </button>
@@ -942,7 +943,7 @@ export default {
             opacity: 1;
         }
 
-        .add-to-cart-btn {
+        .view-details-btn {
             .btn-background {
                 transform: scaleX(1);
             }
@@ -1083,12 +1084,12 @@ export default {
     }
 }
 
-.add-to-cart-btn {
+.view-details-btn {
     position: relative;
     width: 100%;
     background: transparent;
-    border: 2px solid #ff6452;
-    color: #ff6452;
+    border: 2px solid #3B82F6;
+    color: #3B82F6;
     padding: 1rem;
     border-radius: 16px;
     font-weight: 700;
@@ -1105,7 +1106,7 @@ export default {
         z-index: 2;
         transition: all 0.3s ease;
 
-        .cart-icon {
+        .view-icon {
             width: 18px;
             height: 18px;
             transition: all 0.3s ease;
@@ -1119,7 +1120,7 @@ export default {
     .btn-background {
         position: absolute;
         inset: 0;
-        background: linear-gradient(135deg, #ff6452, #ff8a80);
+        background: linear-gradient(135deg, #3B82F6, #60A5FA);
         transform: scaleX(0);
         transform-origin: left;
         transition: transform 0.3s ease;
@@ -1128,11 +1129,11 @@ export default {
 
     &:hover {
         color: white;
-        border-color: #ff6452;
+        border-color: #3B82F6;
         transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(255, 100, 82, 0.3);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
 
-        .cart-icon {
+        .view-icon {
             transform: scale(1.1);
         }
     }

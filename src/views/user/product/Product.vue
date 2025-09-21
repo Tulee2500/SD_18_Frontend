@@ -142,58 +142,73 @@
 
               <!-- Product Options -->
               <div class="product-options">
-                <!-- Color Option -->
-                <div class="option-group" v-if="availableColors.length > 0">
-                  <div class="option-header">
-                    <span class="option-label">Màu sắc:</span>
-                    <span class="option-value">{{ selectedColorName }}</span>
-                  </div>
-                  <div class="color-options">
-                    <div
-                      v-for="color in availableColors"
-                      :key="color.id"
-                      class="color-item"
-                      :class="{ selected: selectedColor === color.id }"
-                      @click="selectColor(color.id)"
-                    >
-                      <div
-                        class="color-circle"
-                        :style="{ backgroundColor: getColorHex(color.name) }"
-                      ></div>
-                      <span class="color-name">{{ color.name }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Size Option -->
-                <div class="option-group" v-if="availableSizes.length > 0">
-                  <div class="option-header">
-                    <span class="option-label">Kích cỡ:</span>
-                    <span class="option-value">{{ selectedSizeName }}</span>
-                  </div>
-                  <div class="size-options">
-                    <div
-                      v-for="size in availableSizes"
-                      :key="size.id"
-                      class="size-item"
-                      :class="{
-                        selected: selectedSize === size.id,
-                        disabled: !isVariantAvailable(selectedColor, size.id)
-                      }"
-                      @click="selectSize(size.id)"
-                    >
-                      <span class="size-name">{{ size.name }}</span>
-                    </div>
-                  </div>
-                  <div class="size-guide">
-                    <button class="size-guide-btn">
-                      <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-                      </svg>
-                      <span>Hướng dẫn chọn size</span>
-                    </button>
-                  </div>
-                </div>
+             <!-- Color Option -->
+<div class="option-group">
+  <div class="option-header">
+    <span class="option-label">Màu sắc:</span>
+    <span class="option-value" :class="{ 'text-muted': !selectedColorName }">
+      {{ selectedColorName || 'Chưa chọn màu' }}
+    </span>
+  </div>
+  <div class="color-options" v-if="availableColors.length > 0">
+    <div
+      v-for="color in availableColors"
+      :key="color.id"
+      class="color-item"
+      :class="{ selected: selectedColor === color.id }"
+      @click="selectColor(color.id)"
+    >
+      <div
+        class="color-circle"
+        :style="{ backgroundColor: getColorHex(color.name) }"
+        :title="color.name"
+      ></div>
+      <span class="color-name">{{ color.name }}</span>
+    </div>
+  </div>
+  <div v-else class="color-options">
+    <div class="color-item disabled">
+      <div class="color-circle" style="background-color: #cccccc;"></div>
+      <span class="color-name text-muted">Không có màu</span>
+    </div>
+  </div>
+</div>
+<!-- Size Option -->
+<div class="option-group">
+  <div class="option-header">
+    <span class="option-label">Kích cỡ:</span>
+    <span class="option-value" :class="{ 'text-muted': !selectedSizeName }">
+      {{ selectedSizeName || 'Không có size' }}
+    </span>
+  </div>
+  <div class="size-options" v-if="availableSizes.length > 0">
+    <div
+      v-for="size in availableSizes"
+      :key="size.id"
+      class="size-item"
+      :class="{
+        selected: selectedSize === size.id,
+        disabled: !isVariantAvailable(selectedColor, size.id)
+      }"
+      @click="selectSize(size.id)"
+    >
+      <span class="size-name">{{ size.name }}</span>
+    </div>
+  </div>
+  <div v-else class="size-options">
+    <div class="size-item disabled">
+      <span class="size-name text-muted">Không có size</span>
+    </div>
+  </div>
+  <div class="size-guide" v-if="availableSizes.length > 0">
+    <button class="size-guide-btn">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+      </svg>
+      <span>Hướng dẫn chọn size</span>
+    </button>
+  </div>
+</div>
 
                 <!-- Stock Status -->
                 <div class="stock-status" :class="{ 'in-stock': currentStock > 0 }">
@@ -535,38 +550,40 @@ export default {
       ]
     };
   },
-  computed: {
-    productId() {
-      return this.$route.params.id;
-    },
-    selectedImage() {
-      return this.productImages[this.selectedImageIndex];
-    },
-    productName() {
-      return this.product?.sanPham?.tenSanPham || 'Sản phẩm không tên';
-    },
-    selectedColorName() {
-      const color = this.availableColors.find(c => c.id === this.selectedColor);
-      return color ? color.name : '';
-    },
-    selectedSizeName() {
-      const size = this.availableSizes.find(s => s.id === this.selectedSize);
-      return size ? size.name : '';
-    },
-    currentPrice() {
-      return this.currentProduct?.giaBan || 0;
-    },
-    originalPrice() {
-      return this.currentProduct?.giaGoc || 0;
-    },
-    currentStock() {
-      return this.currentProduct?.soLuong || 0;
-    },
-    discountPercent() {
-      if (!this.originalPrice || !this.currentPrice) return 0;
-      return Math.round((1 - this.currentPrice / this.originalPrice) * 100);
-    }
+computed: {
+  productId() {
+    return this.$route.params.id;
   },
+  selectedImage() {
+    return this.productImages[this.selectedImageIndex];
+  },
+  productName() {
+    return this.product?.sanPham?.tenSanPham || 'Sản phẩm không tên';
+  },
+  selectedColorName() {
+    if (!this.selectedColor) return 'Chưa chọn màu';
+    const color = this.availableColors.find(c => c.id === this.selectedColor);
+    return color ? color.name : 'Chưa chọn màu';
+  },
+  selectedSizeName() {
+    if (!this.selectedSize) return 'Chưa chọn size';
+    const size = this.availableSizes.find(s => s.id === this.selectedSize);
+    return size ? size.name : 'Chưa chọn size';
+  },
+  currentPrice() {
+    return this.currentProduct?.giaBan || 0;
+  },
+  originalPrice() {
+    return this.currentProduct?.giaGoc || 0;
+  },
+  currentStock() {
+    return this.currentProduct?.soLuong || 0;
+  },
+  discountPercent() {
+    if (!this.originalPrice || !this.currentPrice) return 0;
+    return Math.round((1 - this.currentPrice / this.originalPrice) * 100);
+  }
+},
   methods: {
     handleReviewSubmitted(review) {
       console.log('New review submitted:', review);
@@ -654,216 +671,301 @@ export default {
     },
 
     selectColor(colorId) {
-      this.selectedColor = colorId;
-      this.updateCurrentProduct();
-      this.updateImages();
-    },
+  console.log('🎨 Color selected:', colorId);
+  this.selectedColor = colorId;
+  
+  // Reset size selection when color changes
+  this.selectedSize = null;
+  
+  // Update current product and images
+  this.updateCurrentProduct();
+  this.updateImages();
+},
 
-    selectSize(sizeId) {
-      if (!this.isVariantAvailable(this.selectedColor, sizeId)) return;
-      this.selectedSize = sizeId;
-      this.updateCurrentProduct();
-    },
+selectSize(sizeId) {
+  console.log('📏 Size selected:', sizeId);
+  
+  if (!this.isVariantAvailable(this.selectedColor, sizeId)) {
+    console.warn('⚠️ Selected size not available for current color');
+    return;
+  }
+  
+  this.selectedSize = sizeId;
+  this.updateCurrentProduct();
+},
 
-    isVariantAvailable(colorId, sizeId) {
-      return this.allProductDetails.some(detail =>
-        detail.mauSac?.id === colorId &&
-        detail.kichCo?.id === sizeId &&
-        detail.soLuong > 0
-      );
-    },
+   isVariantAvailable(colorId, sizeId) {
+  if (!colorId || !sizeId) return false;
+  
+  const available = this.allProductDetails.some(detail =>
+    detail.mauSac?.id === colorId &&
+    detail.kichCo?.id === sizeId &&
+    detail.soLuong > 0
+  );
+  
+  console.log(`🔍 Variant availability check: color=${colorId}, size=${sizeId}, available=${available}`);
+  return available;
+},
+  updateCurrentProduct() {
+  if (!this.selectedColor || !this.selectedSize) {
+    console.log('⚠️ Cannot update product - missing color or size selection');
+    return;
+  }
 
-    updateCurrentProduct() {
-      if (!this.selectedColor || !this.selectedSize) return;
+  console.log(`🔍 Looking for variant: color=${this.selectedColor}, size=${this.selectedSize}`);
 
-      const variant = this.allProductDetails.find(detail =>
-        detail.mauSac?.id === this.selectedColor &&
-        detail.kichCo?.id === this.selectedSize
-      );
+  const variant = this.allProductDetails.find(detail =>
+    detail.mauSac?.id === this.selectedColor &&
+    detail.kichCo?.id === this.selectedSize
+  );
 
-      if (variant) {
-        this.currentProduct = variant;
-      }
-    },
+  if (variant) {
+    this.currentProduct = variant;
+    console.log('✅ Updated current product:', {
+      id: variant.id,
+      maChiTiet: variant.maChiTiet,
+      giaBan: variant.giaBan,
+      soLuong: variant.soLuong,
+      color: variant.mauSac?.tenMauSac,
+      size: variant.kichCo?.tenKichCo
+    });
+  } else {
+    console.warn('⚠️ No variant found for selected color/size combination');
+    // Fallback to first available variant with selected color
+    const colorVariant = this.allProductDetails.find(detail => 
+      detail.mauSac?.id === this.selectedColor
+    );
+    if (colorVariant) {
+      this.currentProduct = colorVariant;
+      this.selectedSize = colorVariant.kichCo?.id;
+      console.log('🔄 Fallback to first available size for selected color');
+    }
+  }
+},
 
     // XỬ LÝ HÌNH ẢNH ĐÃ SỬA CHO ENTITY MỚI - SỬA HOÀN TOÀN
-    async updateImages() {
-      if (!this.selectedColor) return;
+   async updateImages() {
+  if (!this.selectedColor) return;
 
-      try {
-        // Lấy danh sách hình ảnh từ API
-        const imagesResponse = await axios.get('http://localhost:8080/hinh-anh');
-        const imageMap = new Map();
-        imagesResponse.data.forEach(image => {
-          imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
-        });
+  try {
+    // Lấy danh sách hình ảnh từ API
+    const imagesResponse = await axios.get('http://localhost:8080/hinh-anh');
+    const imageMap = new Map();
+    imagesResponse.data.forEach(image => {
+      imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
+    });
 
-        const colorVariants = this.allProductDetails.filter(detail =>
-          detail.mauSac?.id === this.selectedColor
-        );
+    const colorVariants = this.allProductDetails.filter(detail =>
+      detail.mauSac?.id === this.selectedColor
+    );
 
-        const newImages = [];
+    const newImages = [];
 
-        colorVariants.forEach(detail => {
-          if (detail.hinhAnh) {
-            let imageUrl = '';
+    colorVariants.forEach(detail => {
+      if (detail.hinhAnh) {
+        let imageUrl = '';
 
-            if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
-              // Trường hợp API trả về object với id
-              if (detail.hinhAnh.id) {
-                imageUrl = imageMap.get(detail.hinhAnh.id);
-                console.log(`Found image by ID ${detail.hinhAnh.id}:`, imageUrl);
-              }
-              // Trường hợp API trả về object đầy đủ
-              else if (detail.hinhAnh.fullUrl) {
-                imageUrl = detail.hinhAnh.fullUrl;
-              } else if (detail.hinhAnh.duongDan) {
-                const duongDan = detail.hinhAnh.duongDan;
-                if (duongDan.startsWith('http')) {
-                  imageUrl = duongDan;
-                } else if (duongDan.startsWith('/hinh-anh/')) {
-                  imageUrl = 'http://localhost:8080' + duongDan;
-                } else {
-                  imageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
-                }
-              }
-            } else if (typeof detail.hinhAnh === 'number') {
-              // Trường hợp API trả về ID number trực tiếp
-              imageUrl = imageMap.get(detail.hinhAnh);
-              console.log(`Found image by number ID ${detail.hinhAnh}:`, imageUrl);
-            }
-
-            if (imageUrl && imageUrl.trim() !== '') {
-              newImages.push(imageUrl);
+        if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
+          if (detail.hinhAnh.id) {
+            imageUrl = imageMap.get(detail.hinhAnh.id);
+            console.log(`Found image by ID ${detail.hinhAnh.id}:`, imageUrl);
+          }
+          else if (detail.hinhAnh.fullUrl) {
+            imageUrl = detail.hinhAnh.fullUrl;
+          } else if (detail.hinhAnh.duongDan) {
+            const duongDan = detail.hinhAnh.duongDan;
+            if (duongDan.startsWith('http')) {
+              imageUrl = duongDan;
+            } else if (duongDan.startsWith('/hinh-anh/')) {
+              imageUrl = 'http://localhost:8080' + duongDan;
+            } else {
+              imageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
             }
           }
-        });
-
-        if (newImages.length > 0) {
-          this.productImages = [...new Set(newImages)]; // Remove duplicates
-          this.selectedImageIndex = 0;
-        } else {
-          // Fallback sang SVG placeholder
-          this.productImages = ['data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4='];
+        } else if (typeof detail.hinhAnh === 'number') {
+          imageUrl = imageMap.get(detail.hinhAnh);
+          console.log(`Found image by number ID ${detail.hinhAnh}:`, imageUrl);
         }
-      } catch (error) {
-        console.error('Error updating images:', error);
-        this.productImages = ['data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4='];
-      }
-    },
 
+        if (imageUrl && imageUrl.trim() !== '') {
+          newImages.push(imageUrl);
+        }
+      }
+    });
+
+    if (newImages.length > 0) {
+      this.productImages = [...new Set(newImages)];
+      this.selectedImageIndex = 0;
+    } else {
+      this.productImages = ['data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4='];
+    }
+  } catch (error) {
+    console.error('Error updating images:', error);
+    this.productImages = ['data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4='];
+  }
+},
     // FETCHPRODUCT ĐÃ SỬA HOÀN TOÀN
-    async fetchProduct() {
-      try {
-        this.loading = true;
-        console.log('Fetching product with ID:', this.productId);
+// Sửa hàm fetchProduct()
+async fetchProduct() {
+  try {
+    this.loading = true;
+    console.log('Fetching product with ID:', this.productId);
 
-        // Lấy thông tin sản phẩm chi tiết và hình ảnh
-        const [detailResponse, imagesResponse] = await Promise.all([
-          axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${this.productId}`),
-          axios.get('http://localhost:8080/hinh-anh')
-        ]);
-        if (!detailResponse.data) {
-          throw new Error('Không tìm thấy sản phẩm');
-        }
+    // Lấy thông tin sản phẩm chi tiết
+    const detailResponse = await axios.get(`http://localhost:8080/api/san-pham-chi-tiet/${this.productId}`);
+    if (!detailResponse.data) {
+      throw new Error('Không tìm thấy sản phẩm');
+    }
 
-        const currentDetail = detailResponse.data;
-        console.log('Current detail:', currentDetail);
+    const currentDetail = detailResponse.data; // KHAI BÁO TRONG TRY BLOCK
+    console.log('Current detail:', currentDetail);
 
-        // Tạo map hình ảnh theo ID
-        const imageMap = new Map();
-        imagesResponse.data.forEach(image => {
-          imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
-        });
+    // Lấy tất cả chi tiết sản phẩm liên quan
+    const allDetailsResponse = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
+    const relatedDetails = allDetailsResponse.data.filter(d =>
+      d.sanPham?.id === currentDetail.sanPham?.id
+    );
 
-        const allDetailsResponse = await axios.get('http://localhost:8080/api/san-pham-chi-tiet');
-        const relatedDetails = allDetailsResponse.data.filter(d =>
-          d.sanPham?.id === currentDetail.sanPham?.id
-        );
+    console.log('Related details:', relatedDetails.length);
 
-        console.log('Related details:', relatedDetails.length);
+    // Lấy danh sách hình ảnh
+    const imagesResponse = await axios.get('http://localhost:8080/hinh-anh');
+    const imageMap = new Map(); // KHAI BÁO imageMap Ở ĐÂY
+    imagesResponse.data.forEach(image => {
+      imageMap.set(image.id, image.fullUrl || `http://localhost:8080${image.duongDan}`);
+    });
 
-        this.product = currentDetail;
-        this.allProductDetails = relatedDetails;
+    // THÊM: Lấy dữ liệu màu sắc và kích cỡ
+    const [colorsResponse, sizesResponse] = await Promise.all([
+      axios.get('http://localhost:8080/mau-sac'),
+      axios.get('http://localhost:8080/kich-co')
+    ]);
 
-        // Extract available colors and sizes
-        this.availableColors = [...new Map(relatedDetails
-          .filter(d => d.mauSac)
-          .map(d => [d.mauSac.id, {
-            id: d.mauSac.id,
-            name: d.mauSac.tenMauSac
-          }])
-        ).values()];
+    // Tạo map cho màu sắc và kích cỡ
+    const colorMap = new Map();
+    colorsResponse.data.forEach(color => {
+      colorMap.set(color.id, color.tenMauSac);
+    });
 
-        this.availableSizes = [...new Map(relatedDetails
-          .filter(d => d.kichCo)
-          .map(d => [d.kichCo.id, {
-            id: d.kichCo.id,
-            name: d.kichCo.tenKichCo
-          }])
-        ).values()];
+    const sizeMap = new Map();
+    sizesResponse.data.forEach(size => {
+      sizeMap.set(size.id, size.tenKichCo);
+    });
 
-        // Set initial selections
-        this.selectedColor = currentDetail.mauSac?.id || (this.availableColors[0]?.id);
-        this.selectedSize = currentDetail.kichCo?.id || (this.availableSizes[0]?.id);
-        this.currentProduct = currentDetail;
+    // ENRICH DETAILS với tên màu sắc và kích cỡ đúng
+    const enrichedDetails = relatedDetails.map(detail => {
+      const colorInfo = detail.mauSac ? {
+        id: detail.mauSac.id,
+        tenMauSac: colorMap.get(detail.mauSac.id) || `Màu ${detail.mauSac.id}`
+      } : null;
 
-        // XỬ LÝ HÌNH ẢNH CHO SẢN PHẨM HIỆN TẠI - SỬA MỚI
-        const currentImages = [];
-        relatedDetails.forEach(detail => {
-          if (detail.hinhAnh) {
-            let imageUrl = '';
+      const sizeInfo = detail.kichCo ? {
+        id: detail.kichCo.id,
+        tenKichCo: sizeMap.get(detail.kichCo.id) || `Size ${detail.kichCo.id}`
+      } : null;
 
-            if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
-              // Trường hợp API trả về object với id
-              if (detail.hinhAnh.id) {
-                imageUrl = imageMap.get(detail.hinhAnh.id);
-                console.log(`Found image by ID ${detail.hinhAnh.id}:`, imageUrl);
-              }
-              // Trường hợp API trả về object đầy đủ
-              else if (detail.hinhAnh.fullUrl) {
-                imageUrl = detail.hinhAnh.fullUrl;
-              } else if (detail.hinhAnh.duongDan) {
-                const duongDan = detail.hinhAnh.duongDan;
-                if (duongDan.startsWith('http')) {
-                  imageUrl = duongDan;
-                } else if (duongDan.startsWith('/hinh-anh/')) {
-                  imageUrl = 'http://localhost:8080' + duongDan;
-                } else {
-                  imageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
-                }
-              }
-            } else if (typeof detail.hinhAnh === 'number') {
-              // Trường hợp API trả về ID number trực tiếp
-              imageUrl = imageMap.get(detail.hinhAnh);
-              console.log(`Found image by number ID ${detail.hinhAnh}:`, imageUrl);
-            }
+      return {
+        ...detail,
+        mauSac: colorInfo,
+        kichCo: sizeInfo
+      };
+    });
 
-            if (imageUrl && imageUrl.trim() !== '') {
-              currentImages.push(imageUrl);
+    this.product = currentDetail;
+    this.allProductDetails = enrichedDetails;
+
+    // Extract available colors and sizes từ enriched data
+    this.availableColors = [...new Map(enrichedDetails
+      .filter(d => d.mauSac && d.mauSac.id)
+      .map(d => [d.mauSac.id, {
+        id: d.mauSac.id,
+        name: d.mauSac.tenMauSac
+      }])
+    ).values()];
+
+    this.availableSizes = [...new Map(enrichedDetails
+      .filter(d => d.kichCo && d.kichCo.id)
+      .map(d => [d.kichCo.id, {
+        id: d.kichCo.id,
+        name: d.kichCo.tenKichCo
+      }])
+    ).values()];
+
+    console.log('🔴 Available colors:', this.availableColors);
+    console.log('🔵 Available sizes:', this.availableSizes);
+
+    // Set initial selections với fallback
+    this.selectedColor = currentDetail.mauSac?.id || (this.availableColors[0]?.id) || null;
+    this.selectedSize = currentDetail.kichCo?.id || (this.availableSizes[0]?.id) || null;
+    
+    // Tìm current product trong enriched details
+    this.currentProduct = enrichedDetails.find(d => d.id === parseInt(this.productId)) || currentDetail;
+    
+    console.log('🎯 Selected color:', this.selectedColor);
+    console.log('📏 Selected size:', this.selectedSize);
+    console.log('📦 Current product:', this.currentProduct);
+
+    // XỬ LÝ HÌNH ẢNH
+    const currentImages = [];
+    enrichedDetails.forEach(detail => {
+      if (detail.hinhAnh) {
+        let imageUrl = '';
+
+        if (typeof detail.hinhAnh === 'object' && detail.hinhAnh !== null) {
+          if (detail.hinhAnh.id) {
+            imageUrl = imageMap.get(detail.hinhAnh.id);
+            console.log(`Found image by ID ${detail.hinhAnh.id}:`, imageUrl);
+          }
+          else if (detail.hinhAnh.fullUrl) {
+            imageUrl = detail.hinhAnh.fullUrl;
+          } else if (detail.hinhAnh.duongDan) {
+            const duongDan = detail.hinhAnh.duongDan;
+            if (duongDan.startsWith('http')) {
+              imageUrl = duongDan;
+            } else if (duongDan.startsWith('/hinh-anh/')) {
+              imageUrl = 'http://localhost:8080' + duongDan;
+            } else {
+              imageUrl = 'http://localhost:8080/hinh-anh/images/' + duongDan;
             }
           }
-        });
-
-        if (currentImages.length > 0) {
-          this.productImages = [...new Set(currentImages)]; // Remove duplicates
-        } else {
-          // Fallback sang SVG placeholder
-          this.productImages = ['data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4='];
+        } else if (typeof detail.hinhAnh === 'number') {
+          imageUrl = imageMap.get(detail.hinhAnh);
+          console.log(`Found image by number ID ${detail.hinhAnh}:`, imageUrl);
         }
 
-        console.log('Product images:', this.productImages);
-
-        await this.fetchSimilarProducts();
-
-      } catch (error) {
-        console.error('Error fetching product:', error);
-        this.product = null;
-      } finally {
-        this.loading = false;
+        if (imageUrl && imageUrl.trim() !== '') {
+          currentImages.push(imageUrl);
+        }
       }
-    },
+    });
 
+    if (currentImages.length > 0) {
+      this.productImages = [...new Set(currentImages)];
+      console.log('🖼️ Product images loaded:', this.productImages);
+    } else {
+      this.productImages = ['/placeholder-shoe.png']; // SỬA: dùng placeholder đơn giản
+      console.log('🖼️ No images found, using placeholder');
+    }
+
+    await this.fetchSimilarProducts();
+
+    console.log('✅ Product loaded successfully');
+
+  } catch (error) {
+    console.error('❌ Error fetching product:', error);
+    console.error('Error details:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+    
+    // SỬA: Xóa phần fallback UI vì currentDetail không trong scope
+    this.product = null;
+    this.loading = false;
+  } finally {
+    this.loading = false;
+  }
+},
     // FETCHSIMILARPRODUCTS ĐÃ SỬA
     async fetchSimilarProducts() {
       try {
@@ -1240,16 +1342,15 @@ async addSimilarToCart(similarProduct) {
     },
 
     // XỬ LÝ LỖI HÌNH ẢNH ĐÃ SỬA
-    handleImageError(event) {
-      console.log('Product image load failed for:', event.target.src);
+handleImageError(event) {
+  console.log('Product image load failed for:', event.target.src);
 
-      // Chỉ set SVG placeholder nếu chưa phải SVG
-      if (!event.target.src.startsWith('data:image/svg+xml')) {
-        console.log('Setting SVG placeholder');
-        event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjE2MCIgdmlld0Jvg9IjAiMCIyNDAgMTYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyNDAiIGhlaWdodD0iMTYwIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iMTIwIiB5PSI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzZiNzI4MCIgZm9udC1zaXplPSIxNCI+U2hvZSBJbWFnZTwvdGV4dD48L3N2Zz4=';
-      }
-    },
-
+  // Chỉ set placeholder nếu chưa phải placeholder
+  if (!event.target.src.includes('placeholder-shoe.png')) {
+    console.log('Setting placeholder');
+    event.target.src = '/placeholder-shoe.png';
+  }
+},
     handleSimilarImageError(event) {
       console.log('Similar product image load failed for:', event.target.src);
 
@@ -1259,11 +1360,25 @@ async addSimilarToCart(similarProduct) {
       }
     }
   },
-  mounted() {
-    this.fetchProduct();
+mounted() {
+  console.log('🚀 === PRODUCT COMPONENT MOUNTED ===');
+  console.log('📍 Route ID:', this.productId);
+  
+  this.fetchProduct().then(() => {
+    console.log('✅ === PRODUCT LOADED SUCCESSFULLY ===');
+    console.log('📦 Product:', this.product);
+    console.log('🎯 Current Product:', this.currentProduct);
+    console.log('🔴 Colors:', this.availableColors);
+    console.log('🔵 Sizes:', this.availableSizes);
+    console.log('🖼️ Images:', this.productImages);
+    console.log('🎨 Selected Color:', this.selectedColor);
+    console.log('📏 Selected Size:', this.selectedSize);
+    
     this.startAutoSlide();
-  },
-  beforeUnmount() {
+  }).catch(error => {
+    console.error('❌ === PRODUCT LOAD FAILED ===', error);
+  });
+},  beforeUnmount() {
     this.stopAutoSlide();
   },
   watch: {

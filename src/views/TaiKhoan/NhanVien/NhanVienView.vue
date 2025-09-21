@@ -89,24 +89,7 @@
                 />
                 
                 <div class="ml-auto flex gap-2">
-                    <Badge 
-                        v-if="selectedEmployees.length > 0" 
-                        :value="`${selectedEmployees.length} đã chọn`" 
-                        severity="info" 
-                    />
-                    <Button
-                        v-if="isAdmin"
-                        label="Cho nghỉ việc"
-                        icon="pi pi-user-minus"
-                        severity="danger"
-                        @click="confirmDeleteSelected"
-                        :disabled="!selectedEmployees || !selectedEmployees.length"
-                        title="Cho nhân viên đã chọn nghỉ việc (Chỉ ADMIN)"
-                    />
-                    <div v-else-if="selectedEmployees.length > 0" class="text-sm text-orange-600 px-3 py-2 bg-orange-50 rounded border border-orange-200">
-                        <i class="pi pi-lock mr-1"></i>
-                        Chỉ ADMIN mới có thể xóa nhân viên
-                    </div>
+                    <!-- Đã bỏ nút cho nghỉ việc hàng loạt và badge chọn nhiều -->
                 </div>
             </div>
 
@@ -274,7 +257,6 @@
                             @click="viewEmployee(slotProps.data)"
                             title="Xem chi tiết"
                         />
-                        
                         <!-- Chỉnh sửa - chỉ ADMIN -->
                         <Button
                             v-if="isAdmin"
@@ -294,47 +276,7 @@
                             disabled
                             title="Chỉ ADMIN mới có thể chỉnh sửa"
                         />
-                        
-                        <!-- Thay đổi trạng thái - chỉ ADMIN -->
-                        <Button
-                            v-if="isAdmin"
-                            :icon="slotProps.data.trangThai === 1 ? 'pi pi-lock' : 'pi pi-unlock'"
-                            size="small"
-                            outlined
-                            :severity="slotProps.data.trangThai === 1 ? 'warning' : 'info'"
-                            @click="changeStatus(slotProps.data)"
-                            :title="(slotProps.data.trangThai === 1 ? 'Cho nghỉ việc' : 'Kích hoạt lại') + ' (ADMIN only)'"
-                        />
-                        <Button
-                            v-else
-                            icon="pi pi-lock"
-                            size="small"
-                            outlined
-                            severity="secondary"
-                            disabled
-                            title="Chỉ ADMIN mới có thể thay đổi trạng thái"
-                        />
-                        
-                        <!-- Xóa - chỉ ADMIN -->
-                        <Button
-                            v-if="isAdmin"
-                            icon="pi pi-user-minus"
-                            size="small"
-                            outlined
-                            severity="danger"
-                            @click="confirmDeleteEmployee(slotProps.data)"
-                            title="Cho nghỉ việc (ADMIN only)"
-                            :disabled="slotProps.data.trangThai === 0"
-                        />
-                        <Button
-                            v-else
-                            icon="pi pi-lock"
-                            size="small"
-                            outlined
-                            severity="secondary"
-                            disabled
-                            title="Chỉ ADMIN mới có thể cho nghỉ việc"
-                        />
+                        <!-- Đã bỏ nút khoá/mở khoá và xoá nhân viên -->
                     </div>
                 </template>
             </Column>
@@ -695,6 +637,19 @@
                         />
                     </div>
 
+                    <!-- Thông báo hướng dẫn -->
+                    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-start gap-2">
+                            <i class="pi pi-info-circle text-blue-600 mt-1"></i>
+                            <div class="text-sm text-blue-800">
+                                <p class="font-medium mb-1">Hướng dẫn:</p>
+                                <p>• Chọn đầy đủ <strong>Tỉnh/Thành phố</strong> và <strong>Phường/Xã</strong> để địa chỉ được lưu</p>
+                                <p>• Địa chỉ chưa hoàn chỉnh sẽ không được lưu vào hệ thống</p>
+                                <p>• Cần có ít nhất một địa chỉ hoàn chỉnh để lưu thông tin nhân viên</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div v-if="employee.danhSachDiaChi && employee.danhSachDiaChi.length > 0" class="space-y-3">
                         <div v-for="(diaChi, index) in employee.danhSachDiaChi" 
                              :key="index" 
@@ -705,6 +660,18 @@
                                 <h6 class="font-semibold flex items-center gap-2">
                                     <i class="pi pi-home"></i>
                                     Địa chỉ {{ index + 1 }}
+                                    <Tag 
+                                        v-if="!diaChi.tenTinh || !diaChi.tenPhuong" 
+                                        value="Chưa hoàn chỉnh" 
+                                        severity="warning" 
+                                        class="ml-2"
+                                    />
+                                    <Tag 
+                                        v-else 
+                                        value="Hoàn chỉnh" 
+                                        severity="success" 
+                                        class="ml-2"
+                                    />
                                 </h6>
                                 <div class="flex gap-2">
                                     <Button
@@ -714,6 +681,7 @@
                                         size="small"
                                         outlined
                                         @click="setDefaultAddress(index)"
+                                        :disabled="!diaChi.tenTinh || !diaChi.tenPhuong"
                                     />
                                     <Tag v-else value="Mặc định" severity="success" />
                                     <Button
@@ -817,7 +785,7 @@
             </div>
             
             <template #footer>
-                <Button label="Hủy" icon="pi pi-times" text @click="hideEmployeeDialog" :disabled="saving" />
+                <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" :disabled="saving" />
                 <Button 
                     label="Lưu tất cả thay đổi" 
                     icon="pi pi-save" 
@@ -852,19 +820,28 @@ const getCurrentUser = () => {
     try {
         const userInfo = localStorage.getItem('user_info')
         if (userInfo) {
-            return JSON.parse(userInfo)
+            const user = JSON.parse(userInfo)
+            console.log('User from user_info:', user)
+            return user
         }
+        
         const userData = localStorage.getItem('user')
         if (userData) {
-            return JSON.parse(userData)
+            const user = JSON.parse(userData)
+            console.log('User from user:', user)
+            return user
         }
-        return {
-            id: 1,
-            email: 'admin@beeshoes.com',
-            hoTen: 'Administrator',
-            vaiTro: 'ADMIN',
-            role: 'ADMIN'
+        
+        // Fallback - kiểm tra session hoặc cookie
+        const sessionUser = sessionStorage.getItem('currentUser')
+        if (sessionUser) {
+            const user = JSON.parse(sessionUser)
+            console.log('User from session:', user)
+            return user
         }
+        
+        console.warn('No user found in storage')
+        return null
     } catch (error) {
         console.error('Error getting user:', error)
         return null
@@ -873,11 +850,46 @@ const getCurrentUser = () => {
 
 const isAdmin = computed(() => {
     const user = getCurrentUser()
-    const result = user?.vaiTro === 'ADMIN' || user?.role === 'ADMIN'
-    console.log('Admin check:', { user, result })
-    return result
+    if (!user) {
+        console.warn('No user data found')
+        return false
+    }
+    
+    const isAdminRole = user.vaiTro === 'ADMIN' || 
+                      user.role === 'ADMIN' || 
+                      user.vai_tro === 'ADMIN'
+    
+    console.log('Admin check:', { 
+        user: user, 
+        vaiTro: user.vaiTro, 
+        role: user.role, 
+        vai_tro: user.vai_tro,
+        isAdmin: isAdminRole 
+    })
+    
+    return isAdminRole
+})
+const currentUserRole = computed(() => {
+    const user = getCurrentUser()
+    if (!user) return null
+    
+    return user.vaiTro || user.role || user.vai_tro || null
 })
 
+const canEditEmployee = computed(() => {
+    const role = currentUserRole.value
+    console.log('Can edit check - Current role:', role)
+    
+    // Chỉ ADMIN mới được sửa/xóa
+    return role === 'ADMIN'
+})
+
+const canViewOnly = computed(() => {
+    const role = currentUserRole.value
+    
+    // NHANVIEN chỉ được xem
+    return role === 'NHANVIEN'
+})
 // Reactive State
 const dt = ref()
 const employees = ref([])
@@ -1037,7 +1049,10 @@ if (advancedFilters.value.trangThai !== null &&
 
         const response = await axios.get('http://localhost:8080/api/nhan-vien', { 
             params,
-            timeout: 10000 
+            timeout: 10000,
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
         })
         if (response.data && response.data.content) {
             employees.value = response.data.content
@@ -1139,22 +1154,7 @@ const validateEmployeeData = () => {
         errors.push('Trạng thái không được để trống')
     }
     
-    // FIXED: Validate địa chỉ - chỉ validate nếu có nhập
-    if (employee.value.danhSachDiaChi && employee.value.danhSachDiaChi.length > 0) {
-        employee.value.danhSachDiaChi.forEach((addr, index) => {
-            // Chỉ validate nếu đã bắt đầu nhập địa chỉ
-            const hasStartedAddress = addr.maTinh || addr.maPhuong || (addr.diaChiChiTiet && addr.diaChiChiTiet.trim())
-            
-            if (hasStartedAddress) {
-                if (!addr.maTinh) {
-                    errors.push(`Địa chỉ ${index + 1}: Vui lòng chọn Tỉnh/Thành phố`)
-                }
-                if (!addr.maPhuong) {
-                    errors.push(`Địa chỉ ${index + 1}: Vui lòng chọn Phường/Xã`)
-                }
-            }
-        })
-    }
+    // Địa chỉ sẽ được validate trong saveEmployeeComplete
     
     return errors
 }
@@ -1206,40 +1206,41 @@ const saveEmployeeComplete = async () => {
     if (validationErrors.length > 0) {
         toast.add({
             severity: 'warn',
-            summary: 'Dữ liệu không hợp lệ', 
+            summary: 'Dữ liệu không hợp lệ',
             detail: validationErrors[0],
-            life: 5000
+            life: 3000
         })
         return
     }
 
     saving.value = true
     try {
-        // Xử lý địa chỉ - CHỈ LẤY ĐỊA CHỈ HOÀN CHỈNH
+        // Xử lý địa chỉ - CHỈ LẤY ĐỊA CHỈ HOÀN CHỈNH (có đầy đủ tỉnh và phường)
         const processedAddresses = employee.value.danhSachDiaChi?.filter(addr => {
             // Chỉ lấy địa chỉ đã chọn đầy đủ tỉnh và phường
-            return addr.maTinh && addr.maPhuong && addr.tenTinh && addr.tenPhuong
-        }).map(addr => {
-            const processedAddr = {
-                diaChiChiTiet: addr.diaChiChiTiet?.trim() || '',
-                tenPhuong: addr.tenPhuong.trim(),
-                tenTinh: addr.tenTinh.trim(),
-                isDefault: addr.isDefault || false,
-                maPhuong: addr.maPhuong,
-                maTinh: addr.maTinh,
-                trangThai: 1
-            }
-            
-            // Tạo địa chỉ đầy đủ
-            const parts = [
-                processedAddr.diaChiChiTiet,
-                processedAddr.tenPhuong,
-                processedAddr.tenTinh
-            ].filter(part => part && part.trim() !== '')
-            
-            processedAddr.diaChiDayDu = parts.join(', ')
-            return processedAddr
-        }) || []
+            return addr.tenTinh && addr.tenTinh.trim() !== '' && 
+                   addr.tenPhuong && addr.tenPhuong.trim() !== ''
+        }).map(addr => ({
+            diaChiChiTiet: addr.diaChiChiTiet?.trim() || '',
+            tenPhuong: addr.tenPhuong.trim(),
+            tenTinh: addr.tenTinh.trim(),
+            diaChiDayDu: formatFullAddressEdit(addr),
+            isDefault: addr.isDefault || false,
+            maPhuong: addr.maPhuong || null,
+            maTinh: addr.maTinh || null,
+            trangThai: 1
+        })) || []
+
+        // Kiểm tra có địa chỉ hoàn chỉnh không
+        if (processedAddresses.length === 0) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Thiếu thông tin địa chỉ',
+                detail: 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã cho ít nhất một địa chỉ',
+                life: 4000
+            })
+            return
+        }
 
         // Đảm bảo có địa chỉ mặc định
         if (processedAddresses.length > 0) {
@@ -1256,12 +1257,23 @@ const saveEmployeeComplete = async () => {
             email: employee.value.email.trim(),
             sdt: employee.value.sdt.trim(),
             trangThai: employee.value.trangThai,
-            idTaiKhoan: employee.value.idTaiKhoan,
-            danhSachDiaChi: processedAddresses
+            idTaiKhoan: employee.value.idTaiKhoan
         }
 
+        console.log('📤 Sending employee data:', employeeData)
+
         // Lưu nhân viên
-        await axios.put(`http://localhost:8080/api/nhan-vien/${employee.value.id}`, employeeData)
+        await axios.put(`http://localhost:8080/api/nhan-vien/${employee.value.id}`, employeeData, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+        })
+        
+        // Cập nhật địa chỉ thông minh
+        console.log('🏠 Updating addresses intelligently:', processedAddresses)
+        await updateEmployeeAddressesIntelligently(employee.value.id, processedAddresses)
+        console.log('✅ Addresses updated successfully')
         
         // SỬA: Đồng bộ trạng thái tài khoản nếu có
         if (employee.value.idTaiKhoan) {
@@ -1271,15 +1283,23 @@ const saveEmployeeComplete = async () => {
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: 'Cập nhật thông tin nhân viên thành công',
+            detail: 'Cập nhật thông tin nhân viên và địa chỉ thành công',
             life: 3000
         })
 
         await fetchData()
-        hideEmployeeDialog()
+        hideDialog()
         
     } catch (error) {
-        console.error('Lỗi cập nhật nhân viên:', error)
+        console.error('❌ Error saving employee:', error)
+        console.error('❌ Error response:', error.response?.data)
+        console.error('❌ Error status:', error.response?.status)
+        console.error('❌ Error headers:', error.response?.headers)
+        
+        if (error.response?.data?.errors) {
+            console.error('❌ Validation errors:', error.response.data.errors)
+        }
+        
         handleApiError(error, 'Không thể cập nhật thông tin nhân viên')
     } finally {
         saving.value = false
@@ -1287,13 +1307,15 @@ const saveEmployeeComplete = async () => {
 }
 // FIXED: Đồng bộ trạng thái giữa các bảng
 const syncAccountStatus = async (accountId, newStatus) => {
+    if (!accountId) return
+    
     try {
-        // SỬA: Sử dụng đúng format RequestBody
         const response = await axios.patch(`http://localhost:8080/api/tai-khoan/${accountId}/trang-thai`, {
             trangThai: newStatus
         }, {
             headers: { 
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             },
             timeout: 10000
         })
@@ -1302,13 +1324,19 @@ const syncAccountStatus = async (accountId, newStatus) => {
             console.log('✅ Đồng bộ trạng thái tài khoản thành công:', accountId, newStatus)
         }
     } catch (error) {
-        console.warn('⚠️ Không thể đồng bộ trạng thái tài khoản:', error.response?.data?.error || error.message)
-        // Không throw error để không ảnh hưởng đến flow chính
+        console.warn('⚠️ Không thể đồng bộ trạng thái tài khoản:', error.response?.data?.message || error.message)
+        
+        // Hiển thị cảnh báo cho user
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo đồng bộ',
+            detail: 'Đã cập nhật nhân viên nhưng không thể đồng bộ trạng thái tài khoản',
+            life: 4000
+        })
     }
 }
-
 const changeStatus = async (employeeData) => {
-    if (!isAdmin.value) {
+    if (!canEditEmployee.value) {
         toast.add({
             severity: 'warn',
             summary: 'Không có quyền',
@@ -1324,9 +1352,14 @@ const changeStatus = async (employeeData) => {
         // Cập nhật trạng thái nhân viên
         await axios.patch(`http://localhost:8080/api/nhan-vien/${employeeData.id}/status`, {
             trangThai: newStatus
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
         })
         
-        // SỬA: Đồng bộ trạng thái tài khoản
+        // Đồng bộ trạng thái tài khoản nếu có
         if (employeeData.idTaiKhoan) {
             await syncAccountStatus(employeeData.idTaiKhoan, newStatus)
         }
@@ -1335,7 +1368,7 @@ const changeStatus = async (employeeData) => {
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: `Đã ${statusText} nhân viên ${employeeData.hoTen}`,
+            detail: `Đã ${statusText} nhân viên ${employeeData.hoTen} và đồng bộ tài khoản`,
             life: 3000
         })
         
@@ -1345,13 +1378,96 @@ const changeStatus = async (employeeData) => {
         handleApiError(error, 'Thay đổi trạng thái thất bại')
     }
 }
+
 // ===== ADDRESS MANAGEMENT - FIXED =====
+const updateEmployeeAddressesIntelligently = async (employeeId, newAddresses) => {
+    try {
+        console.log('🧠 Updating addresses intelligently for employee:', employeeId)
+        
+        // Lấy địa chỉ hiện tại từ API
+        const currentAddresses = await fetchEmployeeAddresses(employeeId)
+        console.log('📋 Current addresses from API:', currentAddresses)
+        console.log('📋 New addresses to save:', newAddresses)
+        
+        // Logic mới: Xử lý từng địa chỉ một cách thông minh
+        console.log('🔍 Analyzing address changes...')
+        
+        // Tạo map để theo dõi địa chỉ đã xử lý
+        const processedAddresses = new Set()
+        
+        // Xử lý từng địa chỉ mới
+        for (let i = 0; i < newAddresses.length; i++) {
+            const newAddr = newAddresses[i]
+            console.log(`📋 Processing new address ${i + 1}:`, newAddr.diaChiChiTiet)
+            
+            // Tìm địa chỉ hiện tại có cùng vị trí trong danh sách (index-based matching)
+            let existingAddr = null
+            if (i < currentAddresses.length) {
+                existingAddr = currentAddresses[i]
+                console.log(`🔍 Found existing address at position ${i}:`, existingAddr.diaChiChiTiet)
+            }
+            
+            if (existingAddr) {
+                // So sánh chi tiết để xem có thay đổi không
+                const hasLocationChange = (
+                    existingAddr.maTinh !== newAddr.maTinh ||
+                    existingAddr.maPhuong !== newAddr.maPhuong ||
+                    existingAddr.tenTinh !== newAddr.tenTinh ||
+                    existingAddr.tenPhuong !== newAddr.tenPhuong
+                )
+                
+                const hasDetailChange = (
+                    existingAddr.diaChiChiTiet !== newAddr.diaChiChiTiet ||
+                    existingAddr.isDefault !== newAddr.isDefault
+                )
+                
+                if (hasLocationChange || hasDetailChange) {
+                    console.log('✏️ Updating address:', existingAddr.id, 'Changes:', { hasLocationChange, hasDetailChange })
+                    await updateEmployeeAddress(existingAddr.id, newAddr)
+                    console.log('✅ Updated address:', existingAddr.id)
+                } else {
+                    console.log('⏭️ No changes for address:', existingAddr.id)
+                }
+                
+                processedAddresses.add(existingAddr.id)
+            } else {
+                // Địa chỉ mới, thêm vào
+                console.log('➕ Adding new address:', newAddr.diaChiChiTiet)
+                await addAddressToEmployee(employeeId, newAddr)
+            }
+        }
+        
+        // Xóa địa chỉ không còn cần (những địa chỉ không được xử lý)
+        const addressesToDelete = currentAddresses.filter(current => !processedAddresses.has(current.id))
+        
+        for (const addrToDelete of addressesToDelete) {
+            if (addrToDelete.isDefault) {
+                console.log('⚠️ Skipping deletion of default address:', addrToDelete.id, addrToDelete.diaChiChiTiet)
+                continue
+            }
+            console.log('🗑️ Deleting unused address:', addrToDelete.id, addrToDelete.diaChiChiTiet)
+            await deleteEmployeeAddress(addrToDelete.id, employeeId)
+            console.log('✅ Deleted address:', addrToDelete.id)
+        }
+        
+        console.log('✅ Intelligent address update completed')
+        
+    } catch (error) {
+        console.error('❌ Error in intelligent address update:', error)
+        throw error
+    }
+}
+
 const fetchProvinces = async () => {
     if (provinces.value.length > 0) return
     
     loadingProvinces.value = true
     try {
-        const response = await axios.get('http://localhost:8080/api/vietnam-address/provinces')
+        const response = await axios.get('http://localhost:8080/api/vietnam-address/provinces', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+        })
         
         if (response.data && response.data.success && response.data.data) {
             provinces.value = response.data.data.map(item => ({
@@ -1382,7 +1498,11 @@ const fetchWardsForAddress = async (provinceCode, addressIndex) => {
     if (!provinceCode || !employee.value.danhSachDiaChi || !employee.value.danhSachDiaChi[addressIndex]) return
     
     try {
-        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
+        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+        })
         
         let wardsData = []
         if (response.data && response.data.success && response.data.data) {
@@ -1404,6 +1524,184 @@ const fetchWardsForAddress = async (provinceCode, addressIndex) => {
         employee.value.danhSachDiaChi[addressIndex].availableWards = [
             { code: '1', name: 'Phường/Xã 1', codename: 'phuong_xa_1' }
         ]
+    }
+}
+
+// ===== EMPLOYEE ADDRESS API FUNCTIONS =====
+const fetchEmployeeAddresses = async (employeeId) => {
+    try {
+        console.log('🏠 Fetching addresses for employee:', employeeId)
+        
+        // Tìm employee để lấy idTaiKhoan
+        const employeeData = employees.value.find(e => e.id === employeeId)
+        if (!employeeData || !employeeData.idTaiKhoan) {
+            console.log('⚠️ No account found for employee:', employeeId)
+            return []
+        }
+        
+        const response = await axios.get(`http://localhost:8080/api/dia-chi/tai-khoan/${employeeData.idTaiKhoan}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            timeout: 10000
+        })
+        
+        if (response.data && Array.isArray(response.data)) {
+            console.log('✅ Addresses fetched from API:', response.data)
+            return response.data
+        } else {
+            console.log('⚠️ No addresses found for employee:', employeeId)
+            return []
+        }
+        
+    } catch (error) {
+        console.error('❌ Error fetching employee addresses:', error)
+        return []
+    }
+}
+
+const addAddressToEmployee = async (employeeId, addressData) => {
+    try {
+        console.log('➕ Adding address for employee:', employeeId, addressData)
+        
+        // Tìm employee để lấy idTaiKhoan
+        const employeeData = employees.value.find(e => e.id === employeeId)
+        if (!employeeData || !employeeData.idTaiKhoan) {
+            throw new Error('Không tìm thấy tài khoản của nhân viên')
+        }
+        
+        const payload = {
+            idTaiKhoan: employeeData.idTaiKhoan,
+            diaChiChiTiet: addressData.diaChiChiTiet,
+            tenPhuong: addressData.tenPhuong,
+            tenTinh: addressData.tenTinh,
+            maPhuong: addressData.maPhuong,
+            maTinh: addressData.maTinh,
+            trangThai: 1
+        }
+        
+        const response = await axios.post('http://localhost:8080/api/dia-chi', payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            timeout: 10000
+        })
+        
+        if (response.data && response.data.data) {
+            console.log('✅ Address added successfully via API:', response.data.data)
+            return response.data.data
+        } else {
+            throw new Error('API response không hợp lệ')
+        }
+        
+    } catch (error) {
+        console.error('❌ Error adding address:', error)
+        throw error
+    }
+}
+
+const updateEmployeeAddress = async (addressId, addressData) => {
+    try {
+        console.log('✏️ Updating address:', addressId, addressData)
+        
+        // Tìm employee để lấy idTaiKhoan
+        const employeeData = employees.value.find(e => e.id === employee.value.id)
+        if (!employeeData || !employeeData.idTaiKhoan) {
+            throw new Error('Không tìm thấy tài khoản của nhân viên')
+        }
+        
+        const payload = {
+            idTaiKhoan: employeeData.idTaiKhoan,
+            diaChiChiTiet: addressData.diaChiChiTiet,
+            tenPhuong: addressData.tenPhuong,
+            tenTinh: addressData.tenTinh,
+            maPhuong: addressData.maPhuong,
+            maTinh: addressData.maTinh,
+            trangThai: 1
+        }
+        
+        const response = await axios.put(`http://localhost:8080/api/dia-chi/${addressId}`, payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            timeout: 10000
+        })
+        
+        if (response.data && response.data.data) {
+            console.log('✅ Address updated successfully:', response.data.data)
+            return response.data.data
+        } else {
+            throw new Error('API response không hợp lệ')
+        }
+        
+    } catch (error) {
+        console.error('❌ Error updating address:', error)
+        throw error
+    }
+}
+
+const deleteEmployeeAddress = async (addressId, employeeId) => {
+    try {
+        console.log('🗑️ Deleting address:', addressId, 'for employee:', employeeId)
+        
+        // Tìm nhân viên để lấy idTaiKhoan
+        const employee = employees.value.find(emp => emp.id === employeeId)
+        if (!employee || !employee.idTaiKhoan) {
+            throw new Error('Không tìm thấy tài khoản của nhân viên')
+        }
+        
+        // Kiểm tra xem đây có phải địa chỉ local không
+        if (addressId && addressId.toString().startsWith('local_')) {
+            console.log('🔄 Deleting local address (no API call needed)')
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Đã xóa địa chỉ tạm thời',
+                life: 3000
+            })
+            return true
+        }
+        
+        try {
+            const response = await axios.delete(`http://localhost:8080/api/dia-chi/${addressId}`, {
+                timeout: 5000
+            })
+            
+            if (response.data && response.data.success) {
+                console.log('✅ Address deleted successfully via API')
+                toast.add({
+                    severity: 'success',
+                    summary: 'Thành công',
+                    detail: 'Đã xóa địa chỉ',
+                    life: 3000
+                })
+                return true
+            }
+            
+            throw new Error('API response không hợp lệ')
+        } catch (apiError) {
+            console.warn('⚠️ Address API not available, treating as local deletion:', apiError.response?.status)
+            
+            toast.add({
+                severity: 'warn',
+                summary: 'Xóa tạm thời',
+                detail: 'Địa chỉ được xóa tạm thời (API chưa sẵn sàng)',
+                life: 3000
+            })
+            
+            return true
+        }
+    } catch (error) {
+        console.error('❌ Error deleting address:', error)
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: `Không thể xóa địa chỉ: ${error.response?.data?.message || error.message}`,
+            life: 5000
+        })
+        throw error
     }
 }
 
@@ -1499,27 +1797,63 @@ const removeAddress = (index) => {
         return
     }
     
-    // Cho phép xóa hết địa chỉ
-    const isRemovedDefault = employee.value.danhSachDiaChi[index].isDefault
-    employee.value.danhSachDiaChi.splice(index, 1)
+    const addressToRemove = employee.value.danhSachDiaChi[index]
+    const isRemovedDefault = addressToRemove.isDefault
     
-    if (isRemovedDefault && employee.value.danhSachDiaChi.length > 0) {
-        employee.value.danhSachDiaChi[0].isDefault = true
-    }
-    
-    toast.add({
-        severity: 'success',
-        summary: 'Đã xóa',
-        detail: 'Đã xóa địa chỉ',
-        life: 2000
+    // Xác nhận trước khi xóa
+    confirm.require({
+        message: `Bạn có chắc chắn muốn xóa địa chỉ "${addressToRemove.diaChiDayDu || formatFullAddressEdit(addressToRemove)}"?`,
+        header: 'Xác nhận xóa địa chỉ',
+        icon: 'pi pi-exclamation-triangle',
+        rejectClass: 'p-button-secondary p-button-outlined',
+        rejectLabel: 'Hủy',
+        acceptLabel: 'Xóa',
+        accept: () => {
+            employee.value.danhSachDiaChi.splice(index, 1)
+            
+            // Nếu xóa địa chỉ mặc định, tự động đặt địa chỉ đầu tiên còn lại làm mặc định
+            if (isRemovedDefault && employee.value.danhSachDiaChi.length > 0) {
+                employee.value.danhSachDiaChi.forEach((addr, i) => addr.isDefault = (i === 0))
+            }
+            
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Đã xóa địa chỉ thành công',
+                life: 3000
+            })
+        }
     })
 }
 
 const setDefaultAddress = (index) => {
     if (!employee.value.danhSachDiaChi) return
     
+    const addressToSetDefault = employee.value.danhSachDiaChi[index]
+    
+    // Kiểm tra địa chỉ có hoàn chỉnh không
+    if (!addressToSetDefault.tenTinh || !addressToSetDefault.tenPhuong) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không thể đặt mặc định',
+            detail: 'Chỉ có thể đặt địa chỉ hoàn chỉnh làm mặc định',
+            life: 3000
+        })
+        return
+    }
+    
+    // Bỏ mặc định cho tất cả địa chỉ
     employee.value.danhSachDiaChi.forEach(addr => addr.isDefault = false)
+    
+    // Đặt địa chỉ này làm mặc định
     employee.value.danhSachDiaChi[index].isDefault = true
+    
+    toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: 'Đã đặt địa chỉ làm mặc định',
+        life: 3000
+    })
 }
 
 // ===== UTILITY FUNCTIONS =====
@@ -1751,7 +2085,7 @@ function editEmployee(emp) {
     fetchProvinces()
 }
 
-const hideEmployeeDialog = () => {
+const hideDialog = () => {
     employeeDialog.value = false
     submitted.value = false
     employee.value = {
@@ -1831,7 +2165,7 @@ const confirmDeleteSelected = () => {
 
 // ===== DELETE FUNCTIONS =====
 const deleteEmployee = async (employeeId) => {
-    if (!isAdmin.value) {
+    if (!canEditEmployee.value) {
         toast.add({
             severity: 'warn',
             summary: 'Không có quyền',
@@ -2023,7 +2357,7 @@ onMounted(() => {
 })
         </script>
 
-<style scoped>
+<style scoped lang="postcss">
 .card {
     @apply bg-white rounded-lg shadow-sm border border-gray-200;
 }
