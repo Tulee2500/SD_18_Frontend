@@ -34,7 +34,7 @@
         </div>
 
         <!-- Lọc theo trạng thái -->
-        <div class="col-span-12 md:col-span-6">
+        <div class="col-span-6 md:col-span-3">
             <label class="mb-2 block text-sm font-medium">Trạng thái</label>
             <Select 
                 v-model="statusFilter" 
@@ -316,10 +316,8 @@
                 <Button 
                     label="Lưu" 
                     icon="pi pi-check" 
-                    @click="saveKhuyenMai" 
-                    :loading="isSaving"
-                    :disabled="isSaving"
-                />
+                    @click="confirmAddDialog = true" 
+                                  />
             </template>
         </Dialog>
 
@@ -650,6 +648,20 @@
             </template>
         </Dialog>
 
+        <Dialog v-model:visible="confirmAddDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="khuyenMai" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này ?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddKhuyenMaiConfirm" :loading="loading" />
+            </template>
+        </Dialog>
         <!-- Toast Notifications -->
         <Toast />
     </div>
@@ -680,6 +692,7 @@ const statusFilter = ref('');
 const submitted = ref(false);
 const isLoading = ref(false);
 const isSaving = ref(false);
+const confirmAddDialog = ref(false);
 
 // Thêm ref để lưu trữ lỗi trùng lặp
 const duplicateErrors = ref({
@@ -807,6 +820,15 @@ function getPromotionStatusText(promotion) {
         default:
             return 'Không xác định';
     }
+}
+
+function handleAddKhuyenMaiConfirm() {
+  saveKhuyenMai();              // gọi API thêm khuyến mãi
+  confirmAddDialog.value = false; // tắt dialog confirm
+}
+function handleUpdateKhuyenMaiConfirm() {
+  editKhuyenMai();              // gọi API cập nhật khuyến mãi
+  confirmUpdateDialog.value = false; // tắt dialog confirm
 }
 
 function getPromotionStatusSeverity(promotion) {

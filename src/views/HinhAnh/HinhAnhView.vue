@@ -21,6 +21,9 @@ const statuses = ref([
     { label: 'Đang load', value: 0 }
 ]);
 
+const confirmAddDialog = ref(false);
+
+
 // CÁC REF CHO UPLOAD FILE
 const fileInput = ref();
 const selectedFile = ref(null);
@@ -69,6 +72,15 @@ function createId() {
         id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return 'HA' + id;
+}
+
+function handleAddHinhAnhConfirm() {
+  saveHinhAnh();              // gọi API thêm hình ảnh
+  confirmAddDialog.value = false; // tắt dialog confirm
+}
+function handleUpdateHinhAnhConfirm() {
+  editHinhAnh();              // gọi API cập nhật hình ảnh
+  confirmUpdateDialog.value = false; // tắt dialog confirm
 }
 
 // HÀM openNew ĐƠN GIẢN
@@ -510,11 +522,11 @@ function exportCSV() {
             </Column>
             <Column field="maHinhAnh" header="Mã Hình Ảnh" sortable style="min-width: 12rem"></Column>
             <Column field="tenHinhAnh" header="Tên File" sortable style="min-width: 20rem"></Column>
-            <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
+            <!-- <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
                 <template #body="slotProps">
                     <Tag :value="slotProps.data.trangThai === 1 ? 'Đã load' : 'Đang load'" :severity="getStatusLabel(slotProps.data.trangThai)" />
                 </template>
-            </Column>
+            </Column> -->
             <Column :exportable="false" style="width: 12rem">
                 <template #body="slotProps">
                     <div class="flex justify-center gap-2">
@@ -561,14 +573,14 @@ function exportCSV() {
                     </div>
                 </div>
 
-                <div>
+                <!-- <div>
                     <label for="trangThai" class="mb-3 block font-bold">Trạng Thái</label>
                     <Select id="trangThai" v-model="hinhAnh.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
-                </div>
+                </div> -->
             </div>
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveHinhAnh" :loading="uploading" />
+                <Button label="Lưu" icon="pi pi-check" @click="confirmAddDialog = true" :loading="uploading" />
             </template>
         </Dialog>
 
@@ -597,6 +609,21 @@ function exportCSV() {
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteHinhAnhDialog = false" />
                 <Button label="Có" icon="pi pi-check" @click="deleteHinhAnh" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="confirmAddDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="hinhAnh" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này ?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddHinhAnhConfirm" :loading="loading" />
             </template>
         </Dialog>
 

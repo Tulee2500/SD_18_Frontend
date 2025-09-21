@@ -17,6 +17,8 @@ const voucher = ref({});
 const selectedVouchers = ref();
 const submitted = ref(false);
 const loading = ref(false);
+const confirmAddDialog = ref(false);
+
 
 // Thêm ref để lưu trữ lỗi trùng lặp
 const duplicateErrors = ref({
@@ -296,6 +298,15 @@ function validateVoucherForm() {
     }
 
     return errors;
+}
+
+function handleAddVoucherConfirm() {
+  saveVoucher();              // gọi API thêm voucher
+  confirmAddDialog.value = false; // tắt dialog confirm
+}
+function handleUpdateVoucherConfirm() {
+  editVoucher();              // gọi API cập nhật voucher
+  confirmUpdateDialog.value = false; // tắt dialog confirm
 }
 
 function validateField(fieldName) {
@@ -1165,7 +1176,7 @@ function exportCSV() {
 
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveVoucher" :loading="uploading || loading" :disabled="uploading || loading" />
+                <Button label="Lưu" icon="pi pi-check" @click="confirmAddDialog = true" :loading="uploading || loading" :disabled="uploading || loading" />
             </template>
         </Dialog>
 
@@ -1203,6 +1214,22 @@ function exportCSV() {
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteVouchersDialog = false" :disabled="loading" />
                 <Button label="Có" icon="pi pi-check" severity="danger" @click="deleteSelectedVouchers" :loading="loading" />
+            </template>
+        </Dialog>
+
+        	<!-- Dialog confirm thêm sản phẩm -->
+        <Dialog v-model:visible="confirmAddDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="voucher" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này ?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddVoucherConfirm" :loading="loading" />
             </template>
         </Dialog>
     </div>
