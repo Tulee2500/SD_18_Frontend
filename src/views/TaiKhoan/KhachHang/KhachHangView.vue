@@ -169,26 +169,16 @@
             <Column header="Địa chỉ" style="min-width: 20rem">
                 <template #body="slotProps">
                     <div class="address-display">
-                        <div v-if="getDefaultAddress(slotProps.data)" class="flex items-center gap-2">
-                            <Button 
-                                icon="pi pi-map-marker" 
-                                outlined 
-                                severity="info" 
-                                size="small" 
-                                @click="viewAllAddresses(slotProps.data)" 
-                                title="Xem tất cả địa chỉ" 
-                            />
-                            <div class="flex flex-col">
-                                <span class="text-sm">{{ getDefaultAddress(slotProps.data) }}</span>
-                                <span class="text-blue-600 text-xs font-semibold" v-if="getAddressCount(slotProps.data) > 0">
-                                    {{ getAddressCount(slotProps.data) }} địa chỉ
-                                </span>
-                            </div>
-                        </div>
-                        <div v-else class="text-muted text-sm">
+                        <span v-if="slotProps.data.diaChiMacDinh && slotProps.data.diaChiMacDinh.diaChiDayDu">
+                            {{ slotProps.data.diaChiMacDinh.diaChiDayDu }}
+                        </span>
+                        <span v-else-if="slotProps.data.danhSachDiaChi && slotProps.data.danhSachDiaChi.length > 0 && slotProps.data.danhSachDiaChi[0].diaChiDayDu">
+                            {{ slotProps.data.danhSachDiaChi[0].diaChiDayDu }}
+                        </span>
+                        <span v-else class="text-muted text-sm">
                             <i class="pi pi-map-marker mr-1"></i>
                             Chưa có địa chỉ
-                        </div>
+                        </span>
                     </div>
                 </template>
             </Column>
@@ -241,6 +231,7 @@
                             title="Xem chi tiết"
                         />
                         <Button
+                            v-if="canEditCustomer"
                             icon="pi pi-pencil"
                             size="small"
                             outlined
@@ -249,6 +240,7 @@
                             title="Chỉnh sửa"
                         />
                         <Button
+                            v-if="canEditCustomer"
                             icon="pi pi-refresh"
                             size="small"
                             outlined
@@ -435,9 +427,23 @@
                         />
                     </div>
 
+                    <!-- Thông báo hướng dẫn -->
+                    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-start gap-2">
+                            <i class="pi pi-info-circle text-blue-600 mt-1"></i>
+                            <div class="text-sm text-blue-800">
+                                <p class="font-medium mb-1">Hướng dẫn:</p>
+                                <p>• Chọn đầy đủ <strong>Tỉnh/Thành phố</strong> và <strong>Phường/Xã</strong> để địa chỉ được lưu</p>
+                                <p>• Địa chỉ chưa hoàn chỉnh sẽ không được lưu vào hệ thống</p>
+                                <p>• Cần có ít nhất một địa chỉ hoàn chỉnh để lưu thông tin khách hàng</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div v-if="customer.danhSachDiaChi && customer.danhSachDiaChi.length > 0" class="space-y-3">
                         <div v-for="(diaChi, index) in customer.danhSachDiaChi" 
                              :key="index" 
+                             :data-address-index="index"
                              class="border rounded-lg p-4 bg-white" 
                              :class="{ 'border-green-500 bg-green-50': diaChi.isDefault }">
                             
@@ -445,8 +451,27 @@
                                 <h6 class="font-semibold flex items-center gap-2">
                                     <i class="pi pi-home"></i>
                                     Địa chỉ {{ index + 1 }}
+                                    <Tag 
+                                        v-if="!diaChi.tenTinh || !diaChi.tenPhuong" 
+                                        value="Chưa hoàn chỉnh" 
+                                        severity="warning" 
+                                        class="ml-2"
+                                    />
+                                    <Tag 
+                                        v-else 
+                                        value="Hoàn chỉnh" 
+                                        severity="success" 
+                                        class="ml-2"
+                                    />
                                 </h6>
                                 <div class="flex gap-2">
+                                    <Button
+                                        icon="pi pi-eye"
+                                        size="small"
+                                        outlined
+                                        @click="viewAddressDetail(diaChi, index)"
+                                        title="Xem chi tiết địa chỉ"
+                                    />
                                     <Button
                                         v-if="!diaChi.isDefault"
                                         label="Đặt mặc định"
@@ -454,6 +479,7 @@
                                         size="small"
                                         outlined
                                         @click="setDefaultAddress(index)"
+                                        :disabled="!diaChi.tenTinh || !diaChi.tenPhuong"
                                     />
                                     <Tag v-else value="Mặc định" severity="success" />
                                     <Button
@@ -541,6 +567,70 @@
             </template>
         </Dialog>
 
+        <!-- Address Detail Dialog -->
+        <Dialog v-model:visible="addressDetailDialog" :style="{ width: '600px' }" header="Chi tiết địa chỉ" :modal="true">
+            <div v-if="viewingAddress" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tỉnh/Thành phố</label>
+                        <div class="p-2 bg-gray-50 rounded border">
+                            {{ viewingAddress.tenTinh || 'Chưa chọn' }}
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phường/Xã</label>
+                        <div class="p-2 bg-gray-50 rounded border">
+                            {{ viewingAddress.tenPhuong || 'Chưa chọn' }}
+                        </div>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Địa chỉ chi tiết</label>
+                        <div class="p-2 bg-gray-50 rounded border">
+                            {{ viewingAddress.diaChiChiTiet || 'Chưa nhập' }}
+                        </div>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Địa chỉ đầy đủ</label>
+                        <div class="p-2 bg-blue-50 rounded border border-blue-200">
+                            <strong>{{ formatFullAddressEdit(viewingAddress) }}</strong>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4 pt-4 border-t">
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-info-circle text-blue-600"></i>
+                        <span class="text-sm text-gray-600">
+                            Trạng thái: 
+                            <Tag 
+                                :value="viewingAddress.trangThai === 1 ? 'Hoạt động' : 'Tạm khóa'" 
+                                :severity="viewingAddress.trangThai === 1 ? 'success' : 'danger'" 
+                            />
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-star text-yellow-600"></i>
+                        <span class="text-sm text-gray-600">
+                            Mặc định: 
+                            <Tag 
+                                :value="viewingAddress.isDefault ? 'Có' : 'Không'" 
+                                :severity="viewingAddress.isDefault ? 'success' : 'secondary'" 
+                            />
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Đóng" icon="pi pi-times" @click="addressDetailDialog = false" />
+                <Button 
+                    label="Chỉnh sửa" 
+                    icon="pi pi-pencil" 
+                    @click="editAddressFromDetail" 
+                    :disabled="!canEditCustomer"
+                />
+            </template>
+        </Dialog>
+
         <!-- Address List Dialog -->
         <Dialog v-model:visible="addressListDialog" :style="{ width: '700px' }" header="Danh sách địa chỉ" :modal="true">
             <div v-if="selectedCustomerAddresses">
@@ -582,7 +672,7 @@
 import axios from 'axios'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 // Composables
@@ -604,11 +694,14 @@ const totalRecords = ref(0)
 const viewDialog = ref(false)
 const customerDialog = ref(false)
 const addressListDialog = ref(false)
+const addressDetailDialog = ref(false)
 
 // Form Data
 const customer = ref({})
 const viewingCustomer = ref(null)
 const selectedCustomerAddresses = ref(null)
+const viewingAddress = ref(null)
+const viewingAddressIndex = ref(-1)
 
 // Address Data - FIXED TO USE API
 const provinces = ref([])
@@ -763,13 +856,95 @@ const debouncedGlobalSearch = debounce(() => {
 }, 500)
 
 // ===== ADDRESS MANAGEMENT - FIXED TO USE API =====
+const updateCustomerAddressesIntelligently = async (customerId, newAddresses) => {
+    try {
+        console.log('🧠 Updating addresses intelligently for customer:', customerId)
+        
+        // Lấy địa chỉ hiện tại từ API
+        const currentAddresses = await fetchCustomerAddresses(customerId)
+        console.log('📋 Current addresses from API:', currentAddresses)
+        console.log('📋 New addresses to save:', newAddresses)
+        
+        // Logic mới: Xử lý từng địa chỉ một cách thông minh
+        console.log('🔍 Analyzing address changes...')
+        
+        // Tạo map để theo dõi địa chỉ đã xử lý
+        const processedAddresses = new Set()
+        
+        // Xử lý từng địa chỉ mới
+        for (let i = 0; i < newAddresses.length; i++) {
+            const newAddr = newAddresses[i]
+            console.log(`📋 Processing new address ${i + 1}:`, newAddr.diaChiChiTiet)
+            
+            // Tìm địa chỉ hiện tại có cùng vị trí trong danh sách (index-based matching)
+            let existingAddr = null
+            if (i < currentAddresses.length) {
+                existingAddr = currentAddresses[i]
+                console.log(`🔍 Found existing address at position ${i}:`, existingAddr.diaChiChiTiet)
+            }
+            
+            if (existingAddr) {
+                // So sánh chi tiết để xem có thay đổi không
+                const hasLocationChange = (
+                    existingAddr.maTinh !== newAddr.maTinh ||
+                    existingAddr.maPhuong !== newAddr.maPhuong ||
+                    existingAddr.tenTinh !== newAddr.tenTinh ||
+                    existingAddr.tenPhuong !== newAddr.tenPhuong
+                )
+                
+                const hasDetailChange = (
+                    existingAddr.diaChiChiTiet !== newAddr.diaChiChiTiet ||
+                    existingAddr.isDefault !== newAddr.isDefault
+                )
+                
+                if (hasLocationChange || hasDetailChange) {
+                    console.log('✏️ Updating address:', existingAddr.id, 'Changes:', { hasLocationChange, hasDetailChange })
+                    await updateCustomerAddress(existingAddr.id, newAddr)
+                    console.log('✅ Updated address:', existingAddr.id)
+                } else {
+                    console.log('⏭️ No changes for address:', existingAddr.id)
+                }
+                
+                processedAddresses.add(existingAddr.id)
+            } else {
+                // Địa chỉ mới, thêm vào
+                console.log('➕ Adding new address:', newAddr.diaChiChiTiet)
+                await addAddressToCustomer(customerId, newAddr)
+            }
+        }
+        
+        // Xóa địa chỉ không còn cần (những địa chỉ không được xử lý)
+        const addressesToDelete = currentAddresses.filter(current => !processedAddresses.has(current.id))
+        
+        for (const addrToDelete of addressesToDelete) {
+            if (addrToDelete.isDefault) {
+                console.log('⚠️ Skipping deletion of default address:', addrToDelete.id, addrToDelete.diaChiChiTiet)
+                continue
+            }
+            console.log('🗑️ Deleting unused address:', addrToDelete.id, addrToDelete.diaChiChiTiet)
+            await deleteCustomerAddress(addrToDelete.id, customerId)
+            console.log('✅ Deleted address:', addrToDelete.id)
+        }
+        
+        console.log('✅ Intelligent address update completed')
+        
+    } catch (error) {
+        console.error('❌ Error in intelligent address update:', error)
+        throw error
+    }
+}
+
 const fetchProvinces = async () => {
     if (provinces.value.length > 0) return
     
     loadingProvinces.value = true
     try {
         console.log('🌍 Fetching provinces from Vietnam API...')
-        const response = await axios.get('http://localhost:8080/api/vietnam-address/provinces')
+        const response = await axios.get('http://localhost:8080/api/vietnam-address/provinces', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+        })
         
         if (response.data && response.data.success && response.data.data) {
             provinces.value = response.data.data.map(item => ({
@@ -806,7 +981,11 @@ const fetchWards = async (provinceCode) => {
     loadingWards.value = true
     try {
         console.log('🏘️ Fetching wards for province:', provinceCode)
-        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
+        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+        })
         
         if (response.data && response.data.success && response.data.data) {
             wards.value = response.data.data.map(item => ({
@@ -830,6 +1009,184 @@ const fetchWards = async (provinceCode) => {
         ]
     } finally {
         loadingWards.value = false
+    }
+}
+
+// ===== CUSTOMER ADDRESS API FUNCTIONS =====
+const fetchCustomerAddresses = async (customerId) => {
+    try {
+        console.log('🏠 Fetching addresses for customer:', customerId)
+        
+        // Tìm customer để lấy idTaiKhoan
+        const customerData = customers.value.find(c => c.id === customerId)
+        if (!customerData || !customerData.idTaiKhoan) {
+            console.log('⚠️ No account found for customer:', customerId)
+            return []
+        }
+        
+        const response = await axios.get(`http://localhost:8080/api/dia-chi/tai-khoan/${customerData.idTaiKhoan}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            timeout: 10000
+        })
+        
+        if (response.data && Array.isArray(response.data)) {
+            console.log('✅ Addresses fetched from API:', response.data)
+            return response.data
+        } else {
+            console.log('⚠️ No addresses found for customer:', customerId)
+            return []
+        }
+        
+    } catch (error) {
+        console.error('❌ Error fetching customer addresses:', error)
+        return []
+    }
+}
+
+const addAddressToCustomer = async (customerId, addressData) => {
+    try {
+        console.log('➕ Adding address for customer:', customerId, addressData)
+        
+        // Tìm customer để lấy idTaiKhoan
+        const customerData = customers.value.find(c => c.id === customerId)
+        if (!customerData || !customerData.idTaiKhoan) {
+            throw new Error('Không tìm thấy tài khoản của khách hàng')
+        }
+        
+        const payload = {
+            idTaiKhoan: customerData.idTaiKhoan,
+            diaChiChiTiet: addressData.diaChiChiTiet,
+            tenPhuong: addressData.tenPhuong,
+            tenTinh: addressData.tenTinh,
+            maPhuong: addressData.maPhuong,
+            maTinh: addressData.maTinh,
+            trangThai: 1
+        }
+        
+        const response = await axios.post('http://localhost:8080/api/dia-chi', payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            timeout: 10000
+        })
+        
+        if (response.data && response.data.data) {
+            console.log('✅ Address added successfully:', response.data.data)
+            return response.data.data
+        } else {
+            throw new Error('API response không hợp lệ')
+        }
+        
+    } catch (error) {
+        console.error('❌ Error adding address:', error)
+        throw error
+    }
+}
+
+const updateCustomerAddress = async (addressId, addressData) => {
+    try {
+        console.log('✏️ Updating address:', addressId, addressData)
+        
+        // Tìm customer để lấy idTaiKhoan
+        const customerData = customers.value.find(c => c.id === customer.value.id)
+        if (!customerData || !customerData.idTaiKhoan) {
+            throw new Error('Không tìm thấy tài khoản của khách hàng')
+        }
+        
+        const payload = {
+            idTaiKhoan: customerData.idTaiKhoan,
+            diaChiChiTiet: addressData.diaChiChiTiet,
+            tenPhuong: addressData.tenPhuong,
+            tenTinh: addressData.tenTinh,
+            maPhuong: addressData.maPhuong,
+            maTinh: addressData.maTinh,
+            trangThai: 1
+        }
+        
+        const response = await axios.put(`http://localhost:8080/api/dia-chi/${addressId}`, payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            timeout: 10000
+        })
+        
+        if (response.data && response.data.data) {
+            console.log('✅ Address updated successfully:', response.data.data)
+            return response.data.data
+        } else {
+            throw new Error('API response không hợp lệ')
+        }
+        
+    } catch (error) {
+        console.error('❌ Error updating address:', error)
+        throw error
+    }
+}
+
+const deleteCustomerAddress = async (addressId, customerId) => {
+    try {
+        console.log('🗑️ Deleting address:', addressId, 'for customer:', customerId)
+        
+        // Tìm khách hàng để lấy idTaiKhoan
+        const customer = customers.value.find(cus => cus.id === customerId)
+        if (!customer || !customer.idTaiKhoan) {
+            throw new Error('Không tìm thấy tài khoản của khách hàng')
+        }
+        
+        // Kiểm tra xem đây có phải địa chỉ local không
+        if (addressId && addressId.toString().startsWith('local_')) {
+            console.log('🔄 Deleting local address (no API call needed)')
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Đã xóa địa chỉ tạm thời',
+                life: 3000
+            })
+            return true
+        }
+        
+        try {
+            const response = await axios.delete(`http://localhost:8080/api/dia-chi/${addressId}`, {
+                timeout: 5000
+            })
+            
+            if (response.data && response.data.success) {
+                console.log('✅ Address deleted successfully via API')
+                toast.add({
+                    severity: 'success',
+                    summary: 'Thành công',
+                    detail: 'Đã xóa địa chỉ',
+                    life: 3000
+                })
+                return true
+            }
+            
+            throw new Error('API response không hợp lệ')
+        } catch (apiError) {
+            console.warn('⚠️ Address API not available, treating as local deletion:', apiError.response?.status)
+            
+            toast.add({
+                severity: 'warn',
+                summary: 'Xóa tạm thời',
+                detail: 'Địa chỉ được xóa tạm thời (API chưa sẵn sàng)',
+                life: 3000
+            })
+            
+            return true
+        }
+    } catch (error) {
+        console.error('❌ Error deleting address:', error)
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: `Không thể xóa địa chỉ: ${error.response?.data?.message || error.message}`,
+            life: 5000
+        })
+        throw error
     }
 }
 
@@ -869,7 +1226,11 @@ const fetchWardsForAddress = async (provinceCode, addressIndex) => {
     if (!provinceCode || !customer.value.danhSachDiaChi || !customer.value.danhSachDiaChi[addressIndex]) return
     
     try {
-        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`)
+        const response = await axios.get(`http://localhost:8080/api/vietnam-address/wards/${provinceCode}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+        })
         
         let wardsData = []
         if (response.data && response.data.success && response.data.data) {
@@ -921,30 +1282,99 @@ const addNewAddress = () => {
         maTinh: '',
         diaChiDayDu: '',
         availableWards: [],
-        isDefault: customer.value.danhSachDiaChi.length === 0
+        isDefault: customer.value.danhSachDiaChi.length === 0,
+        trangThai: 1
     }
     
     customer.value.danhSachDiaChi.push(newAddress)
+    
+    toast.add({
+        severity: 'info',
+        summary: 'Thêm địa chỉ',
+        detail: 'Đã thêm địa chỉ mới. Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã.',
+        life: 3000
+    })
 }
 
 const removeAddress = (index) => {
-    if (!customer.value.danhSachDiaChi || customer.value.danhSachDiaChi.length <= 1) {
+    if (!canEditCustomer.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không có quyền',
+            detail: 'Chỉ tài khoản ADMIN mới có thể xoá địa chỉ khách hàng',
+            life: 3000
+        })
         return
     }
     
-    const isRemovedDefault = customer.value.danhSachDiaChi[index].isDefault
-    customer.value.danhSachDiaChi.splice(index, 1)
-    
-    if (isRemovedDefault && customer.value.danhSachDiaChi.length > 0) {
-        customer.value.danhSachDiaChi[0].isDefault = true
+    if (!customer.value.danhSachDiaChi || customer.value.danhSachDiaChi.length <= 1) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không thể xóa',
+            detail: 'Khách hàng phải có ít nhất một địa chỉ',
+            life: 3000
+        })
+        return
     }
+    
+    const addressToRemove = customer.value.danhSachDiaChi[index]
+    const isRemovedDefault = addressToRemove.isDefault
+    
+    // Xác nhận trước khi xóa
+    confirm.require({
+        message: `Bạn có chắc chắn muốn xóa địa chỉ "${addressToRemove.diaChiDayDu || formatFullAddressEdit(addressToRemove)}"?`,
+        header: 'Xác nhận xóa địa chỉ',
+        icon: 'pi pi-exclamation-triangle',
+        rejectClass: 'p-button-secondary p-button-outlined',
+        rejectLabel: 'Hủy',
+        acceptLabel: 'Xóa',
+        accept: () => {
+            customer.value.danhSachDiaChi.splice(index, 1)
+            
+            // Nếu xóa địa chỉ mặc định, tự động đặt địa chỉ đầu tiên còn lại làm mặc định
+            if (isRemovedDefault && customer.value.danhSachDiaChi.length > 0) {
+                customer.value.danhSachDiaChi.forEach((addr, i) => addr.isDefault = (i === 0))
+            }
+            
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: 'Đã xóa địa chỉ thành công',
+                life: 3000
+            })
+        }
+    })
 }
+
 
 const setDefaultAddress = (index) => {
     if (!customer.value.danhSachDiaChi) return
     
+    const addressToSetDefault = customer.value.danhSachDiaChi[index]
+    
+    // Kiểm tra địa chỉ có hoàn chỉnh không
+    if (!addressToSetDefault.tenTinh || !addressToSetDefault.tenPhuong) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không thể đặt mặc định',
+            detail: 'Chỉ có thể đặt địa chỉ hoàn chỉnh làm mặc định',
+            life: 3000
+        })
+        return
+    }
+    
+    // Bỏ mặc định cho tất cả địa chỉ
     customer.value.danhSachDiaChi.forEach(addr => addr.isDefault = false)
+    
+    // Đặt địa chỉ này làm mặc định
     customer.value.danhSachDiaChi[index].isDefault = true
+    
+    toast.add({
+        severity: 'success',
+        summary: 'Thành công',
+        detail: 'Đã đặt địa chỉ làm mặc định',
+        life: 3000
+    })
 }
 
 // ===== MAIN API FUNCTION =====
@@ -959,7 +1389,7 @@ const fetchData = async () => {
         }
 
         let endpoint = 'http://localhost:8080/api/khach-hang'
-        
+
         // Add search parameter if exists
         if (globalSearch.value && globalSearch.value.trim()) {
             params.search = globalSearch.value.trim()
@@ -976,7 +1406,12 @@ const fetchData = async () => {
             params.endDate = advancedFilters.value.endDate.toISOString().split('T')[0]
         }
 
-        const response = await axios.get(endpoint, { params })
+        const response = await axios.get(endpoint, { 
+            params,
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+        })
 
         if (response.data) {
             if (response.data.content && Array.isArray(response.data.content)) {
@@ -1031,19 +1466,32 @@ const saveCustomer = async () => {
             return
         }
 
-        // Xử lý địa chỉ - CHỈ LẤY ĐỊA CHỈ HOÀN CHỈNH
+        // Xử lý địa chỉ - CHỈ LẤY ĐỊA CHỈ HOÀN CHỈNH (có đầy đủ tỉnh và phường)
         const processedAddresses = customer.value.danhSachDiaChi?.filter(addr => {
-            return addr.maTinh && addr.maPhuong && addr.tenTinh && addr.tenPhuong
+            // Chỉ lấy địa chỉ đã chọn đầy đủ tỉnh và phường
+            return addr.tenTinh && addr.tenTinh.trim() !== '' && 
+                   addr.tenPhuong && addr.tenPhuong.trim() !== ''
         }).map(addr => ({
             diaChiChiTiet: addr.diaChiChiTiet?.trim() || '',
             tenPhuong: addr.tenPhuong.trim(),
             tenTinh: addr.tenTinh.trim(),
             diaChiDayDu: formatFullAddressEdit(addr),
             isDefault: addr.isDefault || false,
-            maPhuong: addr.maPhuong,
-            maTinh: addr.maTinh,
+            maPhuong: addr.maPhuong || null,
+            maTinh: addr.maTinh || null,
             trangThai: 1
         })) || []
+
+        // Kiểm tra có địa chỉ hoàn chỉnh không
+        if (processedAddresses.length === 0) {
+            toast.add({
+                severity: 'warn',
+                summary: 'Thiếu thông tin địa chỉ',
+                detail: 'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã cho ít nhất một địa chỉ',
+                life: 4000
+            })
+            return
+        }
 
         // Đảm bảo có địa chỉ mặc định
         if (processedAddresses.length > 0) {
@@ -1056,24 +1504,47 @@ const saveCustomer = async () => {
         const customerData = {
             hoTen: customer.value.hoTen.trim(),
             sdt: customer.value.sdt.trim(),
-            trangThai: customer.value.trangThai,
-            ngaySinh: customer.value.ngaySinh ? customer.value.ngaySinh.toISOString().split('T')[0] : null,
-            danhSachDiaChi: processedAddresses
+            trangThai: customer.value.trangThai
+        }
+        
+        // Chỉ thêm ngaySinh nếu có
+        if (customer.value.ngaySinh) {
+            customerData.ngaySinh = customer.value.ngaySinh.toISOString().split('T')[0]
         }
 
-        await axios.put(`http://localhost:8080/api/khach-hang/${customer.value.id}`, customerData)
+        console.log('📤 Sending customer data:', customerData)
+
+        await axios.put(`http://localhost:8080/api/khach-hang/${customer.value.id}`, customerData, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+        })
+        
+        // Cập nhật địa chỉ thông minh
+        console.log('🏠 Updating addresses intelligently:', processedAddresses)
+        await updateCustomerAddressesIntelligently(customer.value.id, processedAddresses)
+        console.log('✅ Addresses updated successfully')
         
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: 'Cập nhật thông tin khách hàng thành công',
+            detail: 'Cập nhật thông tin khách hàng và địa chỉ thành công',
             life: 3000
         })
 
         await fetchData()
         hideDialog()
     } catch (error) {
-        console.error('Error saving customer:', error)
+        console.error('❌ Error saving customer:', error)
+        console.error('❌ Error response:', error.response?.data)
+        console.error('❌ Error status:', error.response?.status)
+        console.error('❌ Error headers:', error.response?.headers)
+        
+        if (error.response?.data?.errors) {
+            console.error('❌ Validation errors:', error.response.data.errors)
+        }
+        
         handleApiError(error, 'Không thể cập nhật thông tin khách hàng')
     } finally {
         saving.value = false
@@ -1088,30 +1559,57 @@ const formatDateOnly = (date) => {
     })
 }
 const changeStatus = async (customerData) => {
+    if (!canEditCustomer.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không có quyền',
+            detail: 'Chỉ tài khoản ADMIN mới có thể thay đổi trạng thái khách hàng',
+            life: 3000
+        })
+        return
+    }
+
     try {
         const newStatus = customerData.trangThai === 1 ? 0 : 1
         
+        // Cập nhật trạng thái khách hàng
         await axios.patch(`http://localhost:8080/api/khach-hang/${customerData.id}/status`, { 
             trangThai: newStatus 
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
         })
 
-        // SỬA: Đồng bộ trạng thái tài khoản nếu có
+        // Đồng bộ trạng thái tài khoản nếu có
         if (customerData.idTaiKhoan) {
             try {
                 await axios.patch(`http://localhost:8080/api/tai-khoan/${customerData.idTaiKhoan}/trang-thai`, {
                     trangThai: newStatus
                 }, {
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    },
+                    timeout: 10000
                 })
+                console.log('✅ Đã đồng bộ trạng thái tài khoản')
             } catch (error) {
-                console.warn('Không thể đồng bộ trạng thái tài khoản:', error)
+                console.warn('⚠️ Không thể đồng bộ trạng thái tài khoản:', error)
+                toast.add({
+                    severity: 'warn',
+                    summary: 'Cảnh báo đồng bộ',
+                    detail: 'Đã cập nhật khách hàng nhưng không thể đồng bộ trạng thái tài khoản',
+                    life: 4000
+                })
             }
         }
 
         toast.add({
             severity: 'success',
             summary: 'Thành công',
-            detail: `Đã ${newStatus === 1 ? 'kích hoạt' : 'tạm khóa'} khách hàng ${customerData.hoTen}`,
+            detail: `Đã ${newStatus === 1 ? 'kích hoạt' : 'tạm khóa'} khách hàng ${customerData.hoTen} và đồng bộ tài khoản`,
             life: 3000
         })
 
@@ -1122,6 +1620,16 @@ const changeStatus = async (customerData) => {
     }
 }
 const confirmBatchStatusChange = () => {
+    if (!canEditCustomer.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không có quyền',
+            detail: 'Chỉ tài khoản ADMIN mới có thể thay đổi trạng thái hàng loạt',
+            life: 3000
+        })
+        return
+    }
+
     if (!selectedCustomers.value || !selectedCustomers.value.length) return
 
     confirm.require({
@@ -1134,12 +1642,56 @@ const confirmBatchStatusChange = () => {
         accept: () => batchChangeStatus()
     })
 }
+const getCurrentUser = () => {
+    try {
+        const userInfo = localStorage.getItem('user_info')
+        if (userInfo) {
+            return JSON.parse(userInfo)
+        }
+        const userData = localStorage.getItem('user')
+        if (userData) {
+            return JSON.parse(userData)
+        }
+        const sessionUser = sessionStorage.getItem('currentUser')
+        if (sessionUser) {
+            return JSON.parse(sessionUser)
+        }
+        return null
+    } catch (error) {
+        console.error('Error getting user:', error)
+        return null
+    }
+}
+const isAdmin = computed(() => {
+    const user = getCurrentUser()
+    const result = user?.vaiTro === 'ADMIN' || user?.role === 'ADMIN' || user?.vai_tro === 'ADMIN'
+    console.log('Admin check for customer management:', { user, result })
+    return result
+})
 
+const currentUserRole = computed(() => {
+    const user = getCurrentUser()
+    return user?.vaiTro || user?.role || user?.vai_tro || null
+})
+
+const canEditCustomer = computed(() => {
+    return currentUserRole.value === 'ADMIN'
+})
+
+const canViewOnly = computed(() => {
+    // USER/NHANVIEN chỉ được xem
+    return ['USER', 'NHANVIEN'].includes(currentUserRole.value)
+})
 const batchChangeStatus = async () => {
     try {
         const promises = selectedCustomers.value.map(customer => 
             axios.patch(`http://localhost:8080/api/khach-hang/${customer.id}/status`, { 
                 trangThai: customer.trangThai === 1 ? 0 : 1 
+            }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                }
             })
         )
         
@@ -1180,9 +1732,19 @@ const viewCustomer = (customerData) => {
 }
 
 const editCustomer = (customerData) => {
+    if (!canEditCustomer.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không có quyền',
+            detail: 'Chỉ tài khoản ADMIN mới có thể chỉnh sửa thông tin khách hàng',
+            life: 3000
+        })
+        return
+    }
+
     customer.value = { 
         ...customerData,
-        originalMaKhachHang: customerData.maKhachHang, // Lưu mã gốc
+        originalMaKhachHang: customerData.maKhachHang,
         ngaySinh: customerData.ngaySinh ? new Date(customerData.ngaySinh) : null,
         danhSachDiaChi: customerData.danhSachDiaChi ? 
             customerData.danhSachDiaChi.map(addr => ({
@@ -1191,7 +1753,6 @@ const editCustomer = (customerData) => {
             })) : []
     }
     
-    // Khởi tạo địa chỉ nếu cần
     if (!customer.value.danhSachDiaChi || customer.value.danhSachDiaChi.length === 0) {
         customer.value.danhSachDiaChi = [{
             diaChiChiTiet: '',
@@ -1203,7 +1764,6 @@ const editCustomer = (customerData) => {
             isDefault: true
         }]
     } else {
-        // Load wards cho địa chỉ hiện có
         customer.value.danhSachDiaChi.forEach((addr, index) => {
             if (addr.maTinh) {
                 fetchWardsForAddress(addr.maTinh, index)
@@ -1229,6 +1789,26 @@ const hideDialog = () => {
 const viewAllAddresses = (customerData) => {
     selectedCustomerAddresses.value = customerData
     addressListDialog.value = true
+}
+
+const viewAddressDetail = (address, index) => {
+    viewingAddress.value = { ...address }
+    viewingAddressIndex.value = index
+    addressDetailDialog.value = true
+}
+
+const editAddressFromDetail = () => {
+    addressDetailDialog.value = false
+    // Focus vào địa chỉ đang xem trong form edit
+    if (viewingAddressIndex.value >= 0) {
+        // Scroll to address section
+        setTimeout(() => {
+            const addressElement = document.querySelector(`[data-address-index="${viewingAddressIndex.value}"]`)
+            if (addressElement) {
+                addressElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+        }, 100)
+    }
 }
 
 // ===== EXPORT FUNCTIONS =====
@@ -1292,9 +1872,9 @@ const downloadExcel = (headers, data, filename) => {
 const validateCustomerData = () => {
     const errors = []
     
-    // SỬA: Ngăn sửa mã khách hàng
-    if (customer.value.id && customer.value.maKhachHang && 
-        customer.value.originalMaKhachHang && 
+    // SỬA: Ngăn sửa mã khách hàng - chỉ kiểm tra nếu có thay đổi
+    if (customer.value.id && customer.value.originalMaKhachHang && 
+        customer.value.maKhachHang && 
         customer.value.maKhachHang !== customer.value.originalMaKhachHang) {
         errors.push('Không thể thay đổi mã khách hàng đã được tạo')
     }

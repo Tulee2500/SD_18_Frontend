@@ -21,6 +21,9 @@ const statuses = ref([
     { label: 'Đang load', value: 0 }
 ]);
 
+const confirmAddDialog = ref(false);
+
+
 // CÁC REF CHO UPLOAD FILE
 const fileInput = ref();
 const selectedFile = ref(null);
@@ -69,6 +72,15 @@ function createId() {
         id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return 'HA' + id;
+}
+
+function handleAddHinhAnhConfirm() {
+  saveHinhAnh();              // gọi API thêm hình ảnh
+  confirmAddDialog.value = false; // tắt dialog confirm
+}
+function handleUpdateHinhAnhConfirm() {
+  editHinhAnh();              // gọi API cập nhật hình ảnh
+  confirmUpdateDialog.value = false; // tắt dialog confirm
 }
 
 // HÀM openNew ĐƠN GIẢN
@@ -568,7 +580,7 @@ function exportCSV() {
             </div>
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveHinhAnh" :loading="uploading" />
+                <Button label="Lưu" icon="pi pi-check" @click="confirmAddDialog = true" :loading="uploading" />
             </template>
         </Dialog>
 
@@ -597,6 +609,21 @@ function exportCSV() {
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteHinhAnhDialog = false" />
                 <Button label="Có" icon="pi pi-check" @click="deleteHinhAnh" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="confirmAddDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="hinhAnh" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này ?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddHinhAnhConfirm" :loading="loading" />
             </template>
         </Dialog>
 

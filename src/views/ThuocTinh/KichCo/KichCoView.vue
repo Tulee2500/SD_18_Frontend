@@ -94,7 +94,7 @@
             </div>
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveKichCo" />
+                <Button label="Lưu" icon="pi pi-check" @click="confirmAddDialog = true" />
             </template>
         </Dialog>
 
@@ -109,6 +109,21 @@
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteKichCoDialog = false" />
                 <Button label="Có" icon="pi pi-check" @click="deleteKichCo" />
+            </template>
+        </Dialog>
+
+         <Dialog v-model:visible="confirmAddDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="kichCo" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddKichCoConfirm" :loading="loading" />
             </template>
         </Dialog>
 
@@ -147,6 +162,8 @@ const statuses = ref([
     { label: 'Hoạt động', value: 1 },
     { label: 'Ngừng hoạt động', value: 0 }
 ]);
+
+const confirmAddDialog = ref(false);
 
 // Computed property to check for duplicate names
 const isDuplicateName = computed(() => {
@@ -455,6 +472,14 @@ function exportCSV() {
             life: 3000
         });
     }
+function handleAddKichCoConfirm() {
+    saveKichCo();              // gọi API thêm kích cỡ
+  confirmAddDialog.value = false; // tắt dialog confirm
+}
+function handleUpdateKichCoConfirm() {
+  editKichCo();              // gọi API cập nhật kích cỡ
+  confirmUpdateDialog.value = false; // tắt dialog confirm
+}
 }
 </script>
 

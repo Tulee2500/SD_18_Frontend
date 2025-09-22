@@ -12,6 +12,9 @@ const dt = ref();
 const products = ref([]);
 const productDialog = ref(false);
 const deleteProductDialog = ref(false);
+const confirmAddDialog = ref(false);
+// const confirmDetailDialog = ref(false);
+
 const deleteProductsDialog = ref(false);
 const product = ref({});
 const selectedProducts = ref();
@@ -1372,6 +1375,22 @@ function confirmDeleteProduct(prod) {
     deleteProductDialog.value = true;
 }
 
+function confirmAddProduct(prod) {
+    product.value = product;
+    confirmAddDialog.value = true;
+}
+
+function confirmUpdateProduct(prod) {
+    product.value = { ...prod };
+    confirmUpdateDialog.value = true;
+}
+
+function confirmViewDetail(prod) {
+    product.value = { ...prod };
+    confirmDetailDialog.value = true;
+}
+
+
 async function deleteProduct() {
     try {
         loading.value = true;
@@ -2012,6 +2031,16 @@ async function deleteDetail() {
         loading.value = false;
     }
 }
+function handleAddSanPhamConfirm() {
+  saveProduct();              // gọi API thêm sản phẩm
+  confirmAddDialog.value = false; // tắt dialog confirm
+}
+function handleUpdateSanPhamConfirm() {
+  editProduct();              // gọi API cập nhật sản phẩm
+  confirmUpdateDialog.value = false; // tắt dialog confirm
+}
+
+
 
 function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
@@ -2665,7 +2694,7 @@ function collapseAll() {
 
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="hideDialog" :disabled="loading" />
-                <Button label="Lưu lại" icon="pi pi-check" @click="saveProduct" />
+                <Button label="Lưu lại" icon="pi pi-check" @click="confirmAddDialog = true"  />
             </template>
         </Dialog>
 
@@ -3154,7 +3183,6 @@ function collapseAll() {
                     <p v-if="product" class="mb-2">
                         Bạn có chắc chắn muốn xóa sản phẩm <strong>{{ product.tenSanPham || product.name }}</strong>?
                     </p>
-                    <small class="text-gray-500">Hành động này không thể hoàn tác.</small>
                 </div>
             </div>
             <template #footer>
@@ -3171,7 +3199,6 @@ function collapseAll() {
                     <p>
                         Bạn có chắc chắn muốn xóa <strong>{{ selectedProducts?.length || 0 }}</strong> sản phẩm đã chọn?
                     </p>
-                    <small class="text-gray-500">Hành động này không thể hoàn tác.</small>
                 </div>
             </div>
             <template #footer>
@@ -3188,12 +3215,27 @@ function collapseAll() {
                     <p v-if="detail" class="mb-2">
                         Bạn có chắc chắn muốn xóa chi tiết sản phẩm <strong>{{ detail.maChiTiet }}</strong>?
                     </p>
-                    <small class="text-gray-500">Hành động này không thể hoàn tác.</small>
                 </div>
             </div>
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="deleteDetailDialog = false" :disabled="loading" />
                 <Button label="Xóa" icon="pi pi-trash" severity="danger" @click="deleteDetail" :loading="loading" />
+            </template>
+        </Dialog>
+
+        <!-- Dialog confirm thêm sản phẩm -->
+        <Dialog v-model:visible="confirmAddDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="product" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này với sản phẩm <strong>{{ product.tenSanPham || product.name }}</strong>?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddSanPhamConfirm" :loading="loading" />
             </template>
         </Dialog>
 

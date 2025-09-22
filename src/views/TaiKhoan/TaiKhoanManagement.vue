@@ -333,6 +333,7 @@
                                 :invalid="hasValidationError('hoTen')" 
                                 fluid 
                                 placeholder="Nhập họ và tên"
+                                ref="hoTenInput"
                                 @input="clearFieldError('hoTen')"
                             />
                             <small v-if="hasValidationError('hoTen')" class="text-red-500">
@@ -380,19 +381,23 @@
 
                     <div class="grid grid-cols-1 gap-4 mb-4">
                         <div>
-                            <label for="personalEmail" class="mb-3 block font-bold">Email *</label>
-                            <InputText 
-                                id="personalEmail" 
-                                v-model.trim="personalInfo.email" 
-                                required="true" 
-                                :invalid="hasValidationError('email')" 
-                                fluid 
-                                placeholder="Nhập email"
-                                @input="syncEmailToAccount"
-                            />
-                            <small v-if="hasValidationError('email')" class="text-red-500">
-                                {{ getValidationError('email') }}
-                            </small>
+                           <label for="personalEmail" class="mb-3 block font-bold">Email *</label>
+    <InputText 
+        id="personalEmail" 
+        v-model.trim="personalInfo.email" 
+        required="true" 
+        :invalid="hasValidationError('email')" 
+        fluid 
+        placeholder="Nhập email"
+        @input="syncEmailToAccount"
+        @blur="validateEmailField"
+    />
+                            <small class="text-xs text-gray-500">
+        Current: {{ personalInfo.email || '[empty]' }} | Account: {{ newAccount.email || '[empty]' }}
+    </small>
+    <small v-if="hasValidationError('email')" class="text-red-500">
+        {{ getValidationError('email') }}
+    </small>
                         </div>
                     </div>
 
@@ -658,7 +663,7 @@
             </template>
         </Dialog>
 
-        <!-- View Account Dialog - KHÔNG HIỂN THỊ MẬT KHẨU -->
+        <!-- View Account Dialog - HIỂN THỊ MẬT KHẨU -->
         <Dialog v-model:visible="viewDialog" :style="{ width: DIALOG_SIZES.LARGE }" :header="`Chi tiết tài khoản - ${viewingAccount?.email || 'N/A'}`" :modal="true">
             <div v-if="viewingAccount" class="flex flex-col gap-6">
                 <!-- Thông tin tài khoản -->
@@ -671,6 +676,12 @@
                         <div><strong>ID:</strong> #{{ viewingAccount.id }}</div>
                         <div><strong>Mã TK:</strong> {{ viewingAccount.maTaiKhoan }}</div>
                         <div><strong>Email:</strong> {{ viewingAccount.email }}</div>
+                        <div>
+                            <strong>Mật khẩu:</strong>
+                            <span class="font-mono bg-gray-100 px-2 py-1 rounded text-xs">
+                                {{ viewingAccount.matKhau || 'Không có' }}
+                            </span>
+                        </div>
                         <div>
                             <strong>Vai trò:</strong>
                             <Tag 
@@ -712,13 +723,16 @@
                 </div>
 
                 <!-- Thông báo bảo mật -->
-                <div class="rounded-lg bg-yellow-50 p-4 border border-yellow-200">
-                    <div class="flex items-center gap-2 text-yellow-700">
-                        <i class="pi pi-shield"></i>
-                        <span class="font-semibold">Bảo mật:</span>
+                <div class="rounded-lg bg-amber-50 p-4 border border-amber-200">
+                    <div class="flex items-center gap-2 text-amber-700">
+                        <i class="pi pi-exclamation-triangle"></i>
+                        <span class="font-semibold">Lưu ý bảo mật:</span>
                     </div>
-                    <p class="text-sm text-yellow-600 mt-1 mb-0">
-                        Mật khẩu được mã hóa và không hiển thị vì lý do bảo mật. Sử dụng chức năng "Sửa" để thay đổi mật khẩu.
+                    <p class="text-sm text-amber-600 mt-1 mb-0">
+                        Mật khẩu hiển thị ở dạng đã mã hóa (hash). Để thay đổi mật khẩu, sử dụng chức năng "Sửa" và nhập mật khẩu mới.
+                    </p>
+                    <p class="text-xs text-amber-500 mt-2 mb-0">
+                        ⚠️ Chỉ Admin mới có thể xem thông tin này. Hãy cẩn thận khi chia sẻ thông tin tài khoản.
                     </p>
                 </div>
             </div>
@@ -729,31 +743,33 @@
         </Dialog>
 
         <!-- Delete Dialogs -->
-        <Dialog v-model:visible="deleteAccountDialog" :style="{ width: DIALOG_SIZES.SMALL }" header="Xác nhận xóa" :modal="true">
+        <Dialog v-model:visible="deleteAccountDialog" :style="{ width: DIALOG_SIZES.SMALL }" header="Xác nhận xóa hoàn toàn" :modal="true">
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
                 <span v-if="selectedAccountForDelete">
-                    Bạn có chắc chắn muốn xóa tài khoản <b>{{ selectedAccountForDelete.email }}</b>?
-                    <br><small class="text-red-600">Hành động này sẽ xóa tất cả dữ liệu liên quan.</small>
+                    Bạn có chắc chắn muốn XÓA HOÀN TOÀN tài khoản <b>{{ selectedAccountForDelete.email }}</b>?
+                    <br><small class="text-red-600 font-semibold">⚠️ CẢNH BÁO: Tất cả dữ liệu liên quan sẽ bị XÓA HOÀN TOÀN!</small>
+                    <br><small class="text-red-600 font-semibold">❌ Hành động này KHÔNG THỂ HOÀN TÁC!</small>
                 </span>
             </div>
             <template #footer>
-                <Button label="Không" icon="pi pi-times" text @click="deleteAccountDialog = false" :disabled="deleting" />
-                <Button label="Có" icon="pi pi-check" severity="danger" @click="handleDeleteAccount" :loading="deleting" />
+                <Button label="Hủy" icon="pi pi-times" text @click="deleteAccountDialog = false" :disabled="deleting" />
+                <Button label="Xóa hoàn toàn" icon="pi pi-check" severity="danger" @click="handleDeleteAccount" :loading="deleting" />
             </template>
         </Dialog>
 
-        <Dialog v-model:visible="deleteAccountsDialog" :style="{ width: DIALOG_SIZES.SMALL }" header="Xác nhận xóa" :modal="true">
+        <Dialog v-model:visible="deleteAccountsDialog" :style="{ width: DIALOG_SIZES.SMALL }" header="Xác nhận xóa hoàn toàn" :modal="true">
             <div class="flex items-center gap-4">
                 <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
                 <span>
-                    Bạn có chắc chắn muốn xóa {{ selectedAccounts?.length }} tài khoản đã chọn?
-                    <br><small class="text-red-600">Hành động này sẽ xóa tất cả dữ liệu liên quan.</small>
+                    Bạn có chắc chắn muốn XÓA HOÀN TOÀN {{ selectedAccounts?.length }} tài khoản đã chọn?
+                    <br><small class="text-red-600 font-semibold">⚠️ CẢNH BÁO: Tất cả dữ liệu liên quan (khách hàng/nhân viên) cũng sẽ bị XÓA HOÀN TOÀN!</small>
+                    <br><small class="text-red-600 font-semibold">❌ Hành động này KHÔNG THỂ HOÀN TÁC!</small>
                 </span>
             </div>
             <template #footer>
-                <Button label="Không" icon="pi pi-times" text @click="deleteAccountsDialog = false" :disabled="deleting" />
-                <Button label="Có" icon="pi pi-check" severity="danger" @click="handleDeleteSelectedAccounts" :loading="deleting" />
+                <Button label="Hủy" icon="pi pi-times" text @click="deleteAccountsDialog = false" :disabled="deleting" />
+                <Button label="Xóa tất cả" icon="pi pi-check" severity="danger" @click="handleDeleteSelectedAccounts" :loading="deleting" />
             </template>
         </Dialog>
 
@@ -763,8 +779,9 @@
 
 <script setup>
 import axios from 'axios'
+import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 // Constants
@@ -805,11 +822,12 @@ const DIALOG_SIZES = {
     EXTRA_LARGE: '1000px'
 }
 
-// ===== COMPOSABLES =====
+// Composables
 const router = useRouter()
 const toast = useToast()
+const confirm = useConfirm()
 
-// ===== REACTIVE STATE =====
+// Reactive State
 const dt = ref()
 const accounts = ref([])
 const customers = ref([])
@@ -822,12 +840,14 @@ const viewDialog = ref(false)
 const deleteAccountDialog = ref(false)
 const deleteAccountsDialog = ref(false)
 
+const hoTenInput = ref(null)
+
 const newAccount = ref({})
 const personalInfo = ref({
     hoTen: '',
     email: '',
     sdt: '',
-    ngaySinh: null, // THÊM NGÀY SINH
+    ngaySinh: null,
     maTinh: '',
     maPhuong: '',
     diaChiChiTiet: '',
@@ -859,6 +879,9 @@ const loadingWards = ref(false)
 
 const lastCreatedAccountRole = ref('')
 
+// User authentication
+const isAdmin = ref(false)
+
 // ===== UTILITY FUNCTIONS =====
 const formatDate = (date) => {
     if (!date) return ''
@@ -866,7 +889,7 @@ const formatDate = (date) => {
     try {
         const dateObj = new Date(date)
         if (isNaN(dateObj.getTime())) {
-            console.warn('⚠️ Invalid date:', date)
+            console.warn('Invalid date:', date)
             return 'Ngày không hợp lệ'
         }
         
@@ -876,10 +899,31 @@ const formatDate = (date) => {
             year: 'numeric'
         })
     } catch (error) {
-        console.error('❌ Error formatting date:', error)
+        console.error('Error formatting date:', error)
         return 'Lỗi định dạng ngày'
     }
 }
+
+watch(addDialog, async (val) => {
+    if (val) {
+        await nextTick()
+        
+        setTimeout(() => {
+            try {
+                if (document.activeElement && document.activeElement !== document.body) {
+                    document.activeElement.blur()
+                }
+                
+                if (hoTenInput.value && hoTenInput.value.$el) {
+                    hoTenInput.value.$el.focus()
+                    console.log('Auto-focused họ tên input')
+                }
+            } catch (error) {
+                console.warn('Could not auto-focus input:', error)
+            }
+        }, 150)
+    }
+})
 
 const getStatusLabel = (status) => {
     return status === 1 ? 'Hoạt động' : 'Ngưng hoạt động'
@@ -938,44 +982,10 @@ const getLinkedEmployeeInfo = (accountId) => {
     return employee ? `${employee.hoTen} (ID: ${employee.id})` : 'Chưa liên kết'
 }
 
-const navigateToRolePage = (role) => {
-    console.log('🔄 Navigating to page for role:', role)
-    
-    try {
-        switch (role) {
-            case 'USER':
-                router.push('/khach-hang')
-                break
-            case 'NHANVIEN':
-                router.push('/nhan-vien')
-                break
-            case 'ADMIN':
-                toast.add({
-                    severity: 'info',
-                    summary: 'Thông tin',
-                    detail: 'Tài khoản Admin đã được tạo thành công',
-                    life: 3000
-                })
-                break
-            default:
-                console.warn('Unknown role:', role)
-        }
-    } catch (error) {
-        console.error('❌ Error navigating:', error)
-        toast.add({
-            severity: 'warn',
-            summary: 'Cảnh báo',
-            detail: 'Không thể chuyển trang, vui lòng điều hướng thủ công',
-            life: 4000
-        })
-    }
-}
-
 // ===== COMPUTED =====
 const filteredAccounts = computed(() => {
     let filtered = accounts.value || []
 
-    // Tìm kiếm toàn bộ
     if (globalFilter.value && globalFilter.value.trim()) {
         const searchTerm = globalFilter.value.toLowerCase().trim()
         filtered = filtered.filter(acc => 
@@ -986,12 +996,10 @@ const filteredAccounts = computed(() => {
         )
     }
 
-    // Lọc vai trò
     if (roleFilter.value !== null && roleFilter.value !== undefined && roleFilter.value !== '') {
         filtered = filtered.filter(acc => acc.vaiTro === roleFilter.value)
     }
 
-    // Lọc trạng thái
     if (statusFilter.value !== null && statusFilter.value !== undefined && statusFilter.value !== '') {
         const statusValue = parseInt(statusFilter.value)
         if (!isNaN(statusValue)) {
@@ -999,7 +1007,6 @@ const filteredAccounts = computed(() => {
         }
     }
 
-    // Lọc theo ngày
     if (dateFilters.value.startDate || dateFilters.value.endDate) {
         filtered = filtered.filter(acc => {
             if (!acc.ngayTao) return false
@@ -1034,6 +1041,11 @@ const filteredAccounts = computed(() => {
     return filtered
 })
 
+// Computed property để theo dõi quyền ADMIN
+const adminPermission = computed(() => {
+    return isAdmin.value
+})
+
 const hasValidationError = (field) => {
     return Boolean(validationErrors.value[field])
 }
@@ -1052,8 +1064,14 @@ const fetchData = async () => {
             axios.get('http://localhost:8080/api/nhan-vien').catch(() => ({ data: [] }))
         ])
         
-        accounts.value = Array.isArray(accountsResponse.data) ? accountsResponse.data : []
-        
+        if (Array.isArray(accountsResponse.data)) {
+            accounts.value = accountsResponse.data
+        } else if (accountsResponse.data && Array.isArray(accountsResponse.data.data)) {
+            accounts.value = accountsResponse.data.data
+        } else {
+            accounts.value = []
+        }
+
         if (customersResponse.data) {
             if (Array.isArray(customersResponse.data)) {
                 customers.value = customersResponse.data
@@ -1065,7 +1083,7 @@ const fetchData = async () => {
         } else {
             customers.value = []
         }
-        
+
         if (employeesResponse.data) {
             if (Array.isArray(employeesResponse.data)) {
                 employees.value = employeesResponse.data
@@ -1079,7 +1097,7 @@ const fetchData = async () => {
         }
         
     } catch (error) {
-        console.error('❌ Error fetching data:', error)
+        console.error('Error fetching data:', error)
         toast.add({
             severity: 'error',
             summary: 'Lỗi kết nối',
@@ -1093,6 +1111,495 @@ const fetchData = async () => {
         isLoading.value = false
     }
 }
+
+// ===== DELETE FUNCTIONS =====
+const hardDeleteRelatedEntity = async (accountId, role) => {
+    try {
+        console.log('🔄 hardDeleteRelatedEntity called with:', { accountId, role })
+        
+        if (role === 'USER') {
+            const customer = customers.value.find(c => c.idTaiKhoan === accountId)
+            console.log('🔍 Found customer:', customer)
+            
+            if (customer) {
+                console.log('🔄 Deleting customer:', customer.id)
+                await axios.delete(`http://localhost:8080/api/khach-hang/${customer.id}`, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                })
+                console.log('✅ Customer deleted successfully:', customer.id)
+            } else {
+                console.log('ℹ️ No customer found for account:', accountId)
+            }
+        } else if (role === 'NHANVIEN') {
+            const employee = employees.value.find(e => e.idTaiKhoan === accountId)
+            console.log('🔍 Found employee:', employee)
+            
+            if (employee) {
+                console.log('🔄 Deleting employee:', employee.id)
+                await axios.delete(`http://localhost:8080/api/nhan-vien/${employee.id}`, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                })
+                console.log('✅ Employee deleted successfully:', employee.id)
+            } else {
+                console.log('ℹ️ No employee found for account:', accountId)
+            }
+        } else {
+            console.log('ℹ️ No related entity to delete for role:', role)
+        }
+        
+        console.log('✅ hardDeleteRelatedEntity completed successfully')
+        
+    } catch (error) {
+        console.error('❌ Error in hardDeleteRelatedEntity:', error)
+        console.error('❌ Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        })
+        throw new Error(`Không thể xóa ${role === 'USER' ? 'khách hàng' : 'nhân viên'} liên quan: ${error.response?.data?.message || error.message}`)
+    }
+}
+
+const softDeleteRelatedEntity = async (accountId, role) => {
+    try {
+        if (role === 'USER') {
+            const customer = customers.value.find(c => c.idTaiKhoan === accountId)
+            if (customer) {
+                await axios.patch(`http://localhost:8080/api/khach-hang/${customer.id}/soft-delete`, {
+                    trangThai: 0,
+                    isDeleted: true
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                })
+                console.log('Đã xóa mềm khách hàng:', customer.id)
+            }
+        } else if (role === 'NHANVIEN') {
+            const employee = employees.value.find(e => e.idTaiKhoan === accountId)
+            if (employee) {
+                await axios.patch(`http://localhost:8080/api/nhan-vien/${employee.id}/soft-delete`, {
+                    trangThai: 0,
+                    isDeleted: true
+                }, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                })
+                console.log('Đã xóa mềm nhân viên:', employee.id)
+            }
+        }
+    } catch (error) {
+        console.warn('Không thể xóa mềm entity liên quan:', error.response?.data?.message || error.message)
+        
+        // Fallback: Sử dụng API status cũ
+        try {
+            if (role === 'USER') {
+                const customer = customers.value.find(c => c.idTaiKhoan === accountId)
+                if (customer) {
+                    await axios.patch(`http://localhost:8080/api/khach-hang/${customer.id}/status`, {
+                        trangThai: 0
+                    }, {
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 10000
+                    })
+                    console.log('Fallback: Đã vô hiệu hóa khách hàng')
+                }
+            } else if (role === 'NHANVIEN') {
+                const employee = employees.value.find(e => e.idTaiKhoan === accountId)
+                if (employee) {
+                    await axios.patch(`http://localhost:8080/api/nhan-vien/${employee.id}/status`, {
+                        trangThai: 0
+                    }, {
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 10000
+                    })
+                    console.log('Fallback: Đã cho nhân viên nghỉ việc')
+                }
+            }
+        } catch (fallbackError) {
+            console.error('Fallback cũng thất bại:', fallbackError)
+        }
+    }
+}
+
+const handleDeleteAccount = async () => {
+    deleting.value = true
+    try {
+        console.log('🗑️ handleDeleteAccount called')
+        console.log('📋 Account to delete:', selectedAccountForDelete.value)
+        
+        if (!selectedAccountForDelete.value) {
+            console.error('❌ No account selected for deletion')
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Không có tài khoản nào được chọn để xóa',
+                life: 3000
+            })
+            return
+        }
+        
+        const accountToDelete = selectedAccountForDelete.value
+        
+        console.log('🔄 Starting deletion process for account:', accountToDelete.email)
+        
+        // Xóa hoàn toàn entity liên quan trước
+        console.log('🔄 Deleting related entity...')
+        await hardDeleteRelatedEntity(accountToDelete.id, accountToDelete.vaiTro)
+        console.log('✅ Related entity deleted successfully')
+        
+        // Xóa hoàn toàn tài khoản
+        console.log('🔄 Deleting account...')
+        const response = await axios.delete(
+            `http://localhost:8080/api/tai-khoan/${accountToDelete.id}`,
+            {
+                timeout: 30000,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
+        )
+        
+        console.log('📡 Delete response:', response.status, response.data)
+        
+        if (response.status === 200 || response.status === 204) {
+            const entityName = accountToDelete.vaiTro === 'USER' ? 'khách hàng' : 
+                             accountToDelete.vaiTro === 'NHANVIEN' ? 'nhân viên' : 'admin'
+            
+            console.log('✅ Account deleted successfully')
+            
+            toast.add({
+                severity: 'success',
+                summary: 'Xóa thành công',
+                detail: `Đã xóa hoàn toàn tài khoản và ${entityName} liên quan khỏi hệ thống`,
+                life: 4000
+            })
+            
+            deleteAccountDialog.value = false
+            selectedAccountForDelete.value = null
+            await fetchData()
+        }
+        
+    } catch (error) {
+        console.error('❌ Error in handleDeleteAccount:', error)
+        console.error('❌ Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        })
+        handleDeleteError(error)
+    } finally {
+        deleting.value = false
+    }
+}
+
+
+const handleDeleteError = (error) => {
+    if (error.response) {
+        const { status, data } = error.response
+        let errorMessage = 'Không thể xóa tài khoản'
+        let errorDetail = ''
+        
+        switch (status) {
+            case 409:
+                errorMessage = 'Xung đột dữ liệu'
+                errorDetail = 'Tài khoản có dữ liệu liên quan không thể xóa.'
+                break
+            case 500:
+                errorMessage = 'Lỗi hệ thống'
+                errorDetail = data?.message || 'Có lỗi ràng buộc dữ liệu.'
+                break
+            case 400:
+                errorMessage = 'Yêu cầu không hợp lệ'
+                errorDetail = data?.message || 'Tài khoản không thể xóa do vi phạm quy tắc nghiệp vụ.'
+                break
+            default:
+                errorDetail = data?.message || error.message || 'Lỗi không xác định'
+        }
+        
+        toast.add({
+            severity: 'error',
+            summary: errorMessage,
+            detail: errorDetail,
+            life: 5000
+        })
+        
+    } else {
+        handleApiError(error, 'Không thể xóa tài khoản')
+    }
+}
+
+const handleHardDeleteSafely = async (accountToDelete) => {
+    try {
+        // Hủy liên kết entity trước khi xóa cứng
+        if (accountToDelete.vaiTro === 'USER') {
+            const relatedCustomer = customers.value.find(c => c.idTaiKhoan === accountToDelete.id)
+            if (relatedCustomer) {
+                try {
+                    await axios.put(`http://localhost:8080/api/khach-hang/${relatedCustomer.id}`, {
+                        ...relatedCustomer,
+                        idTaiKhoan: null
+                    }, {
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    console.log('Đã hủy liên kết khách hàng')
+                } catch (unlinkError) {
+                    console.warn('Không thể hủy liên kết khách hàng:', unlinkError)
+                    throw new Error('Không thể hủy liên kết dữ liệu. Hãy thử lại sau.')
+                }
+            }
+        } else if (accountToDelete.vaiTro === 'NHANVIEN') {
+            const relatedEmployee = employees.value.find(e => e.idTaiKhoan === accountToDelete.id)
+            if (relatedEmployee) {
+                try {
+                    await axios.put(`http://localhost:8080/api/nhan-vien/${relatedEmployee.id}`, {
+                        ...relatedEmployee,
+                        idTaiKhoan: null
+                    }, {
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    console.log('Đã hủy liên kết nhân viên')
+                } catch (unlinkError) {
+                    console.warn('Không thể hủy liên kết nhân viên:', unlinkError)
+                    throw new Error('Không thể hủy liên kết dữ liệu. Hãy thử lại sau.')
+                }
+            }
+        }
+        
+        // Xóa cứng tài khoản
+        const response = await axios.delete(
+            `http://localhost:8080/api/tai-khoan/${accountToDelete.id}`,
+            {
+                timeout: 30000,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
+        )
+        
+        if (response.status === 200 || response.status === 204) {
+            const entityName = accountToDelete.vaiTro === 'USER' ? 'khách hàng' : 
+                             accountToDelete.vaiTro === 'NHANVIEN' ? 'nhân viên' : 'admin'
+            
+            toast.add({
+                severity: 'success',
+                summary: 'Xóa thành công',
+                detail: `Đã xóa hoàn toàn tài khoản và ${entityName} liên quan`,
+                life: 3000
+            })
+            
+            deleteAccountDialog.value = false
+            selectedAccountForDelete.value = null
+            await fetchData()
+        }
+    } catch (error) {
+        throw error
+    }
+}
+
+
+const confirmDeleteAccount = (account) => {
+    try {
+        console.log('🗑️ confirmDeleteAccount called with:', account)
+        
+        if (!account || !account.id) {
+            console.error('❌ Invalid account data:', account)
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Dữ liệu tài khoản không hợp lệ',
+                life: 3000
+            })
+            return
+        }
+        
+    selectedAccountForDelete.value = account
+    
+        let warningMessage = `Bạn có chắc chắn muốn XÓA HOÀN TOÀN tài khoản "${account.email}"?`
+        let hasRelatedData = false
+        let relatedEntityName = ''
+        
+        if (account.vaiTro === 'USER') {
+            const relatedCustomer = customers.value.find(c => c.idTaiKhoan === account.id)
+            if (relatedCustomer) {
+                hasRelatedData = true
+                relatedEntityName = `khách hàng "${relatedCustomer.hoTen}"`
+                warningMessage += `\n\n⚠️ CẢNH BÁO: Tài khoản này liên kết với ${relatedEntityName}.`
+            }
+        } else if (account.vaiTro === 'NHANVIEN') {
+            const relatedEmployee = employees.value.find(e => e.idTaiKhoan === account.id)
+            if (relatedEmployee) {
+                hasRelatedData = true
+                relatedEntityName = `nhân viên "${relatedEmployee.hoTen}"`
+                warningMessage += `\n\n⚠️ CẢNH BÁO: Tài khoản này liên kết với ${relatedEntityName}.`
+            }
+        }
+        
+        if (hasRelatedData) {
+            warningMessage += `\n\n🗑️ Dữ liệu liên quan (${relatedEntityName}) cũng sẽ bị XÓA HOÀN TOÀN khỏi hệ thống.`
+            warningMessage += `\n\n❌ Hành động này KHÔNG THỂ HOÀN TÁC!`
+        } else {
+            warningMessage += `\n\n❌ Hành động này sẽ XÓA HOÀN TOÀN tài khoản khỏi hệ thống!`
+        }
+        
+        console.log('🔍 About to show confirm dialog with message:', warningMessage)
+        
+        if (!confirm || typeof confirm.require !== 'function') {
+            console.error('❌ Confirm service not available:', confirm)
+            console.log('🔄 Falling back to manual dialog...')
+            
+            // Fallback: Sử dụng dialog thông thường
+            deleteAccountDialog.value = true
+            return
+        }
+        
+        confirm.require({
+            message: warningMessage,
+            header: 'Xác nhận xóa hoàn toàn',
+            icon: 'pi pi-exclamation-triangle',
+            rejectClass: 'p-button-secondary p-button-outlined',
+            rejectLabel: 'Hủy',
+            acceptLabel: hasRelatedData ? 'Xóa tất cả' : 'Xóa tài khoản',
+            acceptClass: 'p-button-danger',
+            accept: () => {
+                console.log('✅ User confirmed deletion')
+                handleDeleteAccount()
+            },
+            reject: () => {
+                console.log('❌ User cancelled deletion')
+            }
+        })
+        
+        console.log('✅ Confirm dialog should be shown')
+        
+    } catch (error) {
+        console.error('❌ Error in confirmDeleteAccount:', error)
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi hệ thống',
+            detail: `Không thể hiển thị dialog xác nhận: ${error.message}`,
+            life: 5000
+        })
+    }
+}
+
+const handleDeleteSelectedAccounts = async () => {
+    deleting.value = true
+    
+    try {
+        
+        const totalAccounts = selectedAccounts.value.length
+        let successCount = 0
+        let failedAccounts = []
+        
+        for (const account of selectedAccounts.value) {
+            try {
+                // Xóa hoàn toàn entity liên quan trước
+                await hardDeleteRelatedEntity(account.id, account.vaiTro)
+                
+                // Xóa hoàn toàn tài khoản
+                await axios.delete(`http://localhost:8080/api/tai-khoan/${account.id}`, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                })
+                successCount++
+            } catch (error) {
+                failedAccounts.push({
+                    account: account,
+                    error: error.response?.data?.message || error.message
+                })
+            }
+        }
+        
+        if (successCount > 0) {
+            toast.add({
+                severity: successCount === totalAccounts ? 'success' : 'warn',
+                summary: 'Hoàn thành',
+                detail: `Đã xóa hoàn toàn ${successCount}/${totalAccounts} tài khoản và dữ liệu liên quan. ${failedAccounts.length > 0 ? failedAccounts.length + ' tài khoản không thể xóa.' : ''}`,
+                life: 5000
+            })
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Thất bại',
+                detail: 'Không thể xóa tài khoản nào.',
+                life: 5000
+            })
+        }
+        
+        deleteAccountsDialog.value = false
+        selectedAccounts.value = null
+        await fetchData()
+        
+    } catch (error) {
+        console.error('Lỗi xóa nhiều tài khoản:', error)
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi hệ thống',
+            detail: 'Có lỗi xảy ra khi xử lý hàng loạt',
+            life: 5000
+        })
+    } finally {
+        deleting.value = false
+    }
+}
+
+const confirmDeleteSelected = () => {
+    // Kiểm tra quyền ADMIN
+    if (!isAdmin.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Không có quyền',
+            detail: 'Chỉ tài khoản ADMIN mới có thể xóa tài khoản',
+            life: 3000
+        })
+        return
+    }
+    
+    deleteAccountsDialog.value = true
+}
+
+// ===== STATUS CHANGE FUNCTION =====
+const handleChangeStatus = async (account) => {
+    try {
+        const newStatus = account.trangThai === 1 ? 0 : 1
+        const statusText = newStatus === 1 ? 'kích hoạt' : 'ngưng hoạt động'
+        
+        console.log(`🔄 Changing status for account ${account.email} to ${statusText}`)
+        
+        const response = await axios.put(
+            `http://localhost:8080/api/tai-khoan/${account.id}`,
+            { trangThai: newStatus },
+            {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 10000
+            }
+        )
+        
+        if (response.status === 200) {
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã ${statusText} tài khoản ${account.email}`,
+                life: 3000
+            })
+            
+            await fetchData()
+        }
+        
+    } catch (error) {
+        console.error('❌ Error changing status:', error)
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: `Không thể thay đổi trạng thái tài khoản: ${error.response?.data?.message || error.message}`,
+            life: 5000
+        })
+    }
+}
+
+// ===== UTILITY FUNCTIONS =====
 
 // ===== ADDRESS MANAGEMENT =====
 const fetchProvinces = async () => {
@@ -1116,7 +1623,7 @@ const fetchProvinces = async () => {
             ]
         }
     } catch (error) {
-        console.error('❌ Error fetching provinces:', error)
+        console.error('Error fetching provinces:', error)
         provinces.value = [
             { code: '1', name: 'Hà Nội', codename: 'ha_noi' },
             { code: '79', name: 'TP. Hồ Chí Minh', codename: 'ho_chi_minh' },
@@ -1253,7 +1760,7 @@ const resetForms = () => {
         hoTen: '',
         email: '',
         sdt: '',
-        ngaySinh: null, // RESET ngày sinh
+        ngaySinh: null,
         maTinh: '',
         maPhuong: '',
         diaChiChiTiet: '',
@@ -1275,6 +1782,7 @@ const onRoleChange = () => {
         hoTen: '',
         email: '',
         sdt: '',
+        ngaySinh: null,
         maTinh: '',
         maPhuong: '',
         diaChiChiTiet: '',
@@ -1286,17 +1794,34 @@ const onRoleChange = () => {
     
     if (newAccount.value.vaiTro === 'ADMIN') {
         newAccount.value.email = ''
+    } else {
+        if (personalInfo.value.email?.trim()) {
+            newAccount.value.email = personalInfo.value.email.trim()
+        }
     }
 }
 
 const syncEmailToAccount = () => {
-    newAccount.value.email = personalInfo.value.email
+    const personalEmail = personalInfo.value.email?.trim() || ''
+    
+    if (newAccount.value.vaiTro !== 'ADMIN' && personalEmail) {
+        newAccount.value.email = personalEmail
+    }
     
     if (validationErrors.value.email) {
         delete validationErrors.value.email
     }
     if (validationErrors.value.accountEmail) {
         delete validationErrors.value.accountEmail
+    }
+    
+    if (personalEmail && newAccount.value.vaiTro !== 'ADMIN') {
+        nextTick(() => {
+            const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+            if (!emailRegex.test(personalEmail)) {
+                validationErrors.value.email = 'Email không hợp lệ'
+            }
+        })
     }
 }
 
@@ -1340,15 +1865,6 @@ const editFromView = () => {
     viewDialog.value = false
 }
 
-const confirmDeleteAccount = (account) => {
-    selectedAccountForDelete.value = account
-    deleteAccountDialog.value = true
-}
-
-const confirmDeleteSelected = () => {
-    deleteAccountsDialog.value = true
-}
-
 // ===== VALIDATION =====
 const checkEmailExists = (email, excludeId = null) => {
     return accounts.value.some(account => 
@@ -1357,7 +1873,6 @@ const checkEmailExists = (email, excludeId = null) => {
 }
 
 const checkPhoneExists = (phone) => {
-    // Kiểm tra trong danh sách khách hàng và nhân viên
     const customerPhones = customers.value.map(c => c.sdt?.replace(/\s/g, '') || '')
     const employeePhones = employees.value.map(e => e.sdt?.replace(/\s/g, '') || '')
     const allPhones = [...customerPhones, ...employeePhones]
@@ -1365,150 +1880,315 @@ const checkPhoneExists = (phone) => {
     return allPhones.includes(phone)
 }
 
+const normalizeName = (name) => {
+    if (!name || typeof name !== 'string') return '';
+    
+    let normalized = name.normalize('NFC').trim();
+    normalized = normalized.replace(/[^\p{L}\s]/gu, '');
+    normalized = normalized.replace(/\s+/g, ' ').trim();
+    
+    if (normalized.length < 2) {
+        return normalized;
+    }
+    
+    const words = normalized.split(/\s+/).filter(word => word.length > 0);
+    if (words.length < 2) {
+        console.warn('Họ tên phải có ít nhất 2 từ:', normalized);
+    }
+    
+    return normalized;
+}
+
+// Debounce validation để tránh validate quá nhiều lần
+let validationTimeout = null
+const debouncedValidate = (callback) => {
+    if (validationTimeout) {
+        clearTimeout(validationTimeout)
+    }
+    validationTimeout = setTimeout(callback, 100)
+}
+
 const validateForm = () => {
     validationErrors.value = {}
     
-    // Validate vai trò
+    // Kiểm tra vai trò trước (đơn giản nhất)
     if (!newAccount.value.vaiTro) {
         validationErrors.value.vaiTro = 'Vui lòng chọn vai trò'
+        return false
     }
     
-    // Validate email
-    if (!newAccount.value.email?.trim()) {
-        validationErrors.value.accountEmail = 'Email không được để trống'
-    } else {
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
-        if (!emailRegex.test(newAccount.value.email.trim())) {
-            validationErrors.value.accountEmail = 'Email không hợp lệ'
-        } else if (checkEmailExists(newAccount.value.email)) {
-            validationErrors.value.accountEmail = 'Email đã tồn tại trong hệ thống'
-        }
-    }
-    
-    // Validate mật khẩu
-    if (!newAccount.value.matKhau?.trim()) {
-        validationErrors.value.matKhau = 'Mật khẩu không được để trống'
-    } else if (newAccount.value.matKhau.length < 6) {
-        validationErrors.value.matKhau = 'Mật khẩu phải có ít nhất 6 ký tự'
-    } else if (newAccount.value.matKhau.length > 50) {
-        validationErrors.value.matKhau = 'Mật khẩu không được quá 50 ký tự'
-    }
-    
-    // Validate trạng thái
+    // Kiểm tra trạng thái (đơn giản)
     if (newAccount.value.trangThai === undefined || newAccount.value.trangThai === null) {
         validationErrors.value.trangThai = 'Vui lòng chọn trạng thái'
+        return false
     }
     
-    // Validate thông tin cá nhân cho các vai trò không phải admin
-    if (newAccount.value.vaiTro && newAccount.value.vaiTro !== 'ADMIN') {
-        if (!personalInfo.value.hoTen?.trim()) {
-            validationErrors.value.hoTen = 'Họ tên không được để trống'
-        } else if (personalInfo.value.hoTen.trim().length < 2) {
-            validationErrors.value.hoTen = 'Họ tên phải có ít nhất 2 ký tự'
-        } else if (personalInfo.value.hoTen.trim().length > 100) {
-            validationErrors.value.hoTen = 'Họ tên không được quá 100 ký tự'
+    // Kiểm tra mật khẩu (đơn giản)
+    const password = newAccount.value.matKhau?.trim() || ''
+    if (!password) {
+        validationErrors.value.matKhau = 'Mật khẩu không được để trống'
+        return false
+    } else if (password.length < 6) {
+        validationErrors.value.matKhau = 'Mật khẩu phải có ít nhất 6 ký tự'
+        return false
+    } else if (password.length > 50) {
+        validationErrors.value.matKhau = 'Mật khẩu không được quá 50 ký tự'
+        return false
+    }
+    
+    // Xử lý email
+    let accountEmail = newAccount.value.email?.trim() || ''
+    
+    if (newAccount.value.vaiTro !== 'ADMIN' && personalInfo.value.email?.trim()) {
+        accountEmail = personalInfo.value.email.trim()
+        newAccount.value.email = accountEmail
+    }
+    
+    if (!accountEmail) {
+        validationErrors.value.accountEmail = 'Email không được để trống'
+        validationErrors.value.email = 'Email không được để trống'
+        return false
+    } else {
+        // Sử dụng regex đơn giản hơn
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(accountEmail)) {
+            validationErrors.value.accountEmail = 'Email không hợp lệ'
+            validationErrors.value.email = 'Email không hợp lệ'
+            return false
+        } else if (checkEmailExists(accountEmail)) {
+            validationErrors.value.accountEmail = 'Email đã tồn tại trong hệ thống'
+            validationErrors.value.email = 'Email đã tồn tại trong hệ thống'
+            return false
         }
-        
-        if (!personalInfo.value.email?.trim()) {
-            validationErrors.value.email = 'Email không được để trống'
+    }
+    
+    // Kiểm tra thông tin cá nhân
+    if (newAccount.value.vaiTro !== 'ADMIN') {
+        const hoTen = personalInfo.value.hoTen?.trim() || ''
+        if (!hoTen) {
+            validationErrors.value.hoTen = 'Họ tên không được để trống'
+            return false
+        } else if (hoTen.length > 100) {
+            validationErrors.value.hoTen = 'Họ tên không được quá 100 ký tự'
+            return false
         } else {
-            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
-            if (!emailRegex.test(personalInfo.value.email.trim())) {
-                validationErrors.value.email = 'Email không hợp lệ'
+            // Sử dụng regex đơn giản hơn cho tên tiếng Việt
+            const nameRegex = /^[a-zA-ZÀ-ỹ\s]+$/u
+            if (!nameRegex.test(hoTen)) {
+                validationErrors.value.hoTen = 'Họ tên chỉ được chứa chữ cái và khoảng trắng'
+                return false
             }
         }
         
-        if (!personalInfo.value.sdt?.trim()) {
+        const sdt = personalInfo.value.sdt?.trim() || ''
+        if (!sdt) {
             validationErrors.value.sdt = 'Số điện thoại không được để trống'
+            return false
         } else {
             const phoneRegex = /^0\d{9,10}$/
-            const cleanPhone = personalInfo.value.sdt.replace(/\s/g, '')
-            if (!phoneRegex.test(cleanPhone)) {
-                validationErrors.value.sdt = 'Số điện thoại không hợp lệ (10-11 số, bắt đầu bằng 0)'
-            } else if (checkPhoneExists(cleanPhone)) {
-                validationErrors.value.sdt = 'Số điện thoại đã tồn tại trong hệ thống'
+            if (!phoneRegex.test(sdt)) {
+                validationErrors.value.sdt = 'Số điện thoại không hợp lệ'
+                return false
             }
         }
+    }
+    
+    return true
+}
+
+// Validation cho email field riêng biệt
+const validateEmailField = (email) => {
+    if (!email?.trim()) {
+        return 'Email không được để trống'
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+        return 'Email không hợp lệ'
+    }
+    
+    if (checkEmailExists(email.trim())) {
+        return 'Email đã tồn tại trong hệ thống'
+    }
+    
+    return null
+}
+
+// Validation cho các field khác
+const validateOtherFields = () => {
+    if (newAccount.value.vaiTro && newAccount.value.vaiTro !== 'ADMIN') {
+        const rawHoTen = personalInfo.value.hoTen || ''
+        const normalizedHoTen = normalizeName(rawHoTen)
         
-        // Validate ngày sinh nếu có
+        if (!normalizedHoTen) {
+            validationErrors.value.hoTen = 'Họ tên không được để trống'
+            return false
+        } else if (normalizedHoTen.length < 2) {
+            validationErrors.value.hoTen = 'Họ tên phải có ít nhất 2 ký tự'
+            return false
+        } else if (normalizedHoTen.length > 100) {
+            validationErrors.value.hoTen = 'Họ tên không được quá 100 ký tự'
+            return false
+        } else {
+            const vietnameseRegex = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂẾỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪỬỮỰỲỴÝỶỸàáâãèéêìíòóôõùúăđĩũơưăạảấầẩẫậắằẳẵặẹẻẽềếểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵýỷỹ\s]+$/u
+            if (!vietnameseRegex.test(normalizedHoTen)) {
+                validationErrors.value.hoTen = 'Họ tên chỉ chứa chữ cái và khoảng trắng, hỗ trợ tiếng Việt'
+                return false
+            }
+        }
+
+        const personalEmail = personalInfo.value.email?.trim() || ''
+        if (!personalEmail) {
+            validationErrors.value.email = 'Email không được để trống'
+            return false
+        } else {
+            const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+            if (!emailRegex.test(personalEmail)) {
+                validationErrors.value.email = 'Email không hợp lệ'
+                return false
+            }
+        }
+
+        const phone = personalInfo.value.sdt?.replace(/\s/g, '') || ''
+        if (!phone) {
+            validationErrors.value.sdt = 'Số điện thoại không được để trống'
+            return false
+        } else {
+            const phoneRegex = /^(03|05|07|08|09|02)\d{8}$/
+            if (!phoneRegex.test(phone)) {
+                validationErrors.value.sdt = 'Số điện thoại không hợp lệ (10 số, bắt đầu bằng 03/05/07/08/09/02)'
+                return false
+            } else if (checkPhoneExists(phone)) {
+                validationErrors.value.sdt = 'Số điện thoại đã tồn tại trong hệ thống'
+                return false
+            }
+        }
+
         if (personalInfo.value.ngaySinh) {
             const today = new Date()
             const birthDate = new Date(personalInfo.value.ngaySinh)
             if (birthDate > today) {
                 validationErrors.value.ngaySinh = 'Ngày sinh không thể lớn hơn ngày hiện tại'
+                return false
             }
-            
-            // Kiểm tra tuổi hợp lý (ít nhất 16 tuổi)
-            const age = today.getFullYear() - birthDate.getFullYear()
+            const age = Math.floor((today - birthDate) / (365.25 * 24 * 60 * 60 * 1000))
             if (age < 16) {
                 validationErrors.value.ngaySinh = 'Người dùng phải ít nhất 16 tuổi'
+                return false
+            }
+        }
+
+        const hasAddressData = personalInfo.value.maTinh || 
+                              personalInfo.value.maPhuong || 
+                              personalInfo.value.diaChiChiTiet?.trim()
+        
+        if (hasAddressData) {
+            if (!personalInfo.value.maTinh) {
+                validationErrors.value.diaChi = 'Vui lòng chọn tỉnh/thành phố'
+                return false
+            }
+            if (!personalInfo.value.maPhuong) {
+                validationErrors.value.diaChi = 'Vui lòng chọn phường/xã'
+                return false
+            }
+            if (!personalInfo.value.diaChiChiTiet?.trim()) {
+                validationErrors.value.diaChiChiTiet = 'Vui lòng nhập địa chỉ chi tiết'
+                return false
             }
         }
     }
     
     return Object.keys(validationErrors.value).length === 0
 }
-// ===== ENHANCED SAVE ACCOUNT METHOD =====
+
+
+// Kiểm tra backend health trước khi tạo tài khoản
+const checkBackendHealth = async () => {
+    try {
+        const response = await axios.get('http://localhost:8080/api/tai-khoan', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` },
+            timeout: 5000
+        })
+        return true
+    } catch (error) {
+        console.error('❌ Backend health check failed:', error)
+        return false
+    }
+}
+
+// ===== SAVE ACCOUNT METHOD =====
 const handleSaveAccount = async () => {
     submitted.value = true
     saving.value = true
     
     try {
+        // Kiểm tra backend health trước
+        console.log('🔍 Checking backend health...')
+        const isHealthy = await checkBackendHealth()
+        if (!isHealthy) {
+            throw new Error('Backend server không phản hồi. Vui lòng kiểm tra kết nối và đảm bảo server đang chạy.')
+        }
+        
+        validationErrors.value = {}
+        
         if (!validateForm()) {
             toast.add({
                 severity: 'warn',
                 summary: 'Dữ liệu không hợp lệ',
-                detail: 'Vui lòng kiểm tra và sửa các lỗi được đánh dấu',
+                detail: 'Vui lòng kiểm tra và sửa các lỗi được đánh dấu màu đỏ',
                 life: 4000
             })
             return
         }
         
-        updateFullAddress()
-        lastCreatedAccountRole.value = newAccount.value.vaiTro
-        
-        // SỬA: Chuẩn bị dữ liệu đúng format backend
         const accountData = {
-            email: newAccount.value.email.trim(),
-            matKhau: newAccount.value.matKhau,
+            email: newAccount.value.email?.trim() || '',
+            matKhau: newAccount.value.matKhau?.trim() || '',
             vaiTro: newAccount.value.vaiTro,
-            trangThai: newAccount.value.trangThai
+            trangThai: newAccount.value.trangThai || 1
         }
         
-        // Thêm mã tài khoản nếu có
         if (newAccount.value.maTaiKhoan && newAccount.value.maTaiKhoan.trim()) {
             accountData.maTaiKhoan = newAccount.value.maTaiKhoan.trim()
         }
-        
-        // SỬA: Thêm thông tin cá nhân đầy đủ cho non-admin
-        if (newAccount.value.vaiTro !== 'ADMIN') {
-            accountData.hoTen = personalInfo.value.hoTen.trim()
-            accountData.sdt = personalInfo.value.sdt.replace(/\s/g, '')
-            
-            // THÊM: Ngày sinh nếu có
-            if (personalInfo.value.ngaySinh) {
-                accountData.ngaySinh = personalInfo.value.ngaySinh.toISOString().split('T')[0]
+
+        if (newAccount.value.vaiTro && newAccount.value.vaiTro !== 'ADMIN') {
+            const normalizedHoTen = normalizeName(personalInfo.value.hoTen);
+            if (!normalizedHoTen) {
+                throw new Error('Họ tên không hợp lệ sau normalize');
             }
+            accountData.hoTen = normalizedHoTen;
+            accountData.sdt = personalInfo.value.sdt?.replace(/\s/g, '') || '';
+            accountData.email = personalInfo.value.email?.trim() || newAccount.value.email?.trim() || '';
             
-            // SỬA: Chỉ thêm địa chỉ nếu đã chọn đầy đủ
-            if (personalInfo.value.maTinh && personalInfo.value.maPhuong) {
-                accountData.maTinh = personalInfo.value.maTinh
-                accountData.tenTinh = provinces.value.find(p => p.code === personalInfo.value.maTinh)?.name || ''
-                accountData.maPhuong = personalInfo.value.maPhuong
-                accountData.tenPhuong = wards.value.find(w => w.code === personalInfo.value.maPhuong)?.name || ''
-                
-                if (personalInfo.value.diaChiChiTiet && personalInfo.value.diaChiChiTiet.trim()) {
-                    accountData.diaChiChiTiet = personalInfo.value.diaChiChiTiet.trim()
-                }
+            if (personalInfo.value.ngaySinh) {
+                accountData.ngaySinh = personalInfo.value.ngaySinh.toISOString().split('T')[0];
+            }
+
+            const hasCompleteAddress = personalInfo.value.maTinh && 
+                                     personalInfo.value.maPhuong && 
+                                     personalInfo.value.diaChiChiTiet?.trim();
+            
+            if (hasCompleteAddress) {
+                accountData.maTinh = personalInfo.value.maTinh;
+                accountData.tenTinh = provinces.value.find(p => p.code === personalInfo.value.maTinh)?.name || '';
+                accountData.maPhuong = personalInfo.value.maPhuong;
+                accountData.tenPhuong = wards.value.find(w => w.code === personalInfo.value.maPhuong)?.name || '';
+                accountData.diaChiChiTiet = personalInfo.value.diaChiChiTiet.trim();
             }
         }
+
+        lastCreatedAccountRole.value = newAccount.value.vaiTro;
         
-        console.log('🚀 Sending account data:', accountData)
+        console.log('🚀 Creating account with data:', accountData)
+        console.log('🔐 Auth token present:', !!localStorage.getItem('auth_token'))
+        console.log('🌐 API URL: http://localhost:8080/api/tai-khoan')
         
         const response = await axios.post('http://localhost:8080/api/tai-khoan', accountData, {
             headers: { 
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             },
             timeout: 15000
         })
@@ -1518,7 +2198,6 @@ const handleSaveAccount = async () => {
             await fetchData()
             hideAddDialog()
             
-            // Chuyển trang tùy theo vai trò
             setTimeout(() => {
                 switch(lastCreatedAccountRole.value) {
                     case 'USER':
@@ -1528,7 +2207,7 @@ const handleSaveAccount = async () => {
                             detail: 'Đang chuyển đến trang quản lý khách hàng...',
                             life: 2000
                         })
-                        setTimeout(() => navigateToRolePage('USER'), 2000)
+                        setTimeout(() => router.push('/khach-hang'), 2000)
                         break
                     case 'NHANVIEN':
                         toast.add({
@@ -1537,12 +2216,12 @@ const handleSaveAccount = async () => {
                             detail: 'Đang chuyển đến trang quản lý nhân viên...',
                             life: 2000
                         })
-                        setTimeout(() => navigateToRolePage('NHANVIEN'), 2000)
+                        setTimeout(() => router.push('/nhan-vien'), 2000)
                         break
                     case 'ADMIN':
                         toast.add({
-                            severity: 'info',
-                            summary: 'Thông tin',
+                            severity: 'success',
+                            summary: 'Thành công',
                             detail: 'Tài khoản Admin đã được tạo thành công',
                             life: 3000
                         })
@@ -1552,17 +2231,72 @@ const handleSaveAccount = async () => {
         }
         
     } catch (error) {
-        console.error('❌ Lỗi tạo tài khoản:', error)
-        handleApiError(error, 'Không thể tạo tài khoản')
+        console.error('❌ Error creating account:', error)
+        console.error('❌ Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+            config: {
+                url: error.config?.url,
+                method: error.config?.method,
+                headers: error.config?.headers
+            }
+        })
+        
+        // Hiển thị lỗi chi tiết trong confirm dialog
+        let errorMessage = 'Không thể tạo tài khoản'
+        let errorDetail = ''
+        
+        if (error.response?.data?.message) {
+            errorDetail = error.response.data.message
+        } else if (error.response?.data?.errors) {
+            const errors = Object.values(error.response.data.errors)
+            errorDetail = errors.join('\n')
+        } else if (error.message) {
+            errorDetail = error.message
+        } else {
+            errorDetail = 'Lỗi không xác định từ server'
+        }
+        
+        // Kiểm tra backend health
+        if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+            errorMessage = 'Không thể kết nối đến server'
+            errorDetail = 'Vui lòng kiểm tra kết nối mạng và đảm bảo backend đang chạy'
+        } else if (error.response?.status === 401) {
+            errorMessage = 'Không có quyền truy cập'
+            errorDetail = 'Token xác thực không hợp lệ hoặc đã hết hạn'
+        } else if (error.response?.status === 409) {
+            errorMessage = 'Email đã tồn tại'
+            errorDetail = 'Email này đã được sử dụng bởi tài khoản khác'
+        } else if (error.response?.status === 500) {
+            errorMessage = 'Lỗi server'
+            errorDetail = 'Có lỗi xảy ra ở phía server. Vui lòng thử lại sau'
+        }
+        
+        confirm.require({
+            message: `❌ ${errorMessage}\n\n📋 Chi tiết lỗi:\n${errorDetail}`,
+            header: 'Lỗi tạo tài khoản',
+            icon: 'pi pi-exclamation-triangle',
+            rejectClass: 'p-button-secondary p-button-outlined',
+            rejectLabel: 'Đóng',
+            acceptLabel: 'Thử lại',
+            acceptClass: 'p-button-warning',
+            accept: () => {
+                // Thử lại tạo tài khoản
+                handleSaveAccount();
+            },
+            reject: () => {
+                // Đóng dialog và reset state
+                hideAddDialog();
+            }
+        })
     } finally {
         saving.value = false
     }
 }
+
 // ===== SUCCESS HANDLING =====
 const handleSuccessResponse = (response) => {
-    console.log('✅ Tạo tài khoản thành công:', response.data)
-    
-    // Phân tích response để hiển thị thông tin chi tiết
     if (response.data && response.data.data) {
         const result = response.data.data
         
@@ -1578,7 +2312,7 @@ const handleSuccessResponse = (response) => {
         
         if (result.nhanVien) {
             successDetail += `. Mã nhân viên: ${result.nhanVien.maNhanVien}`
-            }
+        }
         
         if (result.warning) {
             toast.add({
@@ -1605,17 +2339,11 @@ const handleSuccessResponse = (response) => {
     }
 }
 
-// ===== ENHANCED API ERROR HANDLING =====
+// ===== API ERROR HANDLING =====
 const handleApiError = (error, defaultMessage) => {
     let errorMessage = defaultMessage
     let errorDetail = ''
     let severity = 'error'
-    
-    console.error('API Error Details:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
-    })
     
     if (error.response) {
         const { status, data } = error.response
@@ -1625,128 +2353,71 @@ const handleApiError = (error, defaultMessage) => {
                 errorMessage = 'Dữ liệu không hợp lệ'
                 severity = 'warn'
                 
-                // Xử lý lỗi validation chi tiết
                 if (data.errors && typeof data.errors === 'object') {
                     Object.keys(data.errors).forEach(field => {
                         validationErrors.value[field] = data.errors[field]
                     })
                     errorDetail = 'Vui lòng sửa các lỗi được đánh dấu màu đỏ'
                 } else if (data.message) {
-                    // Xử lý các lỗi cụ thể từ backend
-                    if (data.message.includes('Số điện thoại đã tồn tại')) {
-                        errorMessage = 'Số điện thoại đã được sử dụng'
-                        errorDetail = 'Vui lòng sử dụng số điện thoại khác'
-                        validationErrors.value.sdt = 'Số điện thoại này đã tồn tại trong hệ thống'
-                    } else if (data.message.includes('Email đã tồn tại')) {
-                        errorMessage = 'Email đã được sử dụng'
-                        errorDetail = 'Vui lòng sử dụng email khác'
+                    errorDetail = data.message
+                    
+                    if (data.message.includes('Email đã tồn tại')) {
                         validationErrors.value.email = 'Email này đã tồn tại trong hệ thống'
                         validationErrors.value.accountEmail = 'Email này đã tồn tại trong hệ thống'
-                    } else if (data.message.includes('Mã tài khoản đã tồn tại')) {
-                        errorMessage = 'Mã tài khoản đã được sử dụng'
-                        errorDetail = 'Vui lòng để trống để hệ thống tự tạo mã'
-                        validationErrors.value.maTaiKhoan = 'Mã tài khoản này đã tồn tại'
-                    } else {
-                        errorDetail = data.message
+                    } else if (data.message.includes('Số điện thoại đã tồn tại')) {
+                        validationErrors.value.sdt = 'Số điện thoại này đã tồn tại trong hệ thống'
                     }
-                } else {
-                    errorDetail = 'Vui lòng kiểm tra lại thông tin nhập vào'
                 }
                 break
                 
             case 409:
                 errorMessage = 'Dữ liệu bị trùng lặp'
                 severity = 'warn'
+                errorDetail = data.message || 'Email hoặc số điện thoại đã tồn tại trong hệ thống'
                 
-                if (data.errorCode === 'EMAIL_EXISTS') {
-                    errorDetail = 'Email đã tồn tại trong hệ thống'
+                if (data.message && data.message.includes('email')) {
                     validationErrors.value.email = 'Email đã tồn tại'
                     validationErrors.value.accountEmail = 'Email đã tồn tại'
-                } else if (data.errorCode === 'PHONE_EXISTS' || data.message.includes('Số điện thoại')) {
-                    errorDetail = 'Số điện thoại đã tồn tại trong hệ thống'
-                    validationErrors.value.sdt = 'Số điện thoại đã tồn tại'
-                } else {
-                    errorDetail = data.message || 'Dữ liệu đã tồn tại trong hệ thống'
                 }
-                break
-                
-            case 403:
-                errorMessage = 'Không có quyền truy cập'
-                errorDetail = 'Bạn không có quyền thực hiện thao tác này'
-                severity = 'warn'
-                break
-                
-            case 404:
-                errorMessage = 'Không tìm thấy tài nguyên'
-                errorDetail = 'Endpoint API không tồn tại hoặc đã bị thay đổi'
+                if (data.message && data.message.includes('phone')) {
+                    validationErrors.value.sdt = 'Số điện thoại đã tồn tại'
+                }
                 break
                 
             case 422:
                 errorMessage = 'Dữ liệu không thể xử lý'
                 severity = 'warn'
-                
-                if (data.message && data.message.includes('Transaction')) {
-                    errorDetail = 'Có lỗi trong quá trình xử lý. Vui lòng thử lại sau.'
-                } else {
-                    errorDetail = data.message || 'Dữ liệu không phù hợp với yêu cầu hệ thống'
-                }
+                errorDetail = data.message || 'Dữ liệu không đúng định dạng yêu cầu'
                 break
                 
             case 500:
                 errorMessage = 'Lỗi hệ thống'
-                errorDetail = 'Có lỗi xảy ra trên máy chủ. Vui lòng thử lại sau hoặc liên hệ quản trị viên.'
+                errorDetail = 'Có lỗi xảy ra trên máy chủ. Vui lòng thử lại sau.'
                 
-                // Phân tích thêm lỗi 500
-                if (data && data.message) {
-                    if (data.message.includes('Transaction silently rolled back')) {
-                        errorDetail = 'Giao dịch bị hủy do vi phạm ràng buộc dữ liệu. Vui lòng kiểm tra lại thông tin.'
-                        severity = 'warn'
-                    } else if (data.message.includes('constraint')) {
-                        errorDetail = 'Vi phạm ràng buộc dữ liệu. Có thể do email hoặc số điện thoại đã tồn tại.'
-                        severity = 'warn'
-                    } else if (data.message.includes('foreign key')) {
-                        errorDetail = 'Lỗi liên kết dữ liệu. Vui lòng thử lại.'
-                        severity = 'warn'
-                    }
+                if (data.message && data.message.includes('constraint')) {
+                    severity = 'warn'
+                    errorDetail = 'Vi phạm ràng buộc dữ liệu. Email hoặc số điện thoại có thể đã tồn tại.'
                 }
                 break
                 
-            case 503:
-                errorMessage = 'Dịch vụ không khả dụng'
-                errorDetail = 'Hệ thống đang bảo trì hoặc quá tải. Vui lòng thử lại sau.'
-                break
-                
             default:
-                errorMessage = `Lỗi HTTP ${status}`
-                errorDetail = data?.message || data?.error || error.message || 'Lỗi không xác định từ máy chủ'
+                errorDetail = data?.message || error.message || 'Lỗi không xác định từ máy chủ'
         }
-    } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+    } else if (error.code === 'ECONNREFUSED') {
         errorMessage = 'Lỗi kết nối'
-        errorDetail = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.'
+        errorDetail = 'Không thể kết nối đến máy chủ'
         severity = 'warn'
-    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+    } else if (error.message.includes('timeout')) {
         errorMessage = 'Hết thời gian chờ'
-        errorDetail = 'Quá trình xử lý mất quá nhiều thời gian. Vui lòng thử lại.'
+        errorDetail = 'Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.'
         severity = 'warn'
-    } else {
-        errorMessage = 'Lỗi không xác định'
-        errorDetail = error.message || defaultMessage
     }
 
-    // Hiển thị thông báo lỗi
     toast.add({
         severity: severity,
         summary: errorMessage,
         detail: errorDetail,
         life: severity === 'error' ? 8000 : 6000
-    })
-    
-    // Log chi tiết cho debug
-    console.error('🔍 Error Analysis:', {
-        originalError: error,
-        processedMessage: errorMessage,
-        processedDetail: errorDetail,
-        validationErrors: validationErrors.value
     })
 }
 
@@ -1758,7 +2429,6 @@ const handleUpdateAccount = async () => {
     try {
         validationErrors.value = {}
         
-        // CHỈ VALIDATE EMAIL VÀ MẬT KHẨU
         if (!editAccountData.value.email?.trim()) {
             validationErrors.value.editEmail = 'Email không được để trống'
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAccountData.value.email)) {
@@ -1767,7 +2437,6 @@ const handleUpdateAccount = async () => {
             validationErrors.value.editEmail = 'Email đã tồn tại'
         }
         
-        // VALIDATE MẬT KHẨU NẾU CÓ NHẬP
         if (editAccountData.value.matKhau && editAccountData.value.matKhau.trim()) {
             if (editAccountData.value.matKhau.length < 6) {
                 validationErrors.value.editMatKhau = 'Mật khẩu phải có ít nhất 6 ký tự'
@@ -1780,17 +2449,13 @@ const handleUpdateAccount = async () => {
             return
         }
         
-        // CHỈ GỬI EMAIL VÀ MẬT KHẨU (NẾU CÓ)
         const updateData = {
             email: editAccountData.value.email.trim()
         }
         
-        // Chỉ thêm mật khẩu nếu có nhập
         if (editAccountData.value.matKhau && editAccountData.value.matKhau.trim()) {
             updateData.matKhau = editAccountData.value.matKhau.trim()
         }
-        
-        console.log('🔧 Updating account (email/password only):', updateData)
         
         const response = await axios.put(
             `http://localhost:8080/api/tai-khoan/${editAccountData.value.id}`, 
@@ -1817,176 +2482,14 @@ const handleUpdateAccount = async () => {
         }
         
     } catch (error) {
-        console.error('❌ Update error:', error)
+        console.error('Update error:', error)
         handleApiError(error, 'Không thể cập nhật thông tin đăng nhập')
     } finally {
         saving.value = false
     }
 }
 
-// ===== DELETE METHODS =====
-const handleDeleteSelectedAccounts = async () => {
-    deleting.value = true
-    
-    try {
-        const totalAccounts = selectedAccounts.value.length
-        let successCount = 0
-        let failedAccounts = []
-        
-        // Xóa từng tài khoản và track kết quả
-        for (const account of selectedAccounts.value) {
-            try {
-                await axios.delete(`http://localhost:8080/api/tai-khoan/${account.id}`, {
-                    timeout: 10000
-                })
-                successCount++
-            } catch (error) {
-                failedAccounts.push({
-                    account: account,
-                    error: error.response?.data?.message || error.message
-                })
-            }
-        }
-        
-        // Hiển thị kết quả
-        if (successCount === totalAccounts) {
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: `Đã xóa thành công ${successCount} tài khoản`,
-                life: 3000
-            })
-        } else if (successCount > 0) {
-            toast.add({
-                severity: 'warn',
-                summary: 'Hoàn thành một phần',
-                detail: `Đã xóa ${successCount}/${totalAccounts} tài khoản. ${failedAccounts.length} tài khoản không thể xóa.`,
-                life: 5000
-            })
-        } else {
-            toast.add({
-                severity: 'error',
-                summary: 'Thất bại',
-                detail: 'Không thể xóa tài khoản nào. Có thể do ràng buộc dữ liệu.',
-                life: 5000
-            })
-        }
-        
-        deleteAccountsDialog.value = false
-        selectedAccounts.value = null
-        await fetchData()
-        
-    } catch (error) {
-        console.error('❌ Lỗi xóa nhiều tài khoản:', error)
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi hệ thống',
-            detail: 'Có lỗi xảy ra khi xóa tài khoản',
-            life: 5000
-        })
-    } finally {
-        deleting.value = false
-    }
-}
-
-const handleDeleteAccount = async () => {
-    deleting.value = true
-    try {
-        console.log('🗑️ Đang xóa tài khoản:', selectedAccountForDelete.value.id)
-        
-        const response = await axios.delete(
-            `http://localhost:8080/api/tai-khoan/${selectedAccountForDelete.value.id}`,
-            {
-                timeout: 30000,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }
-        )
-        
-        if (response.status === 200) {
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: 'Tài khoản đã được xóa thành công',
-                life: 3000
-            })
-            
-            deleteAccountDialog.value = false
-            selectedAccountForDelete.value = null
-            await fetchData()
-        }
-        
-    } catch (error) {
-        console.error('❌ Lỗi xóa tài khoản:', error)
-        handleApiError(error, 'Không thể xóa tài khoản')
-    } finally {
-        deleting.value = false
-    }
-}
-
-const handleChangeStatus = async (account) => {
-    try {
-        const newStatus = account.trangThai === 1 ? 0 : 1
-        
-        console.log('🔄 Thay đổi trạng thái:', {
-            accountId: account.id,
-            currentStatus: account.trangThai,
-            newStatus: newStatus
-        })
-        
-        // SỬA: Gửi trong request body thay vì query param
-        const response = await axios.patch(
-            `http://localhost:8080/api/tai-khoan/${account.id}/trang-thai`,
-            { 
-                trangThai: newStatus  // Gửi trong body
-            },
-            {
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                timeout: 10000
-            }
-        )
-        
-        if (response.status === 200) {
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: `Tài khoản đã được ${newStatus === 1 ? 'kích hoạt' : 'ngưng hoạt động'}`,
-                life: 3000
-            })
-            await fetchData()
-        }
-        
-    } catch (error) {
-        console.error('❌ Lỗi thay đổi trạng thái:', error)
-        
-        // Xử lý lỗi chi tiết
-        if (error.response) {
-            const { status, data } = error.response
-            let errorMessage = 'Không thể thay đổi trạng thái'
-            
-            if (status === 400 && data.message) {
-                errorMessage = data.message
-            } else if (status === 404) {
-                errorMessage = 'Không tìm thấy tài khoản'
-            } else if (data.message) {
-                errorMessage = data.message
-            }
-            
-            toast.add({
-                severity: 'error',
-                summary: 'Lỗi',
-                detail: errorMessage,
-                life: 5000
-            })
-        } else {
-            handleApiError(error, 'Không thể thay đổi trạng thái')
-        }
-    }
-}// ===== EXPORT FUNCTION =====
+// ===== EXPORT FUNCTION =====
 const handleExportCSV = () => {
     exporting.value = true
     try {
@@ -2000,7 +2503,7 @@ const handleExportCSV = () => {
             })
         }
     } catch (error) {
-        console.error('❌ Error exporting CSV:', error)
+        console.error('Error exporting CSV:', error)
         toast.add({
             severity: 'error',
             summary: 'Lỗi xuất file',
@@ -2014,8 +2517,33 @@ const handleExportCSV = () => {
 
 // ===== LIFECYCLE =====
 onMounted(() => {
+    // Kiểm tra quyền ADMIN từ localStorage
+    checkAdminPermission()
     fetchData()
 })
+
+// Kiểm tra quyền ADMIN
+const checkAdminPermission = () => {
+    try {
+        // Thử cả hai key có thể có trong localStorage
+        let userInfo = localStorage.getItem('userInfo') || localStorage.getItem('user_info')
+        if (userInfo) {
+            const user = JSON.parse(userInfo)
+            isAdmin.value = user.vaiTro === 'ADMIN'
+            console.log('🔐 Admin permission checked:', { 
+                userRole: user.vaiTro, 
+                isAdmin: isAdmin.value,
+                userEmail: user.email
+            })
+        } else {
+            isAdmin.value = false
+            console.log('🔐 No user info found in localStorage, setting isAdmin to false')
+        }
+    } catch (error) {
+        console.error('❌ Error checking admin permission:', error)
+        isAdmin.value = false
+    }
+}
 </script>
 <style scoped>
 .card {
