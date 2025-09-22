@@ -62,6 +62,7 @@ const loadingMessage = ref('');
 // Tab management
 const activeTabIndex = ref(0);
 const itemsPerPage = ref(10);
+const currentPage = ref(0);
 
 // Filters - Tab 1
 const searchKeyword = ref('');
@@ -535,6 +536,14 @@ function viewProductReturnHistory(product) {
     });
 }
 
+function getPlaceholderImage() {
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNmM3NTdkIj5Ow6RuZyBjw7MgYW5oPC90ZXh0Pjwvc3ZnPg==';
+}
+
+function handleImageError(event) {
+    event.target.src = getPlaceholderImage();
+}
+
 // ===== FILTER FUNCTIONS =====
 function onSearch() {
     // Auto trigger filter
@@ -731,6 +740,12 @@ const filteredReturnedProducts = computed(() => {
     }
 
     return filtered;
+});
+
+const paginatedReturnedProducts = computed(() => {
+    const start = currentPage.value * itemsPerPage.value;
+    const end = start + itemsPerPage.value;
+    return filteredReturnedProducts.value.slice(start, end);
 });
 
 // Statistics
@@ -1153,122 +1168,169 @@ onMounted(() => {
                 </div>
             </div>
 
-            <!-- Returned Products Table -->
-            <div class="table-container">
-                <DataTable
-                    :value="filteredReturnedProducts"
-                    dataKey="id"
-                    :paginator="true"
-                    :rows="itemsPerPage"
-                    :loading="isLoading"
-                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-                    :rowsPerPageOptions="[10, 25, 50, 100]"
-                    currentPageReportTemplate="Hiển thị {first} đến {last} trong tổng số {totalRecords} sản phẩm"
-                    class="p-datatable-lg"
-                    responsiveLayout="scroll"
-                >
-                    <Column field="hinhAnh" header="Hình ảnh" style="min-width: 8rem">
-                        <template #body="slotProps">
-                            <div class="d-flex align-items-center gap-2">
-                                <img v-if="slotProps.data.hinhAnhSanPham" :src="createImageUrl(slotProps.data.hinhAnhSanPham)" alt="Product" class="product-thumbnail rounded" style="width: 40px; height: 40px; object-fit: cover" />
-                                <div v-if="slotProps.data.duongDanAnh" class="evidence-indicator">
-                                    <i class="pi pi-camera text-info cursor-pointer" @click="showEvidenceImage(slotProps.data)" title="Xem ảnh minh chứng"></i>
+            <!-- Individual Return Items Display -->
+            <div class="return-items-container">
+                <div class="section-header mb-4">
+                    <h5 class="section-title">
+                        <i class="pi pi-list me-2"></i>
+                        Chi tiết từng yêu cầu trả hàng ({{ filteredReturnedProducts.length }} yêu cầu)
+                    </h5>
+                    <div class="section-actions">
+                        <Button @click="exportProductData" severity="info" outlined size="small">
+                            <i class="pi pi-download me-1"></i>
+                            Xuất Excel
+                        </Button>
+                    </div>
+                </div>
+
+                <!-- Return Items Grid -->
+                <div class="return-items-grid">
+                    <div v-for="(returnItem, index) in paginatedReturnedProducts" :key="returnItem.id" class="return-item-card">
+                        <!-- Card Header -->
+                        <div class="return-card-header">
+                            <div class="return-index">
+                                <span class="index-number">{{ (currentPage * itemsPerPage) + index + 1 }}</span>
+                            </div>
+                            <div class="return-meta">
+                                <h6 class="return-code">{{ returnItem.maChiTietTraHang || `TH-${returnItem.id}` }}</h6>
+                                <div class="return-date">
+                                    <i class="pi pi-calendar me-1"></i>
+                                    {{ formatDate(returnItem.ngayTaoTraHang) }}
                                 </div>
                             </div>
-                        </template>
-                    </Column>
-
-                    <Column field="tenSanPham" header="Sản phẩm" style="min-width: 20rem">
-                        <template #body="slotProps">
-                            <div>
-                                <div class="fw-medium">{{ slotProps.data.tenSanPham }}</div>
-                                <small class="text-muted">{{ slotProps.data.maSanPham }}</small>
-                                <div class="d-flex mt-1 gap-1">
-                                    <Tag v-if="slotProps.data.mauSac" :value="slotProps.data.mauSac" severity="info" size="small" />
-                                    <Tag v-if="slotProps.data.kichThuoc" :value="slotProps.data.kichThuoc" severity="success" size="small" />
-                                </div>
+                            <div class="return-status">
+                                <Tag :value="getReturnStatusLabel(returnItem.trangThaiHoaDon)" :severity="getReturnStatusSeverity(returnItem.trangThaiHoaDon)" />
                             </div>
-                        </template>
-                    </Column>
-
-                    <Column field="maHoaDon" header="Mã HĐ" style="min-width: 10rem">
-                        <template #body="slotProps">
-                            <Tag :value="slotProps.data.maHoaDon" severity="secondary" />
-                        </template>
-                    </Column>
-
-                    <Column field="tenKhachHang" header="Khách hàng" style="min-width: 15rem">
-                        <template #body="slotProps">
-                            <div>
-                                <div class="fw-semibold">{{ slotProps.data.tenKhachHang }}</div>
-                                <small class="text-muted">{{ slotProps.data.sdtKhachHang }}</small>
-                            </div>
-                        </template>
-                    </Column>
-
-                    <Column field="soLuong" header="SL trả" style="min-width: 8rem">
-                        <template #body="slotProps">
-                            <Tag :value="slotProps.data.soLuong.toString()" severity="warning" />
-                        </template>
-                    </Column>
-
-                    <Column field="tienHoan" header="Tiền hoàn" style="min-width: 12rem">
-                        <template #body="slotProps">
-                            <span class="fw-bold text-danger">{{ formatCurrency(slotProps.data.tienHoan) }}</span>
-                        </template>
-                    </Column>
-
-                    <Column field="lyDo" header="Lý do" style="min-width: 15rem">
-                        <template #body="slotProps">
-                            <div v-if="slotProps.data.lyDo" class="reason-preview">
-                                <span class="text-muted">{{ formatReasonPreview(slotProps.data.lyDo, 30) }}</span>
-                                <Button v-if="slotProps.data.lyDo.length > 30" @click="showFullReason(slotProps.data)" link size="small" class="ms-1 p-0">
-                                    <small>xem thêm</small>
-                                </Button>
-                            </div>
-                            <span v-else class="text-muted">Không có</span>
-                        </template>
-                    </Column>
-
-                    <Column field="ngayTaoTraHang" header="Ngày yêu cầu" style="min-width: 12rem">
-                        <template #body="slotProps">
-                            <small>{{ formatDate(slotProps.data.ngayTaoTraHang) }}</small>
-                        </template>
-                    </Column>
-
-                    <Column field="trangThaiHoaDon" header="Trạng thái" style="min-width: 10rem">
-                        <template #body="slotProps">
-                            <Tag :value="getReturnStatusLabel(slotProps.data.trangThaiHoaDon)" :severity="getReturnStatusSeverity(slotProps.data.trangThaiHoaDon)" />
-                        </template>
-                    </Column>
-
-                    <Column header="Thao tác" style="min-width: 14rem">
-                        <template #body="slotProps">
-                            <div class="d-flex gap-1">
-                                <Button v-if="slotProps.data.duongDanAnh" @click="showEvidenceImage(slotProps.data)" size="small" severity="info" outlined title="Xem ảnh">
-                                    <i class="pi pi-image"></i>
-                                </Button>
-                                <Button v-if="slotProps.data.trangThaiHoaDon === 'PENDING'" @click="approveReturn(slotProps.data)" size="small" severity="success" outlined title="Chấp nhận">
-                                    <i class="pi pi-check"></i>
-                                </Button>
-                                <Button v-if="slotProps.data.trangThaiHoaDon === 'PENDING'" @click="rejectReturn(slotProps.data)" size="small" severity="danger" outlined title="Từ chối">
-                                    <i class="pi pi-times"></i>
-                                </Button>
-                                <Button @click="viewProductReturnHistory(slotProps.data)" size="small" outlined title="Lịch sử">
-                                    <i class="pi pi-history"></i>
-                                </Button>
-                            </div>
-                        </template>
-                    </Column>
-
-                    <template #empty>
-                        <div class="py-5 text-center">
-                            <i class="pi pi-box text-muted display-1 mb-3"></i>
-                            <h5 class="text-muted mb-2">Không tìm thấy sản phẩm trả về</h5>
-                            <p class="text-muted">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
                         </div>
-                    </template>
-                </DataTable>
+
+                        <!-- Product Information -->
+                        <div class="product-info-section">
+                            <div class="product-image-wrapper">
+                                <img 
+                                    :src="createImageUrl(returnItem.hinhAnhSanPham) || getPlaceholderImage()" 
+                                    :alt="returnItem.tenSanPham" 
+                                    class="product-image"
+                                    @error="handleImageError"
+                                />
+                                <div v-if="returnItem.duongDanAnh" class="evidence-badge" @click="showEvidenceImage(returnItem)">
+                                    <i class="pi pi-camera"></i>
+                                    <span>Có ảnh</span>
+                                </div>
+                            </div>
+                            <div class="product-details">
+                                <h6 class="product-name">{{ returnItem.tenSanPham }}</h6>
+                                <div class="product-code">
+                                    <i class="pi pi-tag me-1"></i>
+                                    {{ returnItem.maSanPham }}
+                                </div>
+                                <div class="product-attributes">
+                                    <Tag v-if="returnItem.mauSac" :value="returnItem.mauSac" severity="info" size="small" />
+                                    <Tag v-if="returnItem.kichThuoc" :value="returnItem.kichThuoc" severity="success" size="small" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Order & Customer Info -->
+                        <div class="order-customer-section">
+                            <div class="order-info">
+                                <div class="info-item">
+                                    <i class="pi pi-file text-primary"></i>
+                                    <span class="info-label">Đơn hàng:</span>
+                                    <Tag :value="returnItem.maHoaDon" severity="secondary" />
+                                </div>
+                                <div class="info-item">
+                                    <i class="pi pi-user text-success"></i>
+                                    <span class="info-label">Khách hàng:</span>
+                                    <div class="customer-info">
+                                        <span class="customer-name">{{ returnItem.tenKhachHang }}</span>
+                                        <small v-if="returnItem.sdtKhachHang" class="customer-phone">{{ returnItem.sdtKhachHang }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Return Details -->
+                        <div class="return-details-section">
+                            <div class="detail-grid">
+                                <div class="detail-item quantity">
+                                    <div class="detail-icon">
+                                        <i class="pi pi-shopping-cart"></i>
+                                    </div>
+                                    <div class="detail-content">
+                                        <span class="detail-label">Số lượng trả</span>
+                                        <span class="detail-value">{{ returnItem.soLuong }}</span>
+                                    </div>
+                                </div>
+                                <div class="detail-item refund">
+                                    <div class="detail-icon">
+                                        <i class="pi pi-money-bill"></i>
+                                    </div>
+                                    <div class="detail-content">
+                                        <span class="detail-label">Tiền hoàn</span>
+                                        <span class="detail-value price">{{ formatCurrency(returnItem.tienHoan) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Return Reason -->
+                        <div v-if="returnItem.lyDo" class="reason-section">
+                            <div class="reason-header">
+                                <i class="pi pi-comment text-warning"></i>
+                                <span class="reason-title">Lý do trả hàng</span>
+                            </div>
+                            <div class="reason-content">
+                                <p class="reason-text">{{ formatReasonPreview(returnItem.lyDo, 100) }}</p>
+                                <Button v-if="returnItem.lyDo.length > 100" @click="showFullReason(returnItem)" link size="small" class="p-0">
+                                    <small>Xem đầy đủ</small>
+                                </Button>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="actions-section">
+                            <div class="action-buttons">
+                                <Button v-if="returnItem.duongDanAnh" @click="showEvidenceImage(returnItem)" size="small" severity="info" outlined title="Xem ảnh minh chứng">
+                                    <i class="pi pi-image me-1"></i>
+                                    Xem ảnh
+                                </Button>
+                                <Button v-if="returnItem.trangThaiHoaDon === 'PENDING'" @click="approveReturn(returnItem)" size="small" severity="success" title="Chấp nhận">
+                                    <i class="pi pi-check me-1"></i>
+                                    Duyệt
+                                </Button>
+                                <Button v-if="returnItem.trangThaiHoaDon === 'PENDING'" @click="rejectReturn(returnItem)" size="small" severity="danger" outlined title="Từ chối">
+                                    <i class="pi pi-times me-1"></i>
+                                    Từ chối
+                                </Button>
+                                <Button @click="viewProductReturnHistory(returnItem)" size="small" outlined title="Lịch sử">
+                                    <i class="pi pi-history me-1"></i>
+                                    Lịch sử
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div v-if="filteredReturnedProducts.length > itemsPerPage" class="pagination-section">
+                    <Paginator 
+                        v-model:first="currentPage" 
+                        :rows="itemsPerPage" 
+                        :totalRecords="filteredReturnedProducts.length"
+                        :rowsPerPageOptions="[10, 25, 50, 100]"
+                        template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                        currentPageReportTemplate="Hiển thị {first} đến {last} trong tổng số {totalRecords} yêu cầu"
+                    />
+                </div>
+
+                <!-- Empty State -->
+                <div v-if="filteredReturnedProducts.length === 0" class="empty-state">
+                    <div class="empty-content">
+                        <i class="pi pi-box text-muted"></i>
+                        <h5 class="empty-title">Không tìm thấy yêu cầu trả hàng</h5>
+                        <p class="empty-description">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem kết quả khác.</p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1645,6 +1707,333 @@ onMounted(() => {
     backdrop-filter: blur(2px);
 }
 
+/* Return Items Grid Layout */
+.return-items-container {
+    padding: 1rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.section-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.return-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.return-item-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.return-item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+}
+
+.return-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.return-index {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.return-meta h6 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.return-date {
+    font-size: 0.85rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+}
+
+.product-info-section {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.product-image-wrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.product-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid #e2e8f0;
+}
+
+.evidence-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #fbbf24;
+    color: white;
+    border-radius: 12px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.evidence-badge:hover {
+    background: #f59e0b;
+    transform: scale(1.05);
+}
+
+.product-details {
+    flex: 1;
+}
+
+.product-name {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.product-code {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.product-attributes {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.order-customer-section {
+    margin-bottom: 1rem;
+}
+
+.order-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.info-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    min-width: 80px;
+}
+
+.customer-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.customer-name {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.customer-phone {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.return-details-section {
+    margin-bottom: 1rem;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.detail-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #64748b;
+}
+
+.detail-item.quantity .detail-icon {
+    background: #dbeafe;
+    color: #3b82f6;
+}
+
+.detail-item.refund .detail-icon {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.detail-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.detail-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.detail-value {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.detail-value.price {
+    color: #dc2626;
+}
+
+.reason-section {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #fef3c7;
+    border-radius: 8px;
+    border: 1px solid #fbbf24;
+}
+
+.reason-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.reason-title {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.reason-text {
+    margin: 0;
+    line-height: 1.5;
+    color: #374151;
+}
+
+.actions-section {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 1rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.pagination-section {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+.empty-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+}
+
+.empty-content {
+    text-align: center;
+    color: #64748b;
+}
+
+.empty-content i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #374151;
+}
+
+.empty-description {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
 /* Status indicators */
 .status-pending {
     background: linear-gradient(135deg, #fff3cd, #ffeaa7);
@@ -1663,6 +2052,29 @@ onMounted(() => {
 
 /* Responsive design */
 @media (max-width: 768px) {
+    .return-items-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .product-info-section {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+        justify-content: center;
+    }
+
     .return-item-card {
         margin-bottom: 1rem;
     }

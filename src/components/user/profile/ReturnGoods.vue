@@ -43,6 +43,11 @@ const showQuickEditModal = ref(false);
 const showReturnHistoryModal = ref(false);
 const showOrderDetailModal = ref(false);
 const showConfirmSubmitModal = ref(false);
+const showEvidenceViewer = ref(false);
+
+// Evidence viewer states
+const selectedEvidenceImage = ref(null);
+const selectedEvidenceProduct = ref(null);
 
 // Selected order and products
 const selectedOrder = ref(null);
@@ -395,10 +400,19 @@ const loadExistingReturns = async (orderId) => {
         const response = await fetchWithErrorHandling(`${API_BASE_URL}/api/chi-tiet-tra-hang/by-hoa-don/${orderId}`);
 
         if (response.success && response.data) {
-            // Gộp các yêu cầu trả hàng cùng sản phẩm
-            const groupedReturns = groupReturnsByProduct(response.data);
+            // KHÔNG gộp - hiển thị từng bản ghi riêng biệt như trong database
             existingReturns.value = response.data; // Giữ nguyên để tính toán
-            returnHistory.value = groupedReturns; // Hiển thị đã gộp
+            
+            // Xử lý từng bản ghi riêng biệt, thêm ảnh minh chứng nếu có
+            returnHistory.value = response.data.map(returnItem => ({
+                ...returnItem,
+                // Xử lý ảnh minh chứng - có thể là string hoặc array
+                anhMinhChung: returnItem.duongDanAnh ? 
+                    (Array.isArray(returnItem.duongDanAnh) ? returnItem.duongDanAnh : [returnItem.duongDanAnh]) : 
+                    []
+            }));
+            
+            console.log('📋 Loaded individual return records:', returnHistory.value.length);
         } else {
             existingReturns.value = [];
             returnHistory.value = [];
@@ -1414,6 +1428,95 @@ const closeReturnHistoryModal = () => {
     returnHistory.value = [];
 };
 
+// ===== EVIDENCE VIEWER FUNCTIONS =====
+const viewEvidenceImage = (imageUrl, returnItem) => {
+    selectedEvidenceImage.value = createImageUrl(imageUrl);
+    selectedEvidenceProduct.value = returnItem;
+    showEvidenceViewer.value = true;
+};
+
+const closeEvidenceViewer = () => {
+    showEvidenceViewer.value = false;
+    selectedEvidenceImage.value = null;
+    selectedEvidenceProduct.value = null;
+};
+
+// ===== RETURN HISTORY STATISTICS =====
+const getTotalRefundAmount = () => {
+    return returnHistory.value.reduce((total, item) => total + (item.tienHoan || 0), 0);
+};
+
+const getPendingReturnsCount = () => {
+    return returnHistory.value.filter(item => item.trangThaiHoaDon === 'PENDING').length;
+};
+
+const getApprovedReturnsCount = () => {
+    return returnHistory.value.filter(item => item.trangThaiHoaDon === 'APPROVED').length;
+};
+
+const getRejectedReturnsCount = () => {
+    return returnHistory.value.filter(item => item.trangThaiHoaDon === 'REJECTED').length;
+};
+
+// Tổng số lượng sản phẩm trả (từng bản ghi riêng biệt)
+const getTotalReturnQuantity = () => {
+    return returnHistory.value.reduce((total, item) => total + (item.soLuong || 0), 0);
+};
+
+// ===== EXPORT FUNCTION =====
+const exportReturnHistory = () => {
+    try {
+        const headers = ['STT', 'Mã yêu cầu', 'Sản phẩm', 'Số lượng', 'Tiền hoàn', 'Lý do', 'Trạng thái', 'Ngày tạo'];
+        const csvData = returnHistory.value.map((item, index) => [
+            index + 1,
+            item.maChiTietTraHang,
+            item.tenSanPham,
+            item.soLuong,
+            item.tienHoan || 0,
+            item.lyDo || 'Không có',
+            getReturnStatusLabel(item.trangThaiHoaDon),
+            formatDate(item.ngayTaoTraHang)
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...csvData.map(row => row.map(field => `"${field}"`).join(','))
+        ].join('\n');
+
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const filename = `LichSu_TraHang_${selectedOrder.value?.maHoaDon}_${dateStr}.csv`;
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.add({
+            severity: 'success',
+            summary: 'Xuất báo cáo thành công',
+            detail: `Đã xuất lịch sử trả hàng của đơn ${selectedOrder.value?.maHoaDon}`,
+            life: 3000
+        });
+    } catch (error) {
+        console.error('Error exporting return history:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi xuất báo cáo',
+            detail: 'Có lỗi xảy ra khi xuất file',
+            life: 3000
+        });
+    }
+};
+
 // ===== DEBUG FUNCTION =====
 const debugReturnLogic = (product) => {
     console.group(`🔍 Debug Return Logic: ${product.tenSanPham}`);
@@ -2168,51 +2271,181 @@ onMounted(() => {
         </Dialog>
 
         <!-- Return History Modal -->
-        <Dialog v-model:visible="showReturnHistoryModal" modal :style="{ width: '800px', maxHeight: '90vh' }">
+        <Dialog v-model:visible="showReturnHistoryModal" modal :style="{ width: '1000px', maxHeight: '90vh' }">
             <template #header>
                 <div class="modal-header">
                     <i class="pi pi-history text-info mr-2"></i>
                     <span>Lịch sử trả hàng - {{ selectedOrder?.maHoaDon }}</span>
+                    <Badge v-if="returnHistory.length > 0" :value="returnHistory.length.toString()" class="ml-2" />
                 </div>
             </template>
 
             <div class="return-history-content">
-                <div v-if="returnHistory.length === 0" class="no-returns">
+                <div v-if="isLoadingReturns" class="loading-returns">
+                    <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="6" />
+                    <p class="loading-text">Đang tải lịch sử trả hàng...</p>
+                </div>
+
+                <div v-else-if="returnHistory.length === 0" class="no-returns">
                     <i class="pi pi-info-circle text-info"></i>
                     <p>Chưa có yêu cầu trả hàng nào cho đơn hàng này</p>
                 </div>
 
                 <div v-else class="returns-list">
-                    <div v-for="returnItem in returnHistory" :key="returnItem.id" class="return-item-card">
-                        <div class="return-item-header">
-                            <div class="return-info">
-                                <h5 class="return-code">{{ returnItem.maChiTietTraHang }}</h5>
-                                <p class="return-date">{{ formatDate(returnItem.ngayTaoTraHang) }}</p>
+                    <!-- Summary Stats -->
+                    <div class="return-summary mb-4">
+                        <div class="summary-card">
+                            <div class="summary-item">
+                                <span class="summary-label">Tổng yêu cầu trả:</span>
+                                <span class="summary-value">{{ returnHistory.length }} yêu cầu</span>
                             </div>
-                            <div class="return-status">
-                                <Tag :value="getReturnStatusLabel(returnItem.trangThaiHoaDon)" :severity="getReturnStatusSeverity(returnItem.trangThaiHoaDon)" />
+                            <div class="summary-item">
+                                <span class="summary-label">Tổng số lượng:</span>
+                                <span class="summary-value">{{ getTotalReturnQuantity() }} sản phẩm</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Tổng tiền hoàn:</span>
+                                <span class="summary-value price">{{ formatCurrency(getTotalRefundAmount()) }}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Trạng thái:</span>
+                                <div class="status-badges">
+                                    <Tag v-if="getPendingReturnsCount() > 0" :value="`${getPendingReturnsCount()} chờ xử lý`" severity="warning" />
+                                    <Tag v-if="getApprovedReturnsCount() > 0" :value="`${getApprovedReturnsCount()} đã duyệt`" severity="success" />
+                                    <Tag v-if="getRejectedReturnsCount() > 0" :value="`${getRejectedReturnsCount()} từ chối`" severity="danger" />
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="return-item-details">
-                            <div class="product-mini-info">
-                                <img :src="createImageUrl(returnItem.hinhAnh) || getPlaceholderImage({ tenSanPham: returnItem.tenSanPham })" :alt="returnItem.tenSanPham" class="product-mini-img" @error="handleImageError" />
-                                <div class="product-mini-details">
-                                    <h6 class="product-mini-name">{{ returnItem.tenSanPham }}</h6>
-                                    <div class="product-mini-attrs">
-                                        <span>{{ returnItem.mauSac }} - {{ returnItem.kichThuoc }}</span>
+                    <!-- Individual Return Items -->
+                    <div class="individual-returns">
+                        <h6 class="section-title">
+                            <i class="pi pi-list mr-2"></i>
+                            Chi tiết từng yêu cầu trả hàng ({{ returnHistory.length }} yêu cầu)
+                        </h6>
+                        
+                        <div class="return-items-grid">
+                            <div v-for="(returnItem, index) in returnHistory" :key="returnItem.id" class="return-item-card enhanced">
+                                <!-- Card Header -->
+                                <div class="return-item-header">
+                                    <div class="return-info">
+                                        <div class="return-number">
+                                            <i class="pi pi-hashtag"></i>
+                                            <span>{{ index + 1 }}</span>
+                                        </div>
+                                        <div class="return-meta">
+                                            <h6 class="return-code">{{ returnItem.maChiTietTraHang }}</h6>
+                                            <p class="return-date">{{ formatDate(returnItem.ngayTaoTraHang) }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="return-status">
+                                        <Tag :value="getReturnStatusLabel(returnItem.trangThaiHoaDon)" :severity="getReturnStatusSeverity(returnItem.trangThaiHoaDon)" />
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="return-quantities">
-                                <div class="quantity-item">
-                                    <span class="quantity-label">Số lượng trả:</span>
-                                    <span class="quantity-value">{{ returnItem.soLuong }}</span>
+                                <!-- Product Information -->
+                                <div class="product-section">
+                                    <div class="product-image-container">
+                                        <img 
+                                            :src="createImageUrl(returnItem.hinhAnh) || getPlaceholderImage({ tenSanPham: returnItem.tenSanPham })" 
+                                            :alt="returnItem.tenSanPham" 
+                                            class="product-image" 
+                                            @error="handleImageError"
+                                        />
+                                    </div>
+                                    <div class="product-details">
+                                        <h6 class="product-name">{{ returnItem.tenSanPham }}</h6>
+                                        <div class="product-attributes">
+                                            <Tag v-if="returnItem.mauSac" :value="returnItem.mauSac" severity="info" size="small" />
+                                            <Tag v-if="returnItem.kichThuoc" :value="returnItem.kichThuoc" severity="success" size="small" />
+                                        </div>
+                                        <div class="product-code">
+                                            <small class="text-muted">Mã SP: {{ returnItem.maSanPham || 'N/A' }}</small>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="quantity-item">
-                                    <span class="quantity-label">Tiền hoàn:</span>
-                                    <span class="quantity-value price">{{ formatCurrency(returnItem.tienHoan || 0) }}</span>
+
+                                <!-- Return Details -->
+                                <div class="return-details-section">
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="pi pi-shopping-cart text-primary"></i>
+                                            <span class="detail-label">Số lượng trả:</span>
+                                            <span class="detail-value">{{ returnItem.soLuong }}</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <i class="pi pi-money-bill text-success"></i>
+                                            <span class="detail-label">Tiền hoàn:</span>
+                                            <span class="detail-value price">{{ formatCurrency(returnItem.tienHoan || 0) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Evidence Images Section -->
+                                <div v-if="returnItem.anhMinhChung && returnItem.anhMinhChung.length > 0" class="evidence-section">
+                                    <div class="evidence-header">
+                                        <i class="pi pi-camera text-info"></i>
+                                        <span class="evidence-title">Ảnh minh chứng ({{ returnItem.anhMinhChung.length }})</span>
+                                    </div>
+                                    <div class="evidence-gallery">
+                                        <div 
+                                            v-for="(image, imgIndex) in returnItem.anhMinhChung" 
+                                            :key="imgIndex" 
+                                            class="evidence-item"
+                                            @click="viewEvidenceImage(image, returnItem)"
+                                        >
+                                            <img 
+                                                :src="createImageUrl(image)" 
+                                                :alt="`Ảnh minh chứng ${imgIndex + 1}`" 
+                                                class="evidence-thumbnail"
+                                                @error="handleImageError"
+                                            />
+                                            <div class="evidence-overlay">
+                                                <i class="pi pi-eye"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Reason Section -->
+                                <div v-if="returnItem.lyDo" class="reason-section">
+                                    <div class="reason-header">
+                                        <i class="pi pi-comment text-warning"></i>
+                                        <span class="reason-title">Lý do trả hàng</span>
+                                    </div>
+                                    <div class="reason-content">
+                                        <p class="reason-text">{{ returnItem.lyDo }}</p>
+                                    </div>
+                                </div>
+
+                                <!-- Additional Notes -->
+                                <div v-if="returnItem.ghiChu" class="notes-section">
+                                    <div class="notes-header">
+                                        <i class="pi pi-file-edit text-secondary"></i>
+                                        <span class="notes-title">Ghi chú</span>
+                                    </div>
+                                    <div class="notes-content">
+                                        <p class="notes-text">{{ returnItem.ghiChu }}</p>
+                                    </div>
+                                </div>
+
+                                <!-- Processing Timeline -->
+                                <div class="timeline-section">
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker created"></div>
+                                        <div class="timeline-content">
+                                            <span class="timeline-label">Tạo yêu cầu</span>
+                                            <span class="timeline-date">{{ formatDate(returnItem.ngayTaoTraHang) }}</span>
+                                        </div>
+                                    </div>
+                                    <div v-if="returnItem.ngayXuLy" class="timeline-item">
+                                        <div class="timeline-marker processed"></div>
+                                        <div class="timeline-content">
+                                            <span class="timeline-label">Đã xử lý</span>
+                                            <span class="timeline-date">{{ formatDate(returnItem.ngayXuLy) }}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2221,7 +2454,37 @@ onMounted(() => {
             </div>
 
             <template #footer>
-                <Button @click="closeReturnHistoryModal" outlined>
+                <div class="modal-footer-actions">
+                    <Button @click="exportReturnHistory" severity="info" outlined>
+                        <i class="pi pi-download mr-1"></i>
+                        Xuất báo cáo
+                    </Button>
+                    <Button @click="closeReturnHistoryModal" outlined>
+                        <i class="pi pi-times mr-1"></i>
+                        Đóng
+                    </Button>
+                </div>
+            </template>
+        </Dialog>
+
+        <!-- Evidence Image Viewer Modal -->
+        <Dialog v-model:visible="showEvidenceViewer" modal :style="{ width: '800px' }" header="Xem ảnh minh chứng">
+            <div v-if="selectedEvidenceImage" class="evidence-viewer">
+                <div class="evidence-info mb-3">
+                    <h6>{{ selectedEvidenceProduct?.tenSanPham }}</h6>
+                    <p class="text-muted">Mã yêu cầu: {{ selectedEvidenceProduct?.maChiTietTraHang }}</p>
+                </div>
+                <div class="evidence-image-container">
+                    <img 
+                        :src="selectedEvidenceImage" 
+                        alt="Ảnh minh chứng" 
+                        class="evidence-full-image"
+                        @error="handleImageError"
+                    />
+                </div>
+            </div>
+            <template #footer>
+                <Button @click="closeEvidenceViewer" outlined>
                     <i class="pi pi-times mr-1"></i>
                     Đóng
                 </Button>
@@ -3933,12 +4196,418 @@ onMounted(() => {
     border-radius: 4px !important;
 }
 
+/* Enhanced Return History Styles */
+.return-summary {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+.summary-card {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.summary-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.summary-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.summary-value.price {
+    color: #dc2626;
+}
+
+.status-badges {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.return-items-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.return-item-card.enhanced {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+.return-item-card.enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+}
+
+.return-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.return-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.return-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.return-meta h6 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.return-meta p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.product-section {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.product-image-container {
+    flex-shrink: 0;
+}
+
+.product-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.product-image:hover {
+    border-color: #3b82f6;
+    transform: scale(1.05);
+}
+
+.product-details {
+    flex: 1;
+}
+
+.product-name {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.product-attributes {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.product-code {
+    margin-top: 0.5rem;
+}
+
+.return-details-section {
+    margin-bottom: 1rem;
+}
+
+.detail-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.detail-label {
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.detail-value {
+    font-weight: 600;
+    color: #1e293b;
+    margin-left: auto;
+}
+
+.detail-value.price {
+    color: #dc2626;
+}
+
+.evidence-section {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #fefce8;
+    border-radius: 8px;
+    border: 1px solid #fde047;
+}
+
+.evidence-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.evidence-title {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.evidence-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.75rem;
+}
+
+.evidence-item {
+    position: relative;
+    cursor: pointer;
+    border-radius: 6px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.evidence-item:hover {
+    transform: scale(1.05);
+}
+
+.evidence-thumbnail {
+    width: 100%;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 2px solid #fde047;
+    transition: all 0.3s ease;
+}
+
+.evidence-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    border-radius: 6px;
+}
+
+.evidence-item:hover .evidence-overlay {
+    opacity: 1;
+}
+
+.evidence-overlay i {
+    color: white;
+    font-size: 1.25rem;
+}
+
+.reason-section, .notes-section {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #fef3c7;
+    border-radius: 8px;
+    border: 1px solid #fbbf24;
+}
+
+.reason-header, .notes-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.reason-title, .notes-title {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.reason-text, .notes-text {
+    margin: 0;
+    line-height: 1.5;
+    color: #374151;
+}
+
+.timeline-section {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f1f5f9;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.timeline-marker {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.timeline-marker.created {
+    background: #3b82f6;
+}
+
+.timeline-marker.processed {
+    background: #10b981;
+}
+
+.timeline-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.timeline-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.timeline-date {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.modal-footer-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+/* Evidence Viewer Modal */
+.evidence-viewer {
+    text-align: center;
+}
+
+.evidence-info h6 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.evidence-image-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.evidence-full-image {
+    max-width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .page-title {
         font-size: 2rem;
     }
-
+    
+    .summary-card {
+        grid-template-columns: 1fr;
+    }
+    
+    .return-items-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .product-section {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .detail-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .evidence-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    }
+    
+    .timeline-section {
+        flex-direction: column;
+    }
+    
+    .modal-footer-actions {
+        flex-direction: column;
+    }
+    
     .header-content {
         flex-direction: column;
         align-items: flex-start;
