@@ -4,6 +4,15 @@ const danhSachTinh = ref([]);
 const danhSachXa = ref([]);
 const loadingAddress = ref(false);
 const voucherDaApDung = ref(null);
+const stockReservations = ref(new Map()); // Map để theo dõi các reservation
+const stockLocks = ref(new Map()); // Map để theo dõi các lock
+const reservationTimeouts = ref(new Map()); // Map để theo dõi timeout
+const RESERVATION_TIMEOUT = 5 * 60 * 1000; // 5 phút
+const STOCK_CHECK_INTERVAL = 30 * 1000; // 30 giây check stock
+const stockCheckInterval = ref(null);
+const chiTietVoucherDaApDung = ref([]);
+const loadingChiTietVoucher = ref(false);
+const showVoucherDetailModal = ref(false);
 // Load jsQR từ CDN
 const loadJsQRFromCDN = () => {
     return new Promise((resolve, reject) => {
@@ -40,6 +49,8 @@ export default {
     setup() {
         // =================== CONSTANTS ===================
         const API_BASE_URL = 'http://localhost:8080/api/ban-hang';
+        // Voucher detail APIs live under /api/chi-tiet-voucher (not under /api/ban-hang)
+        const API_VOUCHER_URL = 'http://localhost:8080/api/chi-tiet-voucher';
 
         // =================== REFS ===================
         const nhanVienInfo = ref({
@@ -318,6 +329,70 @@ export default {
             }
         };
 
+        const layChiTietVoucherDaApDung = async (hoaDonId) => {
+            if (!hoaDonId) return;
+
+            loadingChiTietVoucher.value = true;
+            try {
+                const data = await apiCall(`${API_VOUCHER_URL}/hoa-don/${hoaDonId}`);
+                if (data.success) {
+                    chiTietVoucherDaApDung.value = data.data || [];
+                    console.log('✅ Chi tiết voucher loaded:', chiTietVoucherDaApDung.value);
+                } else {
+                    chiTietVoucherDaApDung.value = [];
+                }
+            } catch (error) {
+                console.error('❌ Lỗi lấy chi tiết voucher:', error);
+                chiTietVoucherDaApDung.value = [];
+                showToastMessage('Lỗi tải chi tiết voucher', 'error');
+            } finally {
+                loadingChiTietVoucher.value = false;
+            }
+        };
+
+        // Xem chi tiết voucher đã áp dụng
+        const xemChiTietVoucherDaApDung = async () => {
+            if (!hoaDonDangChon.value?.id) {
+                showToastMessage('Chưa chọn hóa đơn', 'warning');
+                return;
+            }
+
+            await layChiTietVoucherDaApDung(hoaDonDangChon.value.id);
+            showVoucherDetailModal.value = true;
+        };
+
+        // Lấy tất cả chi tiết voucher cho danh sách hóa đơn
+        const layTatCaChiTietVoucher = async () => {
+            try {
+                const data = await apiCall(`${API_VOUCHER_URL}`);
+                if (data.success) {
+                    return data.data || [];
+                }
+                return [];
+            } catch (error) {
+                console.error('❌ Lỗi lấy tất cả chi tiết voucher:', error);
+                return [];
+            }
+        };
+
+        // Format thông tin voucher cho hiển thị
+        const formatVoucherInfo = (voucherDetail) => {
+            if (!voucherDetail) return {};
+
+            return {
+                tenVoucher: voucherDetail.tenVoucher || 'N/A',
+                maVoucher: voucherDetail.maVoucher || 'N/A',
+                loaiGiamGia: voucherDetail.loaiGiamGia,
+                giaTriGiam: voucherDetail.giaTriGiam || 0,
+                soTienGiam: voucherDetail.soTienGiam || 0,
+                giaTriDonHang: voucherDetail.giaTriDonHang || 0,
+                thanhTien: voucherDetail.thanhTien || 0,
+                ngayApDung: voucherDetail.ngayApDung,
+                phanTramGiam: voucherDetail.loaiGiamGia === 'PHAN_TRAM' ? voucherDetail.giaTriGiam : null,
+                tienGiam: voucherDetail.loaiGiamGia === 'TIEN_MAT' ? voucherDetail.giaTriGiam : null
+            };
+        };
+
         // ===== CẬP NHẬT HÀM TẠO ĐỊA CHỈ ĐẦY ĐỦ =====
         const taoDialChiDayDu = () => {
             try {
@@ -491,6 +566,30 @@ export default {
             thongTinThanhToan.value.phuongThucThanhToan = 'CHUYEN_KHOAN';
         };
 
+        // ===== KIỂM TRA TỒN KHO TRƯỚC KHI THANH TOÁN =====
+        const kiemTraTonKhoTruocThanhToan = async () => {
+            try {
+                if (!hoaDonDangChon.value?.id) return { ok: false, conflicts: [] };
+
+                // Gọi API kiểm tra tồn kho mới nhất trước khi thanh toán
+                const res = await apiCall(`${API_BASE_URL}/hoa-don-cho/${hoaDonDangChon.value.id}/kiem-tra-ton-kho`);
+
+                if (!res || !Array.isArray(res)) {
+                    // Một số backend có thể trả object; fallback đọc res.data nếu có
+                    const list = Array.isArray(res?.data) ? res.data : [];
+                    const conflicts = list.filter((i) => i && i.coTheban === false);
+                    return { ok: conflicts.length === 0, conflicts };
+                }
+
+                const conflicts = res.filter((i) => i && i.coTheban === false);
+                return { ok: conflicts.length === 0, conflicts };
+            } catch (err) {
+                console.warn('Không thể kiểm tra tồn kho trước thanh toán:', err);
+                // Thận trọng: nếu lỗi mạng, để người dùng thử lại thay vì tiếp tục thanh toán mù
+                return { ok: false, conflicts: [], error: err };
+            }
+        };
+
         // ===== CẬP NHẬT HÀM XỬ LÝ THANH TOÁN =====
         const xuLyThanhToan = async () => {
             if (loadingPayment.value) return;
@@ -498,6 +597,25 @@ export default {
             try {
                 if (!hoaDonDangChon.value?.id) {
                     showToastMessage('Chưa chọn hóa đơn để thanh toán', 'error');
+                    return;
+                }
+
+                // 1) Kiểm tra tồn kho lần cuối trước khi gửi thanh toán
+                const check = await kiemTraTonKhoTruocThanhToan();
+                if (!check.ok) {
+                    // Làm tươi lại chi tiết hóa đơn để đồng bộ UI với tồn kho thực tế
+                    try {
+                        await layDanhSachHoaDonCho?.();
+                        // Nếu có API lấy chi tiết một hóa đơn: có thể gọi lại để sync panel phải
+                        // await layChiTietHoaDonCho(hoaDonDangChon.value.id);
+                    } catch {}
+
+                    if (check.conflicts && check.conflicts.length > 0) {
+                        const tenSp = check.conflicts.map(c => `${c.tenSanPham || 'Sản phẩm'} (${c.kichCo || ''} ${c.mauSac || ''})`).join(', ');
+                        showToastMessage(`Một số sản phẩm không đủ tồn kho: ${tenSp}. Vui lòng cập nhật hóa đơn trước khi thanh toán.`, 'error');
+                    } else {
+                        showToastMessage('Không thể kiểm tra tồn kho. Vui lòng thử lại.', 'error');
+                    }
                     return;
                 }
 
@@ -510,15 +628,27 @@ export default {
 
                 loadingPayment.value = true;
 
-                // Chuẩn bị dữ liệu cho API mới
+                // ✅ SỬ DỤNG TRỰC TIẾP GIÁ TRỊ ĐÃ TÍNH TỪ COMPUTED tongQuan
+                const tongTienCanThanhToan = tinhTongThanhToan(); // Đã bao gồm voucher và điểm
+
+                // Lấy thông tin chi tiết để gửi lên server
+                const tienGiamVoucher = tongQuan.value.tongTienVoucher;
+                const diemSuDung = Number(thongTinThanhToan.value.diemSuDung) || 0;
+                const giaTriDiem = diemSuDung * 1000;
+
+                // Chuẩn bị dữ liệu cho API - GỬI ĐẦY ĐỦ THÔNG TIN ĐỂ BACKEND TỰ TÍNH
                 const requestData = {
                     phuongThucThanhToan: phuongThucThanhToanHienTai.value,
                     loaiHoaDon: 'OFFLINE',
-                    ghiChu: String(thongTinThanhToan.value.ghiChu || '').trim()
+                    ghiChu: String(thongTinThanhToan.value.ghiChu || '').trim(),
+                    // ✅ THÊM CÁC FIELD TÍNH TOÁN
+                    tongTienHang: tongQuan.value.tongTienKhuyenMai, // 2.5 triệu
+                    tienGiamVoucher: tienGiamVoucher, // 200k
+                    tongSauVoucher: tongQuan.value.tongTienThanhToan, // 2.3 triệu
+                    tongThanhToan: tongTienCanThanhToan // 2.3 triệu (sau khi trừ điểm)
                 };
 
                 // Thêm số tiền theo phương thức
-                // Chỉ gửi đúng field theo phương thức
                 if (phuongThucThanhToanHienTai.value === 'TIEN_MAT') {
                     requestData.tienMat = Number(thongTinThanhToan.value.tienMat);
                 } else if (phuongThucThanhToanHienTai.value === 'CHUYEN_KHOAN') {
@@ -535,9 +665,9 @@ export default {
 
                 if (voucher.value?.id) {
                     requestData.voucherId = Number(voucher.value.id);
+                    requestData.tienGiamVoucher = tienGiamVoucher; // ✅ Gửi số tiền giảm voucher
                 }
 
-                const diemSuDung = Number(thongTinThanhToan.value.diemSuDung) || 0;
                 if (diemSuDung > 0) {
                     const maxDiem = khachHang.value?.diemTichLuy || 0;
                     if (diemSuDung > maxDiem) {
@@ -546,9 +676,16 @@ export default {
                         return;
                     }
                     requestData.diemSuDung = diemSuDung;
+                    requestData.giaTriDiem = giaTriDiem; // ✅ Gửi giá trị quy đổi điểm
                 }
 
-                console.log('🔍 Request data:', requestData);
+                console.log('🔍 Debug payment calculation:');
+                console.log('- Tổng tiền hàng:', tongQuan.value.tongTienKhuyenMai);
+                console.log('- Tiền giảm voucher:', tienGiamVoucher);
+                console.log('- Tổng sau voucher:', tongQuan.value.tongTienThanhToan);
+                console.log('- Điểm sử dụng:', diemSuDung, 'x 1000 =', giaTriDiem);
+                console.log('- Tổng cần thanh toán:', tongTienCanThanhToan);
+                console.log('🔍 Request data with voucher info:', requestData);
 
                 // Gọi API thanh toán chi tiết
                 const data = await apiCall(`${API_BASE_URL}/hoa-don-cho/${hoaDonDangChon.value.id}/thanh-toan-chi-tiet`, {
@@ -562,7 +699,13 @@ export default {
                     // Lưu thông tin cho in hóa đơn
                     hoaDonDaThanhToan.value = responseData;
                     sanPhamDaThanhToan.value = [...sanPhamDaChon.value];
-                    tongQuanDaThanhToan.value = { ...tongQuan.value };
+
+                    // ✅ LƯU TỔNG QUAN VỚI SỐ TIỀN ĐÚNG
+                    tongQuanDaThanhToan.value = {
+                        ...tongQuan.value,
+                        tongTienThanhToan: tongTienCanThanhToan // Số tiền đã trừ voucher
+                    };
+
                     voucherDaThanhToan.value = voucher.value ? { ...voucher.value } : null;
 
                     // Lưu thông tin thanh toán chi tiết
@@ -576,7 +719,7 @@ export default {
                         voucherInfo: responseData.tenVoucher
                             ? {
                                   tenVoucher: responseData.tenVoucher,
-                                  giaTriGiam: responseData.giaTriGiamVoucher || 0
+                                  giaTriGiam: responseData.giaTriGiamVoucher || tienGiamVoucher
                               }
                             : null,
                         khachHangInfo: {
@@ -801,7 +944,8 @@ export default {
         };
 
         const handleImageError = (event) => {
-            event.target.src = 'https://via.placeholder.com/200x200?text=No+Image';
+            event.target.src =
+                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNmM3NTdkIj5LaW9uZyBjbyBhbmg8L3RleHQ+PC9zdmc+';
         };
 
         // =================== API FUNCTIONS ===================
@@ -814,15 +958,37 @@ export default {
                 };
 
                 const response = await fetch(url, {
+                    method: options.method || 'GET',
                     ...options,
-                    headers: headers
+                    headers: {
+                        ...headers,
+                        ...(options.headers || {})
+                    }
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const contentType = response.headers.get('content-type') || '';
+                let payload;
+                try {
+                    if (contentType.includes('application/json')) {
+                        payload = await response.json();
+                    } else {
+                        payload = await response.text();
+                    }
+                } catch (_) {
+                    // Nếu parse body thất bại, để payload = undefined
                 }
 
-                return await response.json();
+                if (!response.ok) {
+                    const detail = typeof payload === 'string' ? payload : (payload?.message || payload?.error || JSON.stringify(payload || {}));
+                    const err = new Error(`HTTP ${response.status}: ${response.statusText}${detail ? ` - ${detail}` : ''}`);
+                    // Gắn thêm thông tin để caller có thể dùng nếu cần
+                    err.status = response.status;
+                    err.statusText = response.statusText;
+                    err.payload = payload;
+                    throw err;
+                }
+
+                return payload;
             } catch (error) {
                 console.error('API Error:', error);
                 throw error;
@@ -863,9 +1029,15 @@ export default {
         const chonHoaDon = async (hoaDon) => {
             resetVoucherStateWhenChangeInvoice();
             hoaDonDangChon.value = hoaDon;
-            await layTongQuanHoaDon(hoaDon.id);
-        };
 
+            // Load thông tin hóa đơn
+            await layTongQuanHoaDon(hoaDon.id);
+
+            // Load chi tiết voucher nếu có
+            if (voucher.value) {
+                await layChiTietVoucherDaApDung(hoaDon.id);
+            }
+        };
         const layTongQuanHoaDon = async (hoaDonId) => {
             try {
                 console.log('🔄 Loading invoice summary for ID:', hoaDonId);
@@ -886,15 +1058,12 @@ export default {
                             soLuongDaChon: Number(item.soLuong) || 1,
                             giaBan: Number(item.giaBan) || 0,
                             giaGoc: Number(item.giaGoc) || Number(item.giaBan) || 0,
-                            // tồn kho hiện tại (lấy theo nhiều tên trường khả dĩ từ backend)
-                            soLuong: Number(
-                                (item.soLuongTon ??
-                                    item.soLuongTonKho ??
-                                    item.tonKho ??
-                                    item.soLuongConLai ??
-                                    item.soLuongHienTai ??
-                                    item.stock) ?? 0
-                            ),
+                            // tồn kho hiện tại (lấy theo nhiều tên trường khả dĩ từ backend). Nếu không có, đặt null để biểu thị 'không rõ'.
+                            // Tránh mặc định 0 vì sẽ khiến nút tăng số lượng bị disable dù thực tế còn hàng.
+                            soLuong: (() => {
+                                const raw = item.soLuongTon ?? item.soLuongTonKho ?? item.tonKho ?? item.soLuongConLai ?? item.soLuongHienTai ?? item.stock;
+                                return raw != null ? Number(raw) : null;
+                            })(),
                             mauSac: {
                                 tenMau: item.mauSac || 'N/A',
                                 maMau: getMauHex(item.mauSac)
@@ -1168,7 +1337,7 @@ export default {
                     showToastMessage(data.message || 'Lỗi cập nhật số lượng', 'error');
                 }
             } catch (error) {
-                showToastMessage(`Lỗi cập nhật: ${error.message}`, 'error');
+                showToastMessage(`${error.message}`, 'error');
             }
         };
 
@@ -1504,9 +1673,6 @@ export default {
                     showVoucherModal.value = false;
                     voucherCode.value = '';
                     showToastMessage(`Đã áp dụng voucher ${selectedVoucher.tenVoucher}`);
-
-                    // KHÔNG reload ngay - để voucher state được giữ
-                    console.log('✅ Voucher applied successfully, keeping state');
                 } else {
                     showToastMessage(data.message || 'Lỗi áp dụng voucher', 'error');
                 }
@@ -1523,7 +1689,8 @@ export default {
 
                 if (data.success) {
                     voucher.value = null;
-                    voucherDaApDung.value = null; // Clear cả voucher đã áp dụng
+                    voucherDaApDung.value = null;
+                    chiTietVoucherDaApDung.value = []; // ✅ Clear chi tiết voucher
                     showToastMessage('Đã bỏ voucher');
                 } else {
                     showToastMessage(data.message || 'Lỗi bỏ voucher', 'error');
@@ -1533,6 +1700,31 @@ export default {
             }
         };
 
+        const voucherHienTaiInfo = computed(() => {
+            if (!voucher.value) return null;
+
+            const chiTiet = chiTietVoucherDaApDung.value.find((cv) => cv.voucherId === voucher.value.id);
+
+            if (chiTiet) {
+                return formatVoucherInfo(chiTiet);
+            }
+
+            // Fallback sử dụng thông tin voucher gốc
+            return {
+                tenVoucher: voucher.value.tenVoucher,
+                maVoucher: voucher.value.maVoucher,
+                loaiGiamGia: voucher.value.loaiGiamGia,
+                giaTriGiam: voucher.value.giaTriGiam,
+                phanTramGiam: voucher.value.loaiGiamGia === 'PHAN_TRAM' ? voucher.value.giaTriGiam : null,
+                tienGiam: voucher.value.loaiGiamGia === 'TIEN_MAT' ? voucher.value.giaTriGiam : null
+            };
+        });
+
+        // Computed để kiểm tra có chi tiết voucher hay không
+        const coChiTietVoucher = computed(() => {
+            return chiTietVoucherDaApDung.value.length > 0;
+        });
+
         const resetVoucherStateWhenChangeInvoice = () => {
             voucher.value = null;
             voucherDaApDung.value = null;
@@ -1540,10 +1732,13 @@ export default {
 
         // =================== PAYMENT FUNCTIONS ===================
         const tinhTongThanhToan = () => {
-            let tong = tongQuan.value.tongTienThanhToan;
+            let tong = tongQuan.value.tongTienThanhToan; // Đã bao gồm voucher
+
+            // Trừ điểm tích lũy nếu có
             if (thongTinThanhToan.value.diemSuDung > 0) {
                 tong -= thongTinThanhToan.value.diemSuDung * 1000;
             }
+
             return Math.max(0, tong);
         };
 
@@ -2043,6 +2238,15 @@ export default {
             xuLyThanhToan,
             printInvoice,
 
+            chiTietVoucherDaApDung,
+            loadingChiTietVoucher,
+            showVoucherDetailModal,
+            layChiTietVoucherDaApDung,
+            xemChiTietVoucherDaApDung,
+            layTatCaChiTietVoucher,
+            formatVoucherInfo,
+            voucherHienTaiInfo,
+            coChiTietVoucher,
             // QR Scanner methods
             switchQrMode,
             startCamera,
@@ -2218,7 +2422,7 @@ export default {
                                                                 <i class="bi bi-dash"></i>
                                                             </button>
                                                             <span class="fw-bold mx-3">{{ item.soLuongDaChon }}</span>
-                                                            <button @click="tangSoLuong(item)" class="btn btn-outline-secondary btn-sm rounded-circle" style="width: 28px; height: 28px; padding: 0" :disabled="item.soLuongDaChon >= item.soLuong">
+                                                            <button @click="tangSoLuong(item)" class="btn btn-outline-secondary btn-sm rounded-circle" style="width: 28px; height: 28px; padding: 0" :disabled="Number.isFinite(item.soLuong) && item.soLuongDaChon >= item.soLuong">
                                                                 <i class="bi bi-plus"></i>
                                                             </button>
                                                         </div>
@@ -2304,6 +2508,19 @@ export default {
                                                             <i class="bi bi-tag-fill me-1"></i>
                                                             <span v-if="voucher.loaiGiamGia === 'PHAN_TRAM'"> Giảm {{ voucher.giaTriGiam }}% </span>
                                                             <span v-else> Giảm {{ formatPrice(voucher.giaTriGiam) }} </span>
+                                                        </div>
+
+                                                        <!-- ✅ THÊM: Hiển thị chi tiết voucher nếu có -->
+                                                        <div v-if="coChiTietVoucher" class="mt-2">
+                                                            <small class="text-muted">
+                                                                <i class="bi bi-info-circle me-1"></i>
+                                                                Đã áp dụng: {{ formatPrice(voucherHienTaiInfo?.soTienGiam || 0) }}
+                                                            </small>
+                                                            <br />
+                                                            <button @click="xemChiTietVoucherDaApDung" class="btn btn-outline-info btn-sm mt-1">
+                                                                <i class="bi bi-eye me-1"></i>
+                                                                Chi tiết
+                                                            </button>
                                                         </div>
                                                     </div>
                                                     <button @click="boVoucher" class="btn btn-outline-danger btn-sm">
@@ -2881,7 +3098,7 @@ export default {
                                             <i class="bi bi-dash"></i>
                                         </button>
                                         <input v-model.number="soLuongChon" type="number" min="1" :max="sanPhamDangXem.soLuong" class="form-control text-center" />
-                                        <button @click="tangSoLuongModal" :disabled="soLuongChon >= sanPhamDangXem.soLuong" class="btn btn-outline-secondary rounded-circle" style="width: 32px; height: 32px; padding: 0">
+                                        <button @click="tangSoLuongModal" :disabled="Number.isFinite(sanPhamDangXem?.soLuong) && soLuongChon >= sanPhamDangXem.soLuong" class="btn btn-outline-secondary rounded-circle" style="width: 32px; height: 32px; padding: 0">
                                             <i class="bi bi-plus"></i>
                                         </button>
                                     </div>
@@ -3196,7 +3413,6 @@ export default {
                         </div>
                     </div>
                     <div class="modal-footer no-print">
-                        <button @click="showInvoicePrint = false" class="btn btn-secondary">Đóng</button>
                         <button @click="printInvoice" class="btn btn-success">
                             <i class="bi bi-printer me-1"></i>
                             In hóa đơn
@@ -3205,6 +3421,142 @@ export default {
                 </div>
             </div>
         </div>
+
+        <!-- Voucher Detail Modal -->
+        <div v-if="showVoucherDetailModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5)">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="bi bi-ticket-detailed me-2"></i>
+                            Chi tiết voucher đã áp dụng
+                        </h5>
+                        <button @click="showVoucherDetailModal = false" class="btn-close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Loading State -->
+                        <div v-if="loadingChiTietVoucher" class="py-4 text-center">
+                            <div class="spinner-border text-primary"></div>
+                            <p class="mt-2">Đang tải chi tiết voucher...</p>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div v-else-if="chiTietVoucherDaApDung.length === 0" class="py-4 text-center">
+                            <i class="bi bi-ticket display-4 text-muted"></i>
+                            <h5 class="mt-3">Chưa áp dụng voucher nào</h5>
+                            <p class="text-muted">Hóa đơn này chưa có voucher được áp dụng</p>
+                        </div>
+
+                        <!-- Voucher Details -->
+                        <div v-else>
+                            <div v-for="(detail, index) in chiTietVoucherDaApDung" :key="detail.id || index" class="card mb-3">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="card-title text-primary">
+                                                <i class="bi bi-ticket-fill me-2"></i>
+                                                {{ detail.tenVoucher }}
+                                            </h6>
+                                            <p class="mb-2">
+                                                <strong>Mã voucher:</strong>
+                                                <code class="bg-light rounded px-2 py-1">
+                                                    {{ detail.maVoucher }}
+                                                </code>
+                                            </p>
+                                            <p class="mb-2">
+                                                <strong>Loại giảm giá:</strong>
+                                                <span v-if="detail.loaiGiamGia === 'PHAN_TRAM'" class="badge bg-warning text-dark">
+                                                    <i class="bi bi-percent me-1"></i>
+                                                    Phần trăm ({{ detail.giaTriGiam }}%)
+                                                </span>
+                                                <span v-else class="badge bg-info">
+                                                    <i class="bi bi-cash me-1"></i>
+                                                    Tiền mặt ({{ formatPrice(detail.giaTriGiam) }})
+                                                </span>
+                                            </p>
+                                            <p class="mb-0">
+                                                <strong>Ngày áp dụng:</strong>
+                                                <span class="text-muted">
+                                                    {{ formatDateTime(detail.ngayApDung) }}
+                                                </span>
+                                            </p>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <div class="bg-light rounded p-3">
+                                                <h6 class="mb-3">
+                                                    <i class="bi bi-calculator me-2"></i>
+                                                    Thông tin tính toán
+                                                </h6>
+
+                                                <div class="d-flex justify-content-between mb-2">
+                                                    <span>Giá trị đơn hàng:</span>
+                                                    <strong>{{ formatPrice(detail.giaTriDonHang) }}</strong>
+                                                </div>
+
+                                                <div class="d-flex justify-content-between text-success mb-2">
+                                                    <span>Số tiền giảm:</span>
+                                                    <strong>-{{ formatPrice(detail.soTienGiam) }}</strong>
+                                                </div>
+
+                                                <hr class="my-2" />
+
+                                                <div class="d-flex justify-content-between fw-bold h6">
+                                                    <span>Thành tiền:</span>
+                                                    <span class="text-primary">
+                                                        {{ formatPrice(detail.thanhTien) }}
+                                                    </span>
+                                                </div>
+
+                                                <!-- Hiển thị % tiết kiệm -->
+                                                <div class="mt-2">
+                                                    <small class="text-muted">
+                                                        Tiết kiệm:
+                                                        <span class="text-success fw-semibold"> {{ ((detail.soTienGiam / detail.giaTriDonHang) * 100).toFixed(1) }}% </span>
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tổng kết nếu có nhiều voucher -->
+                            <div v-if="chiTietVoucherDaApDung.length > 1" class="alert alert-info">
+                                <h6>
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Tổng kết
+                                </h6>
+                                <div class="row">
+                                    <div class="col-md-4"><strong>Tổng voucher:</strong> {{ chiTietVoucherDaApDung.length }}</div>
+                                    <div class="col-md-4">
+                                        <strong>Tổng tiết kiệm:</strong>
+                                        <span class="text-success">
+                                            {{ formatPrice(chiTietVoucherDaApDung.reduce((sum, v) => sum + (v.soTienGiam || 0), 0)) }}
+                                        </span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Thành tiền cuối:</strong>
+                                        <span class="text-primary">
+                                            {{ formatPrice(chiTietVoucherDaApDung.reduce((sum, v) => sum + (v.thanhTien || 0), 0)) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button @click="showVoucherDetailModal = false" class="btn btn-secondary">Đóng</button>
+                        <button v-if="coChiTietVoucher" @click="layChiTietVoucherDaApDung(hoaDonDangChon.id)" :disabled="loadingChiTietVoucher" class="btn btn-outline-primary">
+                            <span v-if="loadingChiTietVoucher" class="spinner-border spinner-border-sm me-2"></span>
+                            <i v-else class="bi bi-arrow-clockwise me-1"></i>
+                            {{ loadingChiTietVoucher ? 'Đang tải...' : 'Làm mới' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        */
     </div>
     <!-- Đóng toast-container -->
     <!-- Đóng main-layout -->

@@ -15,69 +15,74 @@ const router = createRouter({
             path: '/products',
             name: 'products',
             component: () => import('@/views/user/product/ProductList.vue')
-
-  },
-  {
-    path: '/card',
-    name: 'card',
-    component: () => import('@/views/user/card/Card.vue')
-},
-{
-    path: '/checkout',
-    name: 'checkout',
-    component: () => import('@/views/user/card/ThanhToan.vue')
-},
-{
-    path: '/order-success/:orderId',
-    name: 'order-success',
-    component: () => import('@/views/user/card/OrderSuccess.vue')
-},
-  {
-    path: '/product/:id',
-    name: 'product',
-    component: () => import('@/views/user/product/Product.vue')
-  },
- {
-    path: '/profile',
-    name: 'profile',
-    component: () => import('@/views/user/profile/ThongTinCaNhan.vue'),
-    meta: { requiresAuth: true }
- } ,
-  {
-    path: '/payment-return',
-    name: 'PaymentReturn',
-    component: () => import('@/views/user/card/PaymentReturn.vue')
-  },
-  {
-    path: '/profile',
-    component: () => import('@/layout/ProfileLayout.vue'), // Sử dụng ProfileLayout làm layout chính
-    redirect: '/profileInfo', // Redirect to your existing route
-    children: [
-      {
-        path: '/profileInfo', // Route: /profileInfo (absolute path)
-        name: 'profileInfo',
-        component: () => import('@/components/user/profile/ProfileInfo.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: '/profile/orders/:id',
-        name: 'OrderDetail',
-        component: () => import('@/views/user/profile/OrderDetailPage.vue')
-      },
-      {
-        path: '/profileOrders', // Route: /profileOrders
-        name: 'ProfileOrders',
-        component: () => import('@/components/user/profile/ProfileOrders .vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: '/profileAddresses', // Route: /profileAddresses
-        name: 'ProfileAddresses',
-        component: () => import('@/components/user/profile/ProfileAddresses .vue'),
-        meta: { requiresAuth: true }
-      }
-    ]
-  },
+        },
+        {
+            path: '/card',
+            name: 'card',
+            component: () => import('@/views/user/card/Card.vue')
+        },
+        {
+            path: '/checkout',
+            name: 'checkout',
+            component: () => import('@/views/user/card/ThanhToan.vue')
+        },
+        {
+            path: '/order-success/:orderId',
+            name: 'order-success',
+            component: () => import('@/views/user/card/OrderSuccess.vue')
+        },
+        {
+            path: '/product/:id',
+            name: 'product',
+            component: () => import('@/views/user/product/Product.vue')
+        },
+        {
+            path: '/profile',
+            name: 'profile',
+            component: () => import('@/views/user/profile/ThongTinCaNhan.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/payment-return',
+            name: 'PaymentReturn',
+            component: () => import('@/views/user/card/PaymentReturn.vue')
+        },
+        {
+            path: '/profile',
+            component: () => import('@/layout/ProfileLayout.vue'), // Sử dụng ProfileLayout làm layout chính
+            redirect: '/profileInfo', // Redirect to your existing route
+            children: [
+                {
+                    path: '/profileInfo', // Route: /profileInfo (absolute path)
+                    name: 'profileInfo',
+                    component: () => import('@/components/user/profile/ProfileInfo.vue'),
+                    meta: { requiresAuth: true }
+                },
+                {
+                    path: '/profile/orders/:id',
+                    name: 'OrderDetail',
+                    component: () => import('@/views/user/profile/OrderDetailPage.vue')
+                },
+                {
+                    path: '/profileOrders', // Route: /profileOrders
+                    name: 'ProfileOrders',
+                    component: () => import('@/components/user/profile/ProfileOrders .vue'),
+                    meta: { requiresAuth: true }
+                },
+                {
+                    path: '/returnGoods', // Route: /profileOrders
+                    name: 'ReturnGoods',
+                    component: () => import('@/components/user/profile/ReturnGoods.vue'),
+                    meta: { requiresAuth: true }
+                },
+                {
+                    path: '/profileAddresses', // Route: /profileAddresses
+                    name: 'ProfileAddresses',
+                    component: () => import('@/components/user/profile/ProfileAddresses .vue'),
+                    meta: { requiresAuth: true }
+                }
+            ]
+        },
 
         {
             path: '/gioithieu',
@@ -303,6 +308,11 @@ const router = createRouter({
                     name: 'BanHang',
                     path: '/ban-hang',
                     component: () => import('@/views/BanHang/BanHangView.vue')
+                },
+                {
+                    name: 'TraHang',
+                    path: '/tra-hang',
+                    component: () => import('@/views/TraHang/traHang.vue')
                 }
             ]
         },

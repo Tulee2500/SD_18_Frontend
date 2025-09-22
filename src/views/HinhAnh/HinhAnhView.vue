@@ -510,17 +510,17 @@ function exportCSV() {
             </Column>
             <Column field="maHinhAnh" header="Mã Hình Ảnh" sortable style="min-width: 12rem"></Column>
             <Column field="tenHinhAnh" header="Tên File" sortable style="min-width: 20rem"></Column>
-            <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
+            <!-- <Column field="trangThai" header="Trạng Thái" sortable style="min-width: 12rem">
                 <template #body="slotProps">
                     <Tag :value="slotProps.data.trangThai === 1 ? 'Đã load' : 'Đang load'" :severity="getStatusLabel(slotProps.data.trangThai)" />
                 </template>
-            </Column>
+            </Column> -->
             <Column :exportable="false" style="width: 12rem">
                 <template #body="slotProps">
                     <div class="flex justify-center gap-2">
                         <Button icon="pi pi-pencil" outlined rounded size="small" @click="editHinhAnh(slotProps.data)" v-tooltip.top="'Chỉnh sửa'" />
                         <Button icon="pi pi-trash" outlined rounded severity="danger" size="small" @click="confirmDeleteHinhAnh(slotProps.data)" v-tooltip.top="'Xóa'" />
-                        <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" v-tooltip.top="'Đổi trạng thái'" />
+                        <!-- <Button icon="pi pi-refresh" outlined rounded severity="secondary" size="small" @click="changeStatus(slotProps.data)" v-tooltip.top="'Đổi trạng thái'" /> -->
                     </div>
                 </template>
             </Column>
@@ -561,10 +561,10 @@ function exportCSV() {
                     </div>
                 </div>
 
-                <div>
+                <!-- <div>
                     <label for="trangThai" class="mb-3 block font-bold">Trạng Thái</label>
                     <Select id="trangThai" v-model="hinhAnh.trangThai" :options="statuses" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái" fluid />
-                </div>
+                </div> -->
             </div>
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />

@@ -126,14 +126,14 @@ onMounted(() => {
                                         <span class="font-medium">Thông tin cá nhân</span>
                                     </router-link>
 
-                                    <router-link
-                                        to="/profileOrders"
-                                        active-class="bg-orange-50 text-orange-600 border-l-4 border-orange-500"
-                                        class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-gray-600 transition-all duration-200 hover:bg-gray-50"
-                                    >
-                                        <i class="pi pi-file-text text-lg"></i>
-                                        <span class="font-medium">Hóa đơn</span>
-                                    </router-link>
+                                        <!-- <router-link
+                                            to="/profileOrders"
+                                            active-class="bg-orange-50 text-orange-600 border-l-4 border-orange-500"
+                                            class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-gray-600 transition-all duration-200 hover:bg-gray-50"
+                                        >
+                                            <i class="pi pi-file-text text-lg"></i>
+                                            <span class="font-medium">Hóa đơn</span>
+                                        </router-link> -->
 
                                     <router-link
                                         to="/profileAddresses"
@@ -142,6 +142,15 @@ onMounted(() => {
                                     >
                                         <i class="pi pi-map-marker text-lg"></i>
                                         <span class="font-medium">Địa chỉ giao hàng</span>
+                                    </router-link>
+
+                                    <router-link
+                                        to="/returnGoods"
+                                        active-class="bg-orange-50 text-orange-600 border-l-4 border-orange-500"
+                                        class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-gray-600 transition-all duration-200 hover:bg-gray-50"
+                                    >
+                                        <i class="pi pi-map-marker text-lg"></i>
+                                        <span class="font-medium">Trả hàng</span>
                                     </router-link>
 
                                     <hr class="my-4" />
