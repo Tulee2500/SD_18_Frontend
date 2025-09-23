@@ -28,8 +28,22 @@ axios.interceptors.response.use(
             // Token hết hạn hoặc không hợp lệ
             localStorage.removeItem('auth_token');
             localStorage.removeItem('user_info');
-            // Redirect về login
-            window.location.href = '/auth/login';
+
+            // Chỉ redirect về login nếu không phải trang chủ hoặc trang không cần đăng nhập
+            const currentPath = window.location.pathname;
+            const publicPaths = ['/', '/products', '/product/', '/card', '/checkout', '/order-success/', '/payment-return', '/gioithieu', '/lienhe', '/profile', '/profileInfo', '/profileOrders', '/profileAddresses'];
+
+            const isPublicPath = publicPaths.some(path => {
+                if (path.endsWith('/')) {
+                    return currentPath.startsWith(path);
+                }
+                return currentPath === path;
+            });
+
+            if (!isPublicPath) {
+                // Redirect về login
+                window.location.href = '/auth/login';
+            }
         }
         return Promise.reject(error);
     }

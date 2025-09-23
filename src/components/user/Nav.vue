@@ -75,44 +75,59 @@ const loadUserData = () => {
 // Hàm đếm số lượng sản phẩm trong giỏ hàng
 const updateCartCount = async () => {
     const token = localStorage.getItem('auth_token');
+    const userId = localStorage.getItem('user_info');
 
-    // Nếu chưa đăng nhập, set về 0
-    if (!token) {
-        cartItemCount.value = 0;
-        return;
-    }
+    if (token && userId) {
+        // User is logged in - get count from backend
+        try {
+            console.log('📦 Fetching cart count from backend...');
 
-    try {
-        console.log('📦 Fetching cart count from backend...');
+            const response = await axios.get(`${API_BASE_URL}/api/gio-hang/current`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
 
-        const response = await axios.get(`${API_BASE_URL}/api/gio-hang/current`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
+            // Response.data là array của CartItemResponse
+            if (Array.isArray(response.data)) {
+                // Tính tổng số lượng từ backend response
+                const totalQuantity = response.data.reduce((total, item) => total + (item.quantity || 0), 0);
+                cartItemCount.value = totalQuantity;
+                console.log('✅ Cart count from backend:', totalQuantity);
+            } else {
+                cartItemCount.value = 0;
             }
-        });
+        } catch (error) {
+            console.error('❌ Error fetching cart count:', error);
 
-        // Response.data là array của CartItemResponse
-        if (Array.isArray(response.data)) {
-            // Tính tổng số lượng từ backend response
-            const totalQuantity = response.data.reduce((total, item) => total + (item.quantity || 0), 0);
-            cartItemCount.value = totalQuantity;
-            console.log('✅ Cart count from backend:', totalQuantity);
-        } else {
-            cartItemCount.value = 0;
+            // Nếu lỗi 401 (unauthorized), clear token và set count = 0
+            if (error.response?.status === 401) {
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('user_info');
+                cartItemCount.value = 0;
+                user.value = null;
+            } else {
+                // Các lỗi khác, giữ nguyên count hiện tại
+                console.log('Keeping current cart count due to error');
+            }
         }
-    } catch (error) {
-        console.error('❌ Error fetching cart count:', error);
-
-        // Nếu lỗi 401 (unauthorized), clear token và set count = 0
-        if (error.response?.status === 401) {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user_info');
+    } else {
+        // User is not logged in - get count from localStorage (guest cart)
+        try {
+            const guestCart = localStorage.getItem('guest_cart');
+            if (guestCart) {
+                const cartItems = JSON.parse(guestCart);
+                const totalQuantity = cartItems.reduce((total, item) => total + (item.quantity || 0), 0);
+                cartItemCount.value = totalQuantity;
+                console.log('✅ Guest cart count from localStorage:', totalQuantity);
+            } else {
+                cartItemCount.value = 0;
+                console.log('📦 No guest cart found');
+            }
+        } catch (error) {
+            console.error('❌ Error reading guest cart:', error);
             cartItemCount.value = 0;
-            user.value = null;
-        } else {
-            // Các lỗi khác, giữ nguyên count hiện tại
-            console.log('Keeping current cart count due to error');
         }
     }
 };

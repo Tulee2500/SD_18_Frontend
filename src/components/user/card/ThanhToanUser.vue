@@ -2,6 +2,23 @@
 import axios from 'axios';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import emailjs from '@emailjs/browser';
+
+// Cấu hình EmailJS với keys của bạn
+const EMAILJS_CONFIG = {
+    PUBLIC_KEY: 'kTFlCJLQoDSFTVF23',
+    SERVICE_ID: 'service_638ne5n', 
+    // Sử dụng template đảm bảo có trường To Email: {{to_email}}
+    TEMPLATE_ID: 'template_qq0g6zi'
+};
+
+// Trước khi gửi email
+console.log('=== EMAIL DEBUG ===');
+console.log('Service ID:', EMAILJS_CONFIG.SERVICE_ID);
+console.log('Template ID:', EMAILJS_CONFIG.TEMPLATE_ID);
+
+// Khởi tạo EmailJS
+emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
 
 const router = useRouter();
 const emit = defineEmits(['order-success', 'go-back']);
@@ -16,6 +33,112 @@ const isLoading = ref(false);
 const isLoadingCart = ref(false);
 const orderSuccess = ref(false);
 
+// Dual Mode - Guest vs Logged in
+const isGuestMode = ref(false);
+const orderCode = ref('');
+
+// Guest Form Data
+const guestForm = ref({
+    tenNguoiDung: '',
+    email: '',
+    sdt: '',
+    diaChiChiTiet: '', // Thay vì diaChi
+    maTinh: '', // Thêm mã tỉnh
+    maPhuong: '', // Thêm mã phường
+    tenTinh: '', // Tên tỉnh
+    tenPhuong: '', // Tên phường
+    ghiChu: '',
+    phuongThucThanhToan: 'COD',
+    phiVanChuyen: 30000
+});
+
+const guestWards = ref([]);
+
+const onGuestProvinceChange = async () => {
+    console.log('Guest province changed to:', guestForm.value.maTinh);
+
+    // Reset ward selection
+    guestForm.value.maPhuong = '';
+    guestForm.value.tenPhuong = '';
+    guestWards.value = [];
+
+    if (guestForm.value.maTinh) {
+        // Update province name
+        const province = provinces.value.find(p => p.code === guestForm.value.maTinh);
+        guestForm.value.tenTinh = province?.name || '';
+
+        // Load wards for guest form
+        await loadGuestWards(guestForm.value.maTinh);
+    }
+};
+
+const onGuestWardChange = () => {
+    if (guestForm.value.maPhuong) {
+        const ward = guestWards.value.find(w => w.code === guestForm.value.maPhuong);
+        guestForm.value.tenPhuong = ward?.name || '';
+    }
+};
+
+const loadGuestWards = async (provinceCode) => {
+    guestWards.value = [];
+    if (!provinceCode) return;
+
+    try {
+        console.log(`Loading guest wards for province ${provinceCode}...`);
+
+        let apiProvinceCode = provinceCode;
+        if (provinceCode.startsWith('0') && provinceCode.length === 2) {
+            apiProvinceCode = parseInt(provinceCode).toString();
+        }
+
+        const response = await fetch(`https://provinces.open-api.vn/api/v2/p/${apiProvinceCode}?depth=2`);
+        const provinceData = await response.json();
+
+        let allWards = [];
+
+        if (provinceData.districts && Array.isArray(provinceData.districts)) {
+            provinceData.districts.forEach(district => {
+                if (district.wards && Array.isArray(district.wards)) {
+                    district.wards.forEach(ward => {
+                        allWards.push({
+                            code: ward.code.toString(),
+                            name: ward.name,
+                            codename: ward.codename || '',
+                            division_type: ward.division_type || 'phường',
+                            district_code: district.code.toString(),
+                            district_name: district.name
+                        });
+                    });
+                }
+            });
+        } else if (provinceData.wards && Array.isArray(provinceData.wards)) {
+            provinceData.wards.forEach(ward => {
+                allWards.push({
+                    code: ward.code.toString(),
+                    name: ward.name,
+                    codename: ward.codename || '',
+                    division_type: ward.division_type || 'phường'
+                });
+            });
+        }
+
+        const uniqueWards = allWards.filter((ward, index, self) =>
+            index === self.findIndex(w => w.code === ward.code)
+        );
+
+        uniqueWards.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+        guestWards.value = uniqueWards;
+
+        console.log(`Successfully loaded ${guestWards.value.length} guest wards`);
+
+    } catch (error) {
+        console.warn(`Failed to load guest wards for province ${provinceCode}:`, error);
+        guestWards.value = [
+            { code: `${provinceCode}001`, name: 'Phường/Xã Trung tâm', division_type: 'phường' }
+        ];
+    }
+};
+
 // Shipping Information
 const shippingInfo = ref({
     fullName: '',
@@ -23,6 +146,25 @@ const shippingInfo = ref({
     phone: '',
     note: ''
 });
+
+// Thêm validation check trước khi submit
+const checkGuestContact = async () => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/hoa-don/validate-guest-contact`, {
+            email: guestForm.value.email.trim(),
+            sdt: guestForm.value.sdt.trim()
+        });
+        return response.data.valid;
+    } catch (error) {
+        if (error.response?.status === 409) {
+            const data = error.response.data;
+            showNotification('warning', 'Thông tin đã tồn tại', data.suggestion || data.error);
+            return false;
+        }
+        console.error('Validation error:', error);
+        return true; // Cho phép tiếp tục nếu API lỗi
+    }
+};
 
 // Address Management
 const savedAddresses = ref([]);
@@ -66,10 +208,145 @@ const newWards = ref([]);
 
 // Auth helpers
 const getAuthToken = () => localStorage.getItem('auth_token');
-// const getUserId = () => {
-//     const userInfo = localStorage.getItem('user_info');
-//     return userInfo ? JSON.parse(userInfo).id : null;
-// };
+const getUserId = () => {
+    const userInfo = localStorage.getItem('user_info');
+    return userInfo ? JSON.parse(userInfo).id : null;
+};
+
+// Guest mode helpers
+const checkAuthMode = () => {
+    const token = getAuthToken();
+    const userId = getUserId();
+    isGuestMode.value = !(token && userId);
+    console.log('🔐 Auth mode:', isGuestMode.value ? 'Guest' : 'Logged in');
+};
+
+const loadGuestCart = () => {
+    try {
+        const guestCart = localStorage.getItem('guest_cart');
+        if (guestCart) {
+            const raw = JSON.parse(guestCart) || [];
+            // Chuẩn hóa cấu trúc item và đảm bảo có totalPrice
+            cartItems.value = raw.map((it) => {
+                const price = Number(it.price ?? it.giaBan ?? it.unitPrice ?? 0);
+                const quantity = Number(it.quantity ?? it.soLuong ?? 1);
+                return {
+                    cartDetailId: it.cartDetailId ?? it.id ?? null,
+                    productDetailId: it.productDetailId ?? it.idChiTietSanPham ?? it.idSanPhamChiTiet ?? it.variantId ?? null,
+                    name: it.name ?? it.tenSanPham ?? it.productName ?? 'Sản phẩm',
+                    code: it.code ?? it.maSanPham ?? it.sku ?? '',
+                    image: it.image ?? it.hinhAnh ?? it.imageUrl ?? '',
+                    price,
+                    quantity,
+                    size: it.size ?? it.kichCo ?? it.sizeName ?? null,
+                    color: it.color ?? it.mauSac ?? it.colorName ?? null,
+                    stock: it.stock ?? it.soLuongTon ?? null,
+                    points: it.points ?? 0,
+                    totalPrice: Number(it.totalPrice ?? price * quantity)
+                };
+            });
+            console.log('✅ Guest cart normalized:', cartItems.value);
+        } else {
+            cartItems.value = [];
+        }
+
+        if (cartItems.value.length === 0) {
+            router.push('/card');
+        }
+    } catch (error) {
+        console.error('Error loading guest cart:', error);
+        router.push('/card');
+    }
+};
+
+// Guest form validation
+const validateGuestForm = () => {
+    if (!guestForm.value.tenNguoiDung.trim()) {
+        showNotification('error', 'Lỗi thông tin', 'Vui lòng nhập họ tên người nhận');
+        return false;
+    }
+    if (!guestForm.value.email.trim()) {
+        showNotification('error', 'Lỗi thông tin', 'Vui lòng nhập email');
+        return false;
+    }
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(guestForm.value.email)) {
+        showNotification('error', 'Lỗi thông tin', 'Email không đúng định dạng');
+        return false;
+    }
+    if (!guestForm.value.sdt.trim()) {
+        showNotification('error', 'Lỗi thông tin', 'Vui lòng nhập số điện thoại');
+        return false;
+    }
+    // Validate phone format
+    if (!/^\d{10}$/.test(guestForm.value.sdt)) {
+        showNotification('error', 'Lỗi thông tin', 'Số điện thoại phải có 10 chữ số');
+        return false;
+    }
+    if (!guestForm.value.maTinh) {
+        showNotification('error', 'Lỗi thông tin', 'Vui lòng chọn tỉnh/thành phố');
+        return false;
+    }
+    if (!guestForm.value.maPhuong) {
+        showNotification('error', 'Lỗi thông tin', 'Vui lòng chọn phường/xã');
+        return false;
+    }
+    if (!guestForm.value.diaChiChiTiet.trim()) {
+        showNotification('error', 'Lỗi thông tin', 'Vui lòng nhập địa chỉ chi tiết');
+        return false;
+    }
+    return true;
+};
+
+// Validate guest contact information (email/phone) exists in DB
+const validateGuestContact = async () => {
+    try {
+        const response = await axios.post(
+            `${API_BASE_URL}/api/hoa-don/validate-guest-contact`,
+            {
+                email: guestForm.value.email.trim(),
+                sdt: guestForm.value.sdt.trim()
+            }
+        );
+        return !!response.data?.valid;
+    } catch (error) {
+        if (error.response?.status === 409) {
+            const data = error.response.data || {};
+            showNotification(
+                'warning',
+                'Thông tin đã tồn tại',
+                data.suggestion || data.error || 'Email hoặc số điện thoại đã tồn tại'
+            );
+            return false;
+        }
+        console.error('Validation error:', error);
+        // Cho phép tiếp tục nếu API lỗi tạm thời
+        return true;
+    }
+};
+
+const formatGuestFullAddress = () => {
+    return [
+        guestForm.value.diaChiChiTiet,
+        guestForm.value.tenPhuong,
+        guestForm.value.tenTinh
+    ].filter(Boolean).join(', ');
+};
+
+// Navigation after success
+const goToOrderTracking = () => {
+    if (isGuestMode.value) {
+        window.location.href = `/track-order?email=${encodeURIComponent(guestForm.value.email)}&code=${orderCode.value}`;
+    } else {
+        // Điều hướng user đã đăng nhập tới trang đơn hàng của họ
+        router.push('/profileOrders');
+    }
+};
+
+const continueShopping = () => {
+    window.location.href = '/products';
+};
 
 // Toggle voucher selection
 const toggleVoucherSelection = () => {
@@ -80,34 +357,47 @@ const toggleVoucherSelection = () => {
 };
 
 // Load available vouchers from backend
+// Trong loadAvailableVouchers function
 const loadAvailableVouchers = async () => {
     isLoadingVouchers.value = true;
     try {
         console.log('Loading available vouchers...');
 
-        const response = await axios.get(`${API_BASE_URL}/voucher`, {
-            headers: {
-                Authorization: `Bearer ${getAuthToken()}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        // Sử dụng endpoint public cho cả user và guest
+        const endpoint = isGuestMode.value ? '/voucher/public' : '/voucher';
+        const headers = {
+            'Content-Type': 'application/json'
+        };
 
-        console.log('All vouchers loaded:', response.data);
+        // Chỉ thêm Authorization cho user đã login
+        if (!isGuestMode.value) {
+            headers.Authorization = `Bearer ${getAuthToken()}`;
+        }
 
+        const response = await axios.get(`${API_BASE_URL}${endpoint}`, { headers });
+
+        console.log('Vouchers loaded:', response.data);
         let vouchers = response.data || [];
 
-        // Filter voucher khả dụng ở client-side
-        const currentDate = new Date();
-        vouchers = vouchers.filter((voucher) => {
-            if (voucher.trangThai !== 1) return false;
-            const endDate = new Date(voucher.ngayKetThuc);
-            if (endDate < currentDate) return false;
-            const startDate = new Date(voucher.ngayBatDau);
-            if (startDate > currentDate) return false;
-            if (voucher.soLuong <= 0) return false;
-            if (voucher.giaTriGiamToiThieu > subtotal.value) return false;
-            return true;
-        });
+        // Với endpoint public, server đã filter sẵn, chỉ cần filter theo order value
+        if (isGuestMode.value) {
+            vouchers = vouchers.filter(voucher =>
+                voucher.giaTriGiamToiThieu <= subtotal.value
+            );
+        } else {
+            // Logic filter cũ cho user
+            const currentDate = new Date();
+            vouchers = vouchers.filter((voucher) => {
+                if (voucher.trangThai !== 1) return false;
+                const endDate = new Date(voucher.ngayKetThuc);
+                if (endDate < currentDate) return false;
+                const startDate = new Date(voucher.ngayBatDau);
+                if (startDate > currentDate) return false;
+                if (voucher.soLuong <= 0) return false;
+                if (voucher.giaTriGiamToiThieu > subtotal.value) return false;
+                return true;
+            });
+        }
 
         vouchers = vouchers.sort((a, b) => {
             const valueA = calculateVoucherValueForSort(a);
@@ -117,6 +407,7 @@ const loadAvailableVouchers = async () => {
 
         availableVouchers.value = vouchers;
         console.log('Available vouchers after filter:', vouchers);
+
     } catch (error) {
         console.error('Error loading vouchers:', error);
         availableVouchers.value = [];
@@ -579,20 +870,27 @@ const loadCartFromBackend = async () => {
 
         console.log('Cart data received:', response.data);
 
-        cartItems.value = response.data.map((item) => ({
-            cartDetailId: item.id,
-            productDetailId: item.productDetailId,
-            name: item.name,
-            code: item.code,
-            image: buildImageUrl(item.image),
-            price: Number(item.price),
-            quantity: Number(item.quantity),
-            size: item.size,
-            color: item.color,
-            stock: item.stock,
-            points: item.points || 0,
-            totalPrice: Number(item.price) * Number(item.quantity)
-        }));
+        cartItems.value = response.data.map((item) => {
+            const price = Number(item.price ?? item.giaBan ?? 0);
+            const quantity = Number(item.quantity ?? item.soLuong ?? 1);
+            const productDetailId = item.productDetailId ?? item.idChiTietSanPham ?? item.chiTietSanPhamId ?? item.idSanPhamChiTiet ?? null;
+            return {
+                cartDetailId: item.id ?? item.cartDetailId ?? null,
+                productDetailId,
+                name: item.name ?? item.tenSanPham ?? 'Sản phẩm',
+                code: item.code ?? item.maSanPham ?? item.sku ?? '',
+                image: buildImageUrl(item.image ?? item.hinhAnh ?? item.imageUrl),
+                price,
+                quantity,
+                size: item.size ?? item.kichCo ?? null,
+                color: item.color ?? item.mauSac ?? null,
+                stock: item.stock ?? item.soLuongTon ?? null,
+                points: item.points ?? 0,
+                totalPrice: Number(item.totalPrice ?? price * quantity)
+            };
+        });
+
+        console.log('✅ User cart normalized:', cartItems.value);
 
         if (cartItems.value.length === 0) {
             showNotification('warning', 'Giỏ hàng trống', 'Vui lòng thêm sản phẩm trước khi thanh toán');
@@ -799,103 +1097,171 @@ const onNewProvinceChange = async () => {
 
 // Submit order - Updated version with stock reduction
 const submitOrder = async () => {
-    if (!validateForm()) return;
+    if (isGuestMode.value) {
+        await submitGuestOrderWithEmail();
+    } else {
+        await submitUserOrderWithEmail();
+    }
+};
+
+const sendOrderConfirmationEmail = async (orderData, isGuest = false) => {
+    try {
+        console.log('Đang gửi email xác nhận đơn hàng...');
+
+        // QUAN TRỌNG: Sử dụng field names đúng với EmailJS template
+        const emailParams = {
+            // EmailJS cần field 'to_email' cho recipient
+            to_email: isGuest ? guestForm.value.email : shippingInfo.value.email,
+            
+            // Thông tin khách hàng - sử dụng tên field đơn giản
+            customer_name: isGuest ? guestForm.value.tenNguoiDung : shippingInfo.value.fullName,
+            customer_phone: isGuest ? guestForm.value.sdt : shippingInfo.value.phone,
+            
+            // Thông tin đơn hàng
+            order_code: orderData.maHoaDon || orderCode.value,
+            order_date: new Date().toLocaleDateString('vi-VN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }),
+            order_status: 'Chờ xác nhận',
+            
+            // Địa chỉ và thanh toán
+            shipping_address: isGuest ? formatGuestFullAddress() : formatFullAddress(selectedShippingAddress.value),
+            payment_method: isGuest ? 
+                (guestForm.value.phuongThucThanhToan === 'COD' ? 'Thanh toán khi nhận hàng (COD)' : 'Thanh toán online (VNPay)') :
+                (paymentMethod.value === 'cod' ? 'Thanh toán khi nhận hàng (COD)' : 'Chuyển khoản ngân hàng'),
+            
+            // Ghi chú
+            order_note: isGuest ? (guestForm.value.ghiChu || 'Không có') : (shippingInfo.value.note || 'Không có'),
+            
+            // Số tiền (format đơn giản)
+            subtotal: formatCurrency(subtotal.value) + 'đ',
+            discount_amount: formatCurrency(discount.value.value || 0) + 'đ',
+            shipping_fee: shippingFee.value === 0 ? 'Miễn phí' : formatCurrency(shippingFee.value) + 'đ',
+            total_amount: formatCurrency(total.value) + 'đ',
+            
+            // Danh sách sản phẩm (format đơn giản cho email)
+            product_list: cartItems.value.map((item, index) => 
+                `${index + 1}. ${item.name} (${item.code}) - Size: ${item.size} - Số lượng: ${item.quantity} - Giá: ${formatCurrency(item.totalPrice)}đ`
+            ).join('\n'),
+            
+            // Link theo dõi đơn hàng
+            tracking_link: isGuest ? 
+                `${window.location.origin}/track-order?email=${encodeURIComponent(guestForm.value.email)}&code=${orderCode.value}` :
+                `${window.location.origin}/order-tracking/${orderCode.value}`,
+            
+            // Thông tin shop
+            shop_name: 'SHOP GIÀY THỂ THAO',
+            shop_email: 'support@sportshoesshop.com',
+            shop_phone: '0123-456-789',
+            shop_address: '123 Đường Nguyễn Văn Linh, Quận 7, TP.HCM',
+            
+            // Thông tin gửi email
+            from_name: 'SHOP GIÀY THỂ THAO'
+        };
+
+        // LOG để debug
+        console.log('Email sẽ gửi đến:', emailParams.to_email);
+        console.log('Tên khách hàng:', emailParams.customer_name);
+        console.log('Full email params:', emailParams);
+
+        // Kiểm tra email có hợp lệ không
+        if (!emailParams.to_email || !emailParams.to_email.includes('@')) {
+            throw new Error('Email không hợp lệ: ' + emailParams.to_email);
+        }
+
+        // Gửi email qua EmailJS
+        const response = await emailjs.send(
+            EMAILJS_CONFIG.SERVICE_ID,
+            EMAILJS_CONFIG.TEMPLATE_ID,
+            emailParams
+        );
+
+        if (response.status === 200) {
+            console.log('✅ Email xác nhận đã được gửi thành công!');
+            return true;
+        } else {
+            console.warn('⚠️ Không thể gửi email xác nhận');
+            return false;
+        }
+
+    } catch (error) {
+        console.error('❌ Lỗi gửi email:', error);
+        
+        // Log chi tiết lỗi để debug
+        if (error.text) {
+            console.error('EmailJS Error Details:', error.text);
+        }
+        if (error.status) {
+            console.error('EmailJS Status Code:', error.status);
+        }
+        
+        return false;
+    }
+};
+
+// Guest order submission
+const submitGuestOrderWithEmail = async () => {
+    if (!validateGuestForm()) return;
+    if (!validateCart()) return;
+
+    const contactValid = await validateGuestContact();
+    if (!contactValid) return;
 
     isLoading.value = true;
     try {
-        const maHoaDon = `HD${Date.now()}`;
+        const maHoaDon = `GU${Date.now()}`;
+
+        // DEBUG CART before building order
+        console.log('=== ORDER DEBUG (GUEST) ===');
+        console.log('Cart items:', JSON.parse(JSON.stringify(cartItems.value)));
+        console.log('Subtotal:', subtotal.value, 'Shipping:', shippingFee.value, 'Total:', total.value);
 
         const orderData = {
-            khachHangId: userInfo.value.id,
-            tenNguoiDung: selectedShippingAddress.value.tenNguoiNhan,
-            email: shippingInfo.value.email,
-            sdt: selectedShippingAddress.value.sdt,
-            diaChi: formatFullAddress(selectedShippingAddress.value),
-
+            khachHangId: null,
+            tenNguoiDung: guestForm.value.tenNguoiDung,
+            email: guestForm.value.email,
+            sdt: guestForm.value.sdt,
+            diaChi: formatGuestFullAddress(),
             maHoaDon: maHoaDon,
-            ghiChu: shippingInfo.value.note || '',
-            phuongThucThanhToan: paymentMethod.value === 'cod' ? 'COD' : 'VNPAY',
+            ghiChu: guestForm.value.ghiChu || '',
+            phuongThucThanhToan: guestForm.value.phuongThucThanhToan === 'COD' ? 'COD' : 'VNPAY',
             loaiHoaDon: 'ONLINE',
             trangThaiHoaDon: 'CHO_XAC_NHAN',
-
             tongTien: subtotal.value,
             phiVanChuyen: shippingFee.value,
             tongThanhToan: total.value,
             diemSuDung: 0,
-            giaTriDiem: discount.value.value,
-
+            giaTriDiem: discount.value.value || 0,
             voucherId: discount.value.voucher?.id || null,
             maVoucher: discount.value.code || null,
-
+            giaTriVoucher: discount.value.value || 0,
             ngayTao: new Date().toISOString(),
-            ngayXacNhan: null,
-            ngayHoanThanh: null,
-            ngayGiaoHang: null,
-            ngayNhanHang: null,
-            thoiGianVanChuyen: null,
-
             chiTietSanPham: cartItems.value.map((item) => ({
                 idChiTietSanPham: item.productDetailId,
                 soLuong: item.quantity,
                 giaBan: item.price
             }))
         };
+        console.log('Order data to submit (GUEST):', JSON.parse(JSON.stringify(orderData)));
 
-        const successPageData = {
-            customerName: selectedShippingAddress.value.tenNguoiNhan,
-            customerEmail: shippingInfo.value.email,
-            customerPhone: selectedShippingAddress.value.sdt,
-            shippingAddress: formatFullAddress(selectedShippingAddress.value),
-            paymentMethod: paymentMethod.value,
-            orderNote: shippingInfo.value.note,
+        if (guestForm.value.phuongThucThanhToan === 'VNPAY') {
+            // VNPay - lưu data và chuyển hướng
+            sessionStorage.setItem('pending_guest_order_data', JSON.stringify(orderData));
 
-            totalItems: cartItems.value.reduce((sum, item) => sum + item.quantity, 0),
-            subtotal: subtotal.value,
-            discount: discount.value.value || 0,
-            shippingFee: shippingFee.value,
-            total: total.value,
-
-            cartItems: cartItems.value.map((item) => ({
-                name: item.name,
-                code: item.code,
-                size: item.size,
-                color: item.color,
-                quantity: item.quantity,
-                price: item.price,
-                image: item.image
-            }))
-        };
-
-        // Lưu dữ liệu vào session storage
-        sessionStorage.setItem('order_success_data', JSON.stringify(successPageData));
-
-        console.log('Sending order data:', orderData);
-
-        // KIỂM TRA PHƯƠNG THỨC THANH TOÁN
-        if (paymentMethod.value === 'bank_transfer') {
-            // === THANH TOÁN VNPAY ===
-            // KHÔNG tạo hóa đơn ở bước này. Lưu dữ liệu đơn và chuyển sang VNPay.
-
-            // Lưu orderData để tạo hóa đơn sau khi thanh toán thành công
-            sessionStorage.setItem('pending_order_data', JSON.stringify(orderData));
-
-            // Tạo payment VNPay dựa trên mã tạm thời (client-gen)
             const vnpayRequest = {
                 orderId: maHoaDon,
                 amount: total.value,
-                orderInfo: `Thanh toan don hang ${maHoaDon}`
+                orderInfo: `Thanh toan don hang guest ${maHoaDon}`
             };
 
-            console.log('Creating VNPay payment with (no invoice yet):', vnpayRequest);
-
             const vnpayResponse = await axios.post(`${API_BASE_URL}/api/vnpay/create-payment`, vnpayRequest, {
-                headers: {
-                    Authorization: `Bearer ${getAuthToken()}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             });
-
-            console.log('VNPay response:', vnpayResponse.data);
 
             if (vnpayResponse.data.success && vnpayResponse.data.paymentUrl) {
                 showNotification('info', 'Đang chuyển đến VNPay...', 'Vui lòng đợi trong giây lát');
@@ -907,8 +1273,152 @@ const submitOrder = async () => {
                 throw new Error(vnpayResponse.data.message || 'Không thể tạo thanh toán VNPay');
             }
         } else {
-            // === THANH TOÁN COD ===
-            // KHÔNG trừ tồn kho ở FE. Chỉ tạo hóa đơn sau khi re-check tồn kho đạt.
+            // COD - tạo đơn hàng và gửi email ngay
+            const response = await axios.post(`${API_BASE_URL}/hoa-don/create`, orderData, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.data && response.data.success) {
+                const hoaDon = response.data.data;
+                orderCode.value = hoaDon.maHoaDon || maHoaDon;
+                orderSuccess.value = true;
+
+                // GỬI EMAIL XÁC NHẬN
+                const emailSent = await sendOrderConfirmationEmail(orderData, true);
+                
+                localStorage.removeItem('guest_cart');
+
+                if (emailSent) {
+                    showNotification('success', 'Đặt hàng thành công!', 
+                        `Mã hóa đơn: ${orderCode.value}. Email xác nhận đã được gửi đến ${guestForm.value.email}!`);
+                } else {
+                    showNotification('success', 'Đặt hàng thành công!', 
+                        `Mã hóa đơn: ${orderCode.value}. (Không thể gửi email xác nhận, vui lòng liên hệ shop)`);
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('Error submitting guest order:', error);
+        let errorMessage = 'Không thể tạo hóa đơn. Vui lòng thử lại!';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        }
+        showNotification('error', 'Lỗi đặt hàng', errorMessage);
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+// Xử lý VNPay return cho guest (dùng chung logic)
+const handleGuestVNPaySuccess = async () => {
+    try {
+        // Lấy dữ liệu đơn hàng đã lưu
+        const pendingOrderData = sessionStorage.getItem('pending_guest_order_data');
+        if (!pendingOrderData) {
+            throw new Error('Không tìm thấy thông tin đơn hàng');
+        }
+
+        const orderData = JSON.parse(pendingOrderData);
+
+        // Tạo đơn hàng sau khi thanh toán thành công bằng API hiện có
+        const response = await axios.post(`${API_BASE_URL}/hoa-don/create`, orderData, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.data && response.data.success) {
+            const hoaDon = response.data.data;
+
+            // Xóa dữ liệu tạm thời
+            sessionStorage.removeItem('pending_guest_order_data');
+
+            // Clear guest cart
+            localStorage.removeItem('guest_cart');
+
+            // Hiển thị thành công
+            orderCode.value = hoaDon.maHoaDon;
+            orderSuccess.value = true;
+
+            showNotification('success', 'Thanh toán thành công!', `Mã đơn hàng: ${orderCode.value}`);
+        }
+
+    } catch (error) {
+        console.error('Error processing VNPay success for guest:', error);
+        showNotification('error', 'Lỗi xử lý thanh toán', 'Vui lòng liên hệ hỗ trợ');
+    }
+};
+
+// User order submission
+const submitUserOrderWithEmail = async () => {
+    if (!validateForm()) return;
+    if (!validateCart()) return;
+
+    isLoading.value = true;
+    try {
+        const maHoaDon = `HD${Date.now()}`;
+
+        // DEBUG CART before building order
+        console.log('=== ORDER DEBUG (USER) ===');
+        console.log('Cart items:', JSON.parse(JSON.stringify(cartItems.value)));
+        console.log('Subtotal:', subtotal.value, 'Shipping:', shippingFee.value, 'Total:', total.value);
+
+        const orderData = {
+            khachHangId: userInfo.value.id,
+            tenNguoiDung: selectedShippingAddress.value.tenNguoiNhan,
+            email: shippingInfo.value.email,
+            sdt: selectedShippingAddress.value.sdt,
+            diaChi: formatFullAddress(selectedShippingAddress.value),
+            maHoaDon: maHoaDon,
+            ghiChu: shippingInfo.value.note || '',
+            phuongThucThanhToan: paymentMethod.value === 'cod' ? 'COD' : 'VNPAY',
+            loaiHoaDon: 'ONLINE',
+            trangThaiHoaDon: 'CHO_XAC_NHAN',
+            tongTien: subtotal.value,
+            phiVanChuyen: shippingFee.value,
+            tongThanhToan: total.value,
+            diemSuDung: 0,
+            giaTriDiem: discount.value.value,
+            voucherId: discount.value.voucher?.id || null,
+            maVoucher: discount.value.code || null,
+            ngayTao: new Date().toISOString(),
+            chiTietSanPham: cartItems.value.map((item) => ({
+                idChiTietSanPham: item.productDetailId,
+                soLuong: item.quantity,
+                giaBan: item.price
+            }))
+        };
+        console.log('Order data to submit (USER):', JSON.parse(JSON.stringify(orderData)));
+
+        if (paymentMethod.value === 'bank_transfer') {
+            // VNPay - lưu data và chuyển hướng
+            sessionStorage.setItem('pending_order_data', JSON.stringify(orderData));
+
+            const vnpayRequest = {
+                orderId: maHoaDon,
+                amount: total.value,
+                orderInfo: `Thanh toan don hang ${maHoaDon}`
+            };
+
+            const vnpayResponse = await axios.post(`${API_BASE_URL}/api/vnpay/create-payment`, vnpayRequest, {
+                headers: {
+                    Authorization: `Bearer ${getAuthToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (vnpayResponse.data.success && vnpayResponse.data.paymentUrl) {
+                showNotification('info', 'Đang chuyển đến VNPay...', 'Vui lòng đợi trong giây lát');
+                setTimeout(() => {
+                    window.location.href = vnpayResponse.data.paymentUrl;
+                }, 1200);
+                return;
+            } else {
+                throw new Error(vnpayResponse.data.message || 'Không thể tạo thanh toán VNPay');
+            }
+        } else {
+            // COD - tạo đơn hàng và gửi email ngay
             const response = await axios.post(`${API_BASE_URL}/hoa-don/create`, orderData, {
                 headers: {
                     Authorization: `Bearer ${getAuthToken()}`,
@@ -916,75 +1426,143 @@ const submitOrder = async () => {
                 }
             });
 
-            console.log('Order response:', response.data);
-
             if (response.data) {
                 orderSuccess.value = true;
 
+                // GỬI EMAIL XÁC NHẬN
+                const emailSent = await sendOrderConfirmationEmail(orderData, false);
+
+                // Lưu dữ liệu hiển thị cho OrderSuccess.vue
+                try {
+                    const successData = buildOrderSuccessData(orderData, cartItems.value, paymentMethod.value);
+                    sessionStorage.setItem('order_success_data', JSON.stringify(successData));
+                } catch (e) {
+                    console.warn('Failed to store order_success_data:', e);
+                }
+
                 await clearCartAfterOrder();
 
-                showNotification('success', 'Đặt hàng thành công!', `Mã hóa đơn: ${response.data.maHoaDon || maHoaDon}`);
+                if (emailSent) {
+                    showNotification('success', 'Đặt hàng thành công!', 
+                        `Mã hóa đơn: ${response.data.maHoaDon || maHoaDon}. Email xác nhận đã được gửi đến ${shippingInfo.value.email}!`);
+                } else {
+                    showNotification('success', 'Đặt hàng thành công!', 
+                        `Mã hóa đơn: ${response.data.maHoaDon || maHoaDon}. (Không thể gửi email xác nhận, vui lòng liên hệ shop)`);
+                }
 
-                setTimeout(() => {
-                    const orderId = response.data.id || response.data.data?.id || response.data.maHoaDon || maHoaDon;
-                    router.push(`/order-success/${orderId}`);
-                }, 2000);
+                // Không điều hướng nữa, hiển thị modal tại trang
+                orderSuccess.value = true;
+                orderCode.value = response.data.maHoaDon || maHoaDon;
             }
         }
     } catch (error) {
         console.error('Order creation error:', error);
-
         let errorMessage = 'Không thể tạo hóa đơn. Vui lòng thử lại!';
-
         if (error.response?.data?.message) {
             errorMessage = error.response.data.message;
-        } else if (error.response?.data?.error) {
-            errorMessage = error.response.data.error;
-        } else if (error.message) {
-            errorMessage = error.message;
         }
-
         showNotification('error', 'Lỗi đặt hàng', errorMessage);
     } finally {
         isLoading.value = false;
     }
 };
 
-// FE no longer reduces stock; backend should handle stock at order creation/payment confirmation.
-
-// Hàm kiểm tra tồn kho đơn giản
-const checkStockAvailability = (item) => {
-    const currentStock = item.stock || 0;
-    const requestedQty = item.quantity || 0;
-
-    if (currentStock < requestedQty) {
-        console.warn(`⚠️ Insufficient stock for ${item.name}: Available ${currentStock}, Requested ${requestedQty}`);
-        return false;
-    }
-
-    return true;
-};
-
-// Re-check latest stock from backend right before payment/creating order
-const validateLatestStock = async () => {
+// Xử lý VNPay success callback với email
+const handleVNPaySuccessWithEmail = async () => {
     try {
-        for (const item of cartItems.value) {
-            const res = await axios.get(`${API_BASE_URL}/api/san-pham-chi-tiet/${item.productDetailId}`, {
-                headers: { Authorization: `Bearer ${getAuthToken()}`, 'Content-Type': 'application/json' }
-            });
-            const currentStock = Number(res.data?.soLuong || 0);
-            if (currentStock < Number(item.quantity)) {
-                showNotification('warning', 'Không đủ tồn kho', `${item.name} (size ${item.size}${item.color ? ', ' + (item.color.name || item.color) : ''}) chỉ còn ${currentStock} sản phẩm`);
-                return false;
+        const pendingOrderData = sessionStorage.getItem('pending_order_data') || sessionStorage.getItem('pending_guest_order_data');
+        const isGuest = !sessionStorage.getItem('pending_order_data');
+        
+        if (!pendingOrderData) {
+            throw new Error('Không tìm thấy thông tin đơn hàng');
+        }
+
+        const orderData = JSON.parse(pendingOrderData);
+
+        const response = await axios.post(`${API_BASE_URL}/hoa-don/create`, orderData, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...(isGuest ? {} : { Authorization: `Bearer ${getAuthToken()}` })
+            }
+        });
+
+        if (response.data && response.data.success) {
+            const hoaDon = response.data.data;
+
+            // GỬI EMAIL XÁC NHẬN SAU KHI THANH TOÁN VNPAY THÀNH CÔNG
+            const emailSent = await sendOrderConfirmationEmail(orderData, isGuest);
+
+            // Clear data
+            sessionStorage.removeItem('pending_order_data');
+            sessionStorage.removeItem('pending_guest_order_data');
+            
+            if (isGuest) {
+                localStorage.removeItem('guest_cart');
+                orderCode.value = hoaDon.maHoaDon;
+                orderSuccess.value = true;
+            } else {
+                // Lưu dữ liệu hiển thị cho OrderSuccess.vue
+                try {
+                    const successData = buildOrderSuccessData(orderData, cartItems.value, paymentMethod.value);
+                    sessionStorage.setItem('order_success_data', JSON.stringify(successData));
+                } catch (e) {
+                    console.warn('Failed to store order_success_data:', e);
+                }
+
+                await clearCartAfterOrder();
+            }
+
+            if (emailSent) {
+                showNotification('success', 'Thanh toán thành công!', 
+                    `Mã đơn hàng: ${hoaDon.maHoaDon}. Email xác nhận đã được gửi!`);
+            } else {
+                showNotification('success', 'Thanh toán thành công!', 
+                    `Mã đơn hàng: ${hoaDon.maHoaDon}. (Không thể gửi email xác nhận, vui lòng liên hệ shop)`);
+            }
+            
+            // Không điều hướng: Hiển thị modal thành công ngay tại trang cho cả USER
+            if (!isGuest) {
+                orderCode.value = hoaDon.maHoaDon;
+                orderSuccess.value = true;
             }
         }
-        return true;
-    } catch (e) {
-        console.error('Stock validation error:', e);
-        showNotification('error', 'Lỗi tồn kho', 'Không kiểm tra được tồn kho. Vui lòng thử lại.');
+
+    } catch (error) {
+        console.error('Error processing VNPay success:', error);
+        showNotification('error', 'Lỗi xử lý thanh toán', 'Vui lòng liên hệ hỗ trợ');
+    }
+};
+
+// Hàm test email (để kiểm tra kết nối)
+const testEmailConnection = async () => {
+    try {
+        const testParams = {
+            to_email: 'test@example.com',
+            customer_name: 'Test Customer',
+            order_code: 'TEST123',
+            order_date: new Date().toLocaleDateString('vi-VN'),
+            shop_name: 'Test Shop',
+            shop_email: 'support@testshop.com'
+        };
+
+        const response = await emailjs.send(
+            EMAILJS_CONFIG.SERVICE_ID,
+            EMAILJS_CONFIG.TEMPLATE_ID,
+            testParams
+        );
+
+        if (response.status === 200) {
+            console.log('✅ EmailJS connection test successful!');
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('❌ EmailJS connection test failed:', error);
         return false;
     }
 };
+
+// FE no longer reduces stock; backend should handle stock at order creation/payment confirmation.
 
 // Clear cart after order
 const clearCartAfterOrder = async () => {
@@ -1003,9 +1581,30 @@ const clearCartAfterOrder = async () => {
     }
 };
 
+// Validate cart before submit
+const validateCart = () => {
+    if (!Array.isArray(cartItems.value) || cartItems.value.length === 0) {
+        showNotification('warning', 'Giỏ hàng trống', 'Vui lòng thêm sản phẩm trước khi thanh toán');
+        console.warn('⚠️ Cart empty, aborting submit');
+        return false;
+    }
+    const invalid = cartItems.value.filter((it) => !it.productDetailId || !it.quantity || it.quantity <= 0 || (!it.price && !it.totalPrice));
+    if (invalid.length > 0) {
+        console.error('❌ Found invalid cart items:', invalid);
+        showNotification('error', 'Lỗi giỏ hàng', 'Có sản phẩm thiếu thông tin (ID/giá/số lượng). Vui lòng thử lại.');
+        return false;
+    }
+    return true;
+};
+
 // Computed properties
 const subtotal = computed(() => {
-    return cartItems.value.reduce((sum, item) => sum + item.totalPrice, 0);
+    return cartItems.value.reduce((sum, item) => {
+        const price = Number(item.price ?? 0);
+        const qty = Number(item.quantity ?? 1);
+        const line = Number(item.totalPrice ?? price * qty);
+        return sum + line;
+    }, 0);
 });
 
 const shippingFee = computed(() => {
@@ -1079,7 +1678,11 @@ const handleImageError = (event) => {
 
 // Go back to cart
 const goBackToCart = () => {
-    emit('go-back');
+    if (isGuestMode.value) {
+        window.location.href = '/card';
+    } else {
+        emit('go-back');
+    }
 };
 
 // Check auth
@@ -1156,32 +1759,44 @@ watch(
 
 // Initialize checkout with API v2
 const initializeCheckout = async () => {
-    console.log('Initializing checkout with API v2...');
+    console.log('Initializing checkout with dual mode...');
 
-    if (!checkAuth()) {
-        console.error('Authentication failed');
-        return;
-    }
+    // Check authentication mode
+    checkAuthMode();
 
     try {
-        console.log('Step 1: Loading user info...');
-        await loadUserInfo();
-
-        console.log('Step 2: Loading address data from API v2...');
+        // LOAD PROVINCES CHO CẢ USER VÀ GUEST
+        console.log('Step 1: Loading address data from API v2...');
         await loadAddressData();
 
-        console.log('Step 3: Loading cart...');
-        await loadCartFromBackend();
+        if (isGuestMode.value) {
+            // Guest mode - load from localStorage
+            console.log('Step 2: Loading guest cart...');
+            loadGuestCart();
+            console.log('Guest checkout initialization completed');
+        } else {
+            // Logged in mode - load from backend
+            if (!checkAuth()) {
+                console.error('Authentication failed');
+                return;
+            }
 
-        console.log('Step 4: Loading saved addresses...');
-        await loadSavedAddresses();
+            console.log('Step 2: Loading user info...');
+            await loadUserInfo();
 
-        if (subtotal.value > 0) {
-            console.log('Step 5: Loading vouchers...');
-            await loadAvailableVouchers();
+            console.log('Step 3: Loading cart...');
+            await loadCartFromBackend();
+
+            console.log('Step 4: Loading saved addresses...');
+            await loadSavedAddresses();
+
+            if (subtotal.value > 0) {
+                console.log('Step 5: Loading vouchers...');
+                await loadAvailableVouchers();
+            }
+
+            console.log('User checkout initialization completed with API v2');
         }
-
-        console.log('Checkout initialization completed with API v2');
     } catch (error) {
         console.error('Checkout initialization failed:', error);
         showNotification('error', 'Lỗi khởi tạo', 'Không thể tải dữ liệu trang thanh toán');
@@ -1191,7 +1806,17 @@ const initializeCheckout = async () => {
 // Initialize
 onMounted(() => {
     window.timer = null;
-    console.log('Checkout component mounted - Using API v2');
+    console.log('Checkout component mounted - Testing EmailJS connection...');
+    
+    // Test EmailJS connection
+    testEmailConnection().then(success => {
+        if (success) {
+            console.log('EmailJS ready to send emails');
+        } else {
+            console.warn('EmailJS connection failed - emails may not work');
+        }
+    });
+    
     initializeCheckout();
 });
 </script>
@@ -1222,8 +1847,167 @@ onMounted(() => {
         <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
             <!-- Left Column - Shipping Information -->
             <div class="lg:col-span-2">
-                <!-- Shipping Information Card -->
-                <div class="mb-6 rounded-lg bg-white p-6 shadow-md">
+                <!-- Guest Form -->
+                <div v-if="isGuestMode" class="mb-6 rounded-lg bg-white p-6 shadow-md">
+    <h2 class="mb-4 flex items-center text-xl font-semibold">
+        <span class="mr-2 text-2xl">👤</span>
+        THÔNG TIN KHÁCH HÀNG
+    </h2>
+    <p class="mb-4 text-sm text-gray-600">Vui lòng điền thông tin để hoàn tất đặt hàng</p>
+
+    <div class="space-y-4">
+        <!-- Họ tên -->
+        <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700">
+                Họ tên người nhận <span class="text-red-500">*</span>
+            </label>
+            <input
+                v-model="guestForm.tenNguoiDung"
+                type="text"
+                required
+                class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                placeholder="Nhập họ tên đầy đủ"
+            />
+        </div>
+
+        <!-- Email và SĐT -->
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700">
+                    Email <span class="text-red-500">*</span>
+                </label>
+                <input
+                    v-model="guestForm.email"
+                    type="email"
+                    required
+                    class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    placeholder="email@example.com"
+                />
+            </div>
+            <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700">
+                    Số điện thoại <span class="text-red-500">*</span>
+                </label>
+                <input
+                    v-model="guestForm.sdt"
+                    type="tel"
+                    required
+                    maxlength="10"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    placeholder="Số điện thoại (10 số)"
+                />
+            </div>
+        </div>
+
+        <!-- ĐỊA CHỈ GIAO HÀNG - DROPDOWN SELECTION -->
+        <div class="border-t pt-4">
+            <h3 class="mb-4 text-lg font-medium text-gray-800">📍 Địa chỉ giao hàng</h3>
+
+            <!-- Tỉnh/Thành phố và Phường/Xã -->
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 mb-4">
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700">
+                        Tỉnh/Thành phố <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        v-model="guestForm.maTinh"
+                        @change="onGuestProvinceChange"
+                        class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="">Chọn tỉnh/thành phố</option>
+                        <option v-for="province in provinces" :key="province.code" :value="province.code">
+                            {{ province.name }}
+                        </option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700">
+                        Phường/Xã <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        v-model="guestForm.maPhuong"
+                        @change="onGuestWardChange"
+                        class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        :disabled="!guestForm.maTinh"
+                    >
+                        <option value="">Chọn phường/xã</option>
+                        <option v-for="ward in guestWards" :key="ward.code" :value="ward.code">
+                            {{ ward.name }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Địa chỉ chi tiết -->
+            <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700">
+                    Địa chỉ chi tiết <span class="text-red-500">*</span>
+                </label>
+                <input
+                    v-model="guestForm.diaChiChiTiet"
+                    type="text"
+                    required
+                    class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    placeholder="Số nhà, tên đường..."
+                />
+            </div>
+
+            <!-- Preview địa chỉ đầy đủ -->
+            <div v-if="guestForm.diaChiChiTiet && guestForm.tenPhuong && guestForm.tenTinh"
+                 class="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p class="text-sm font-medium text-blue-800">📍 Địa chỉ giao hàng:</p>
+                <p class="text-sm text-blue-700">{{ formatGuestFullAddress() }}</p>
+            </div>
+        </div>
+
+        <!-- Ghi chú -->
+        <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700">Ghi chú (tùy chọn)</label>
+            <textarea
+                v-model="guestForm.ghiChu"
+                class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                rows="2"
+                placeholder="Ghi chú cho đơn hàng"
+            ></textarea>
+        </div>
+
+        <!-- Phương thức thanh toán -->
+        <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700">Phương thức thanh toán</label>
+            <div class="space-y-3">
+                <label class="flex cursor-pointer items-center rounded-lg border border-gray-300 p-4 transition hover:border-blue-400 hover:bg-blue-50">
+                    <input
+                        v-model="guestForm.phuongThucThanhToan"
+                        type="radio"
+                        value="COD"
+                        class="mr-3 text-blue-500 focus:ring-blue-500"
+                    />
+                    <div class="flex-1">
+                        <p class="font-medium">💰 Thanh toán khi nhận hàng (COD)</p>
+                        <p class="text-sm text-gray-600">Thanh toán bằng tiền mặt khi nhận hàng</p>
+                    </div>
+                </label>
+
+                <label class="flex cursor-pointer items-center rounded-lg border border-gray-300 p-4 transition hover:border-blue-400 hover:bg-blue-50">
+                    <input
+                        v-model="guestForm.phuongThucThanhToan"
+                        type="radio"
+                        value="VNPAY"
+                        class="mr-3 text-blue-500 focus:ring-blue-500"
+                    />
+                    <div class="flex-1">
+                        <p class="font-medium">🏦 Thanh toán online (VNPay)</p>
+                        <p class="text-sm text-gray-600">Thanh toán qua thẻ ATM, Visa, MasterCard</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+                <!-- User Shipping Information Card -->
+                <div v-else class="mb-6 rounded-lg bg-white p-6 shadow-md">
                     <h2 class="mb-4 flex items-center text-xl font-semibold">
                         <span class="mr-2 text-2xl">📦</span>
                         THÔNG TIN GIAO HÀNG
@@ -1491,7 +2275,7 @@ onMounted(() => {
                         <button @click="goBackToCart" class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 py-3 font-medium transition hover:bg-gray-50">← QUAY LẠI GIỎ HÀNG</button>
                         <button
                             @click="submitOrder"
-                            :disabled="isLoading || cartItems.length === 0 || !selectedShippingAddress"
+                            :disabled="isLoading || cartItems.length === 0 || (isGuestMode ? false : !selectedShippingAddress)"
                             class="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 py-3 font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <span v-if="isLoading">⏳</span>
@@ -1580,6 +2364,29 @@ onMounted(() => {
                     <button @click="saveNewAddress" :disabled="!isNewAddressValid || isSavingAddress" class="flex-1 rounded-lg bg-orange-600 py-2 text-white transition hover:bg-orange-700 disabled:opacity-50">
                         {{ isSavingAddress ? 'Đang lưu...' : editingAddress ? 'Cập nhật' : 'Lưu địa chỉ' }}
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Success Modal (for both guest and user) -->
+    <div v-if="orderSuccess" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="mx-4 max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <div class="text-center">
+                <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                    <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="mb-2 text-xl font-semibold text-gray-900">Đặt hàng thành công!</h3>
+                <p class="mb-4 text-gray-600">Cảm ơn bạn đã mua hàng. Chúng tôi sẽ liên hệ với bạn sớm nhất.</p>
+                <div class="mb-4 rounded-lg bg-gray-100 p-3">
+                    <p class="text-sm text-gray-600">Mã đơn hàng:</p>
+                    <p class="text-lg font-bold text-gray-900">{{ orderCode }}</p>
+                </div>
+                <div class="space-y-2">
+                    <button @click="goToOrderTracking" class="w-full rounded-lg bg-blue-600 py-2 text-white transition hover:bg-blue-700">Theo dõi đơn hàng</button>
+                    <button @click="continueShopping" class="w-full rounded-lg border border-gray-300 py-2 text-gray-700 transition hover:bg-gray-50">Tiếp tục mua sắm</button>
                 </div>
             </div>
         </div>
