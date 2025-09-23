@@ -69,12 +69,26 @@ const isFromDetailModal = ref(false);
 // ===== API CONFIGURATION =====
 const API_BASE_URL = 'http://localhost:8080';
 
-const getAuthToken = () => localStorage.getItem('auth_token') || localStorage.getItem('token');
+const getAuthToken = () =>
+    localStorage.getItem('auth_token') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('accessToken') ||
+    sessionStorage.getItem('auth_token') ||
+    sessionStorage.getItem('token');
 
-const getAuthHeaders = () => ({
-    Authorization: `Bearer ${getAuthToken()}`,
-    'Content-Type': 'application/json'
-});
+const getAuthHeaders = () => {
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    };
+    const token = getAuthToken();
+    if (token) {
+        const cleanToken = token.replace(/^Bearer\s+/i, '');
+        headers.Authorization = `Bearer ${cleanToken}`;
+        headers['X-Auth-Token'] = cleanToken;
+    }
+    return headers;
+};
 
 // ===== COMPUTED PROPERTIES =====
 const filteredOrders = computed(() => {
@@ -1102,6 +1116,13 @@ const canReturnOrder = (order) => {
     return allowedStatuses.includes(order.trangThaiHoaDon);
 };
 
+// Cho phép hủy đơn cho KH: chỉ khi CHO_XAC_NHAN (theo backend /hoa-don/{id}/cancel)
+const canCancelOrder = (order) => {
+  if (!order) return false;
+  const status = (order.trangThaiHoaDon || '').toString().toUpperCase();
+  return status === 'CHO_XAC_NHAN';
+};
+
 const getReturnNotice = (order) => {
     const statusMessages = {
         CHO_XAC_NHAN: 'Đơn hàng chờ xác nhận',
@@ -1422,6 +1443,103 @@ const viewReturnHistoryFromDetail = async () => {
     }
 };
 
+// ===== CANCEL ORDER (HỦY ĐƠN) =====
+const cancelOrder = async (order) => {
+    if (!order) return;
+    const reason = prompt('Nhập lý do hủy đơn hàng:');
+    if (!reason || reason.trim() === '') {
+        toast.add({
+            severity: 'warn',
+            summary: 'Cảnh báo',
+            detail: 'Vui lòng nhập lý do hủy đơn',
+            life: 3000
+        });
+        return;
+    }
+
+    let lastError = null;
+
+    // 1) Khách hàng: POST /hoa-don/{id}/cancel (không có body)
+    try {
+        const resCancel = await fetch(`${API_BASE_URL}/hoa-don/${order.id}/cancel`, {
+            method: 'POST',
+            headers: getAuthHeaders()
+        });
+        if (resCancel.ok) {
+            const text = await resCancel.text();
+            let data; try { data = JSON.parse(text); } catch { data = { success: true, data: null }; }
+
+            let updatedOrder = data?.data || null;
+            if (!updatedOrder) updatedOrder = { trangThaiHoaDon: 'CANCELLED' };
+
+            const idx = orders.value.findIndex((o) => o.id === order.id);
+            if (idx !== -1) orders.value[idx] = { ...orders.value[idx], ...updatedOrder };
+            if (selectedOrder.value && selectedOrder.value.id === order.id) {
+                selectedOrder.value = { ...selectedOrder.value, ...updatedOrder };
+            }
+            if (selectedOrderDetail.value && selectedOrderDetail.value.id === order.id) {
+                selectedOrderDetail.value = { ...selectedOrderDetail.value, ...updatedOrder };
+            }
+
+            toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã hủy đơn hàng thành công', life: 3000 });
+            return;
+        } else if (resCancel.status === 403) {
+            lastError = new Error('Không có quyền truy cập tài nguyên này');
+            // Không thử tiếp nếu backend rõ ràng cấm quyền
+            console.error('Cancel by customer forbidden (403)');
+            // Nhưng vẫn thử admin endpoint như fallback nếu tài khoản là admin đăng nhập ở giao diện KH
+        } else {
+            const txt = await resCancel.text();
+            lastError = new Error(txt || `HTTP ${resCancel.status}`);
+        }
+    } catch (e) {
+        lastError = e;
+    }
+
+    // 2) Fallback: PUT /hoa-don/{id}/huy (thường cho admin/nhân viên) với body {lyDo}
+    try {
+        const resHuy = await fetch(`${API_BASE_URL}/hoa-don/${order.id}/huy`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ lyDo: reason })
+        });
+        const txt = await resHuy.text();
+        if (!resHuy.ok) {
+            if (resHuy.status === 403) {
+                lastError = new Error('Không có quyền truy cập tài nguyên này');
+            } else {
+                lastError = new Error(txt || `HTTP ${resHuy.status}`);
+            }
+        } else {
+            let data; try { data = JSON.parse(txt); } catch { data = { success: true, data: null }; }
+            let updatedOrder = data?.data || null;
+            if (!updatedOrder) updatedOrder = { trangThaiHoaDon: 'CANCELLED' };
+
+            const idx = orders.value.findIndex((o) => o.id === order.id);
+            if (idx !== -1) orders.value[idx] = { ...orders.value[idx], ...updatedOrder };
+            if (selectedOrder.value && selectedOrder.value.id === order.id) {
+                selectedOrder.value = { ...selectedOrder.value, ...updatedOrder };
+            }
+            if (selectedOrderDetail.value && selectedOrderDetail.value.id === order.id) {
+                selectedOrderDetail.value = { ...selectedOrderDetail.value, ...updatedOrder };
+            }
+
+            toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã hủy đơn hàng thành công', life: 3000 });
+            return;
+        }
+    } catch (e) {
+        lastError = e;
+    }
+
+    console.error('Error cancelling order:', lastError);
+    toast.add({
+        severity: 'error',
+        summary: 'Lỗi',
+        detail: `Không thể hủy đơn hàng: ${lastError?.message || 'Lỗi không xác định'}`,
+        life: 4000
+    });
+};
+
 const closeReturnHistoryModal = () => {
     showReturnHistoryModal.value = false;
     selectedOrder.value = null;
@@ -1675,6 +1793,11 @@ onMounted(() => {
                             <Button @click="viewReturnHistory(order)" outlined severity="info" size="small" class="history-btn">
                                 <i class="pi pi-history mr-1"></i>
                                 Lịch sử trả
+                            </Button>
+
+                            <Button v-if="canCancelOrder(order)" @click="cancelOrder(order)" outlined severity="danger" size="small" class="cancel-btn">
+                                <i class="pi pi-times mr-1"></i>
+                                Hủy đơn
                             </Button>
 
                             <Button v-if="canReturnOrder(order)" @click="selectOrderForReturn(order)" severity="warning" size="small" class="return-btn">

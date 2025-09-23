@@ -628,13 +628,14 @@ export default {
 
                 loadingPayment.value = true;
 
-                // ✅ SỬ DỤNG TRỰC TIẾP GIÁ TRỊ ĐÃ TÍNH TỪ COMPUTED tongQuan
-                const tongTienCanThanhToan = tinhTongThanhToan(); // Đã bao gồm voucher và điểm
+                // ✅ Tính tổng cần thanh toán (không dùng điểm tích lũy)
+                const tongTienCanThanhToan = tinhTongThanhToan(); // Đã bao gồm voucher, KHÔNG trừ điểm
 
                 // Lấy thông tin chi tiết để gửi lên server
                 const tienGiamVoucher = tongQuan.value.tongTienVoucher;
-                const diemSuDung = Number(thongTinThanhToan.value.diemSuDung) || 0;
-                const giaTriDiem = diemSuDung * 1000;
+                // Bỏ tính điểm
+                const diemSuDung = 0;
+                const giaTriDiem = 0;
 
                 // Chuẩn bị dữ liệu cho API - GỬI ĐẦY ĐỦ THÔNG TIN ĐỂ BACKEND TỰ TÍNH
                 const requestData = {
@@ -658,7 +659,7 @@ export default {
                     requestData.tienChuyenKhoan = Number(thongTinThanhToan.value.tienChuyenKhoan);
                 }
 
-                // Thêm thông tin khách hàng, voucher, điểm
+                // Thêm thông tin khách hàng và voucher (bỏ điểm)
                 if (khachHang.value?.id) {
                     requestData.khachHangId = Number(khachHang.value.id);
                 }
@@ -668,22 +669,13 @@ export default {
                     requestData.tienGiamVoucher = tienGiamVoucher; // ✅ Gửi số tiền giảm voucher
                 }
 
-                if (diemSuDung > 0) {
-                    const maxDiem = khachHang.value?.diemTichLuy || 0;
-                    if (diemSuDung > maxDiem) {
-                        showToastMessage(`Chỉ có thể sử dụng tối đa ${maxDiem} điểm`, 'error');
-                        loadingPayment.value = false;
-                        return;
-                    }
-                    requestData.diemSuDung = diemSuDung;
-                    requestData.giaTriDiem = giaTriDiem; // ✅ Gửi giá trị quy đổi điểm
-                }
+                // Không gửi thông tin điểm
 
                 console.log('🔍 Debug payment calculation:');
                 console.log('- Tổng tiền hàng:', tongQuan.value.tongTienKhuyenMai);
                 console.log('- Tiền giảm voucher:', tienGiamVoucher);
                 console.log('- Tổng sau voucher:', tongQuan.value.tongTienThanhToan);
-                console.log('- Điểm sử dụng:', diemSuDung, 'x 1000 =', giaTriDiem);
+                // Bỏ log điểm sử dụng
                 console.log('- Tổng cần thanh toán:', tongTienCanThanhToan);
                 console.log('🔍 Request data with voucher info:', requestData);
 
@@ -714,8 +706,8 @@ export default {
                         tienMat: responseData.tienMat || 0,
                         tienChuyenKhoan: responseData.tienChuyenKhoan || 0,
                         tienThua: responseData.tienThua || 0,
-                        diemSuDung: responseData.diemSuDung || 0,
-                        giaTriDiem: responseData.giaTriDiem || 0,
+                        diemSuDung: 0,
+                        giaTriDiem: 0,
                         voucherInfo: responseData.tenVoucher
                             ? {
                                   tenVoucher: responseData.tenVoucher,
@@ -1337,7 +1329,7 @@ export default {
                     showToastMessage(data.message || 'Lỗi cập nhật số lượng', 'error');
                 }
             } catch (error) {
-                showToastMessage(`${error.message}`, 'error');
+                showToastMessage(`Lỗi cập nhật: ${error.message}`, 'error');
             }
         };
 
@@ -1594,7 +1586,11 @@ export default {
 
                 const data = await apiCall(`${API_BASE_URL}/voucher/kha-dung?${params}`);
                 if (data.success) {
-                    danhSachVoucher.value = data.data || [];
+                    // ✅ THÊM: Xử lý ảnh voucher (sử dụng duongDanHinhAnh như VoucherList.vue)
+                    danhSachVoucher.value = (data.data || []).map(voucher => ({
+                        ...voucher,
+                        hinhAnh: createVoucherImageUrl(voucher.duongDanHinhAnh)
+                    }));
                 } else {
                     danhSachVoucher.value = [];
                 }
@@ -1605,6 +1601,18 @@ export default {
             } finally {
                 loadingVouchers.value = false;
             }
+        };
+
+        // ✅ THÊM: Helper function để tạo URL ảnh voucher (theo pattern VoucherList.vue)
+        const createVoucherImageUrl = (duongDanHinhAnh) => {
+            if (!duongDanHinhAnh) return null;
+            if (duongDanHinhAnh.startsWith('http://') || duongDanHinhAnh.startsWith('https://')) return duongDanHinhAnh;
+            return `http://localhost:8080${duongDanHinhAnh}`;
+        };
+
+        // ✅ THÊM: Helper function để xử lý lỗi ảnh voucher
+        const handleVoucherImageError = (event) => {
+            event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmaWxsPSIjNmM3NTdkIj5Wb3VjaGVyPC90ZXh0Pjwvc3ZnPg==';
         };
 
         const kiemTraVoucher = async () => {
@@ -1732,13 +1740,8 @@ export default {
 
         // =================== PAYMENT FUNCTIONS ===================
         const tinhTongThanhToan = () => {
-            let tong = tongQuan.value.tongTienThanhToan; // Đã bao gồm voucher
-
-            // Trừ điểm tích lũy nếu có
-            if (thongTinThanhToan.value.diemSuDung > 0) {
-                tong -= thongTinThanhToan.value.diemSuDung * 1000;
-            }
-
+            // Tổng thanh toán KHÔNG trừ điểm tích lũy nữa
+            const tong = tongQuan.value.tongTienThanhToan;
             return Math.max(0, tong);
         };
 
@@ -2465,7 +2468,7 @@ export default {
                                             <div class="flex-grow-1">
                                                 <div class="fw-bold">{{ khachHang.hoTen }}</div>
                                                 <div class="text-muted small">{{ khachHang.sdt }}</div>
-                                                <div class="small mt-1 text-primary">
+                                                <div v-if="false" class="small mt-1 text-primary">
                                                     <i class="bi bi-gem me-1"></i>
                                                     {{ khachHang.diemTichLuy || 0 }} điểm
                                                 </div>
@@ -2502,6 +2505,25 @@ export default {
 
                                             <div v-if="voucher" class="voucher-selected bg-light rounded border p-2">
                                                 <div class="d-flex justify-content-between align-items-center">
+                                                    <!-- ✅ THÊM: Ảnh voucher đã chọn -->
+                                                    <div class="me-3" style="flex-shrink: 0;">
+                                                        <img 
+                                                            v-if="voucher.hinhAnh" 
+                                                            :src="voucher.hinhAnh" 
+                                                            :alt="voucher.tenVoucher"
+                                                            @error="handleVoucherImageError"
+                                                            class="rounded"
+                                                            style="width: 50px; height: 50px; object-fit: cover;"
+                                                        />
+                                                        <div 
+                                                            v-else 
+                                                            class="d-flex align-items-center justify-content-center bg-white rounded border"
+                                                            style="width: 50px; height: 50px;"
+                                                        >
+                                                            <i class="bi bi-ticket text-muted"></i>
+                                                        </div>
+                                                    </div>
+                                                    
                                                     <div class="flex-grow-1">
                                                         <div class="fw-semibold">{{ voucher.tenVoucher }}</div>
                                                         <div class="text-success small">
@@ -2740,7 +2762,7 @@ export default {
                                             <p class="text-muted mb-1">{{ customer.sdt }}</p>
                                             <small class="text-muted">{{ customer.email || 'Chưa có email' }}</small>
                                         </div>
-                                        <span class="badge bg-primary">{{ customer.diemTichLuy || 0 }} điểm</span>
+                                        <span v-if="false" class="badge bg-primary">{{ customer.diemTichLuy || 0 }} điểm</span>
                                     </div>
                                 </button>
                             </div>
@@ -2786,6 +2808,25 @@ export default {
                             <div v-else class="list-group">
                                 <button v-for="voucher_item in danhSachVoucher" :key="voucher_item.id" @click="chonVoucher(voucher_item)" class="list-group-item list-group-item-action">
                                     <div class="d-flex justify-content-between align-items-center">
+                                        <!-- ✅ THÊM: Ảnh voucher -->
+                                        <div class="me-3" style="flex-shrink: 0;">
+                                            <img 
+                                                v-if="voucher_item.hinhAnh" 
+                                                :src="voucher_item.hinhAnh" 
+                                                :alt="voucher_item.tenVoucher"
+                                                @error="handleVoucherImageError"
+                                                class="rounded"
+                                                style="width: 60px; height: 60px; object-fit: cover;"
+                                            />
+                                            <div 
+                                                v-else 
+                                                class="d-flex align-items-center justify-content-center bg-light rounded"
+                                                style="width: 60px; height: 60px;"
+                                            >
+                                                <i class="bi bi-ticket text-muted"></i>
+                                            </div>
+                                        </div>
+                                        
                                         <div class="flex-grow-1">
                                             <h6 class="fw-bold mb-1">{{ voucher_item.tenVoucher }}</h6>
                                             <p class="text-muted small mb-1">
@@ -2857,7 +2898,7 @@ export default {
                                 </div>
 
                                 <!-- Điểm tích lũy -->
-                                <div v-if="khachHang && khachHang.diemTichLuy > 0" class="mb-3">
+                                <div v-if="false" class="mb-3">
                                     <label class="form-label"> Sử dụng điểm ({{ khachHang.diemTichLuy }} điểm có sẵn) </label>
                                     <div class="input-group">
                                         <input v-model.number="thongTinThanhToan.diemSuDung" type="number" min="0" :max="khachHang.diemTichLuy" class="form-control" placeholder="Nhập số điểm sử dụng" />
@@ -2896,7 +2937,7 @@ export default {
                                             <span>Voucher:</span>
                                             <span>-{{ formatPrice(tongQuan.tongTienVoucher) }}</span>
                                         </div>
-                                        <div v-if="thongTinThanhToan.diemSuDung > 0" class="d-flex justify-content-between text-info mb-2">
+                                        <div v-if="false" class="d-flex justify-content-between text-info mb-2">
                                             <span>Điểm tích lũy:</span>
                                             <span>-{{ formatPrice(thongTinThanhToan.diemSuDung * 1000) }}</span>
                                         </div>
@@ -3296,7 +3337,7 @@ export default {
                                                     <td class="label">Chuyển khoản:</td>
                                                     <td class="value amount">{{ formatPrice(thongTinThanhToanCuoi.tienChuyenKhoan) }}</td>
                                                 </tr>
-                                                <tr v-if="thongTinThanhToanCuoi?.diemSuDung > 0">
+                                                <tr v-if="false">
                                                     <td class="label">Điểm tích lũy:</td>
                                                     <td class="value amount discount">{{ thongTinThanhToanCuoi.diemSuDung }} điểm</td>
                                                 </tr>

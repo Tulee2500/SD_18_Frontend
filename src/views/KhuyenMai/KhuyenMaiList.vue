@@ -173,6 +173,18 @@
         <!-- Add/Edit Promotion Dialog -->
         <Dialog v-model:visible="khuyenMaiDialog" :style="{ width: '500px' }" :header="khuyenMai.id ? 'Cập nhật khuyến mãi' : 'Thêm khuyến mãi'" :modal="true">
             <div class="flex flex-col gap-6">
+                <!-- Mã Khuyến Mãi -->
+                <div>
+                    <label for="maKhuyenMai" class="mb-3 block font-bold">Mã Khuyến Mãi</label>
+                    <InputText 
+                        id="maKhuyenMai" 
+                        v-model="khuyenMai.maKhuyenMai" 
+                        fluid 
+                        readonly="true" 
+                        class="bg-gray-50" 
+                    />
+                    
+                </div>
                 <!-- Tên Khuyến Mãi -->
                 <div>
                     <label for="tenKhuyenMai" class="mb-3 block font-bold">
@@ -195,19 +207,6 @@
                     <small v-else-if="submitted && duplicateErrors.tenKhuyenMai" class="text-red-500">
                         {{ duplicateErrors.tenKhuyenMai }}
                     </small>
-                </div>
-
-                <!-- Mã Khuyến Mãi -->
-                <div>
-                    <label for="maKhuyenMai" class="mb-3 block font-bold">Mã Khuyến Mãi</label>
-                    <InputText 
-                        id="maKhuyenMai" 
-                        v-model="khuyenMai.maKhuyenMai" 
-                        fluid 
-                        readonly="true" 
-                        class="bg-gray-50" 
-                    />
-                    
                 </div>
 
                 <!-- Giá Trị Giảm -->
@@ -521,7 +520,6 @@
                         <Column field="chiTietSanPham.mauSac.tenMauSac" header="Màu Sắc" style="width: 120px">
                             <template #body="slotProps">
                                 <div class="flex items-center gap-2">
-                                    <span class="inline-block h-4 w-4 rounded-full border" :style="{ backgroundColor: slotProps.data.chiTietSanPham.mauSac?.maMau || '#ccc' }"></span>
                                     <span>{{ slotProps.data.chiTietSanPham.mauSac?.tenMauSac }}</span>
                                 </div>
                             </template>
@@ -670,7 +668,7 @@
 <script setup>
 import { FilterMatchMode } from '@primevue/core/api';
 import axios from 'axios';
-import { InputText, InputNumber } from 'primevue';
+import { InputText } from 'primevue';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
 
@@ -983,7 +981,8 @@ async function loadAvailableProducts() {
     isLoadingProducts.value = true;
     try {
         const res = await axios.get('http://localhost:8080/khuyen-mai-chi-tiet/products/available');
-        availableProducts.value = res.data;
+        const data = Array.isArray(res.data) ? res.data : [];
+        availableProducts.value = data.filter((p) => p?.sanPham?.id != null);
         selectedProductsForApply.value = [];
         productSearchKeyword.value = '';
     } catch (error) {
@@ -1017,8 +1016,10 @@ async function searchProducts() {
     isLoadingProducts.value = true;
     try {
         const res = await axios.get(`http://localhost:8080/khuyen-mai-chi-tiet/products/search?keyword=${productSearchKeyword.value}`);
-        availableProducts.value = res.data.filter((product) => {
-            return product.trangThai === 1 && product.giaGoc > 0;
+        const data = Array.isArray(res.data) ? res.data : [];
+        availableProducts.value = data.filter((product) => {
+            const hasProduct = product?.sanPham?.id != null;
+            return hasProduct && product.trangThai === 1 && product.giaGoc > 0;
         });
     } catch (error) {
         console.error('Error searching products:', error);
@@ -1151,7 +1152,8 @@ async function loadPromotionProducts(promotionId) {
     isLoadingPromotionProducts.value = true;
     try {
         const res = await axios.get(`http://localhost:8080/khuyen-mai-chi-tiet/${promotionId}`);
-        promotionProducts.value = res.data;
+        const raw = Array.isArray(res.data) ? res.data : [];
+        promotionProducts.value = raw.filter((item) => item?.chiTietSanPham?.sanPham?.id != null);
         
         // Kiểm tra trạng thái khuyến mãi và đảm bảo giá bán được hiển thị đúng
         const promotion = selectedPromotionForView.value;
