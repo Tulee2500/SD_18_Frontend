@@ -84,6 +84,7 @@ const showReturnDetailModal = ref(false);
 const showEvidenceModal = ref(false);
 const showReasonModal = ref(false);
 const showProcessAllModal = ref(false);
+const showApprovalModal = ref(false);
 
 // Selected items
 const selectedInvoiceForReturn = ref(null);
@@ -91,6 +92,9 @@ const selectedInvoiceForProcessAll = ref(null);
 const selectedEvidenceItem = ref(null);
 const selectedReasonItem = ref(null);
 const currentReturnItems = ref([]);
+const selectedReturnForApproval = ref(null);
+const approvalNote = ref('');
+const restoreInventory = ref(true);
 
 // ===== API FUNCTIONS =====
 
@@ -101,33 +105,6 @@ function forceStopLoading() {
     loadingMessage.value = '';
 }
 
-// Hàm test API endpoint
-async function testApiConnection() {
-    try {
-        console.log('🔍 Test kết nối API...');
-        const testUrl = `${API_BASE_URL}/api/chi-tiet-tra-hang/by-hoa-don/1`;
-        const response = await fetch(testUrl, {
-            method: 'GET',
-            headers: getAuthHeaders()
-        });
-        
-        console.log('📡 Test API response:', {
-            url: testUrl,
-            status: response.status,
-            ok: response.ok
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log('📊 Test data:', data);
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error('❌ Test API failed:', error);
-        return false;
-    }
-}
 
 async function fetchAllReturnRequests() {
     try {
@@ -240,47 +217,8 @@ async function fetchAllData() {
 }
 
 async function approveReturn(returnItem) {
-    try {
-        const response = await fetchWithErrorHandling(`${API_ENDPOINTS.chiTietTraHang}/${returnItem.id}/approve`, {
-            method: 'PUT',
-            body: JSON.stringify({
-                ghiChu: 'Đã chấp nhận trả hàng'
-            })
-        });
-
-        if (response.success) {
-            // Update local data
-            const productIndex = returnedProducts.value.findIndex((p) => p.id === returnItem.id);
-            if (productIndex !== -1) {
-                returnedProducts.value[productIndex].trangThaiHoaDon = 'APPROVED';
-            }
-
-            // Update in current modal if open
-            if (currentReturnItems.value.length > 0) {
-                const modalIndex = currentReturnItems.value.findIndex((p) => p.id === returnItem.id);
-                if (modalIndex !== -1) {
-                    currentReturnItems.value[modalIndex].trangThaiHoaDon = 'APPROVED';
-                }
-            }
-
-            toast.add({
-                severity: 'success',
-                summary: 'Thành công',
-                detail: 'Đã chấp nhận yêu cầu trả hàng',
-                life: 3000
-            });
-
-            await refreshAllData();
-        }
-    } catch (error) {
-        console.error('Error approving return:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Lỗi',
-            detail: 'Không thể chấp nhận yêu cầu trả hàng',
-            life: 3000
-        });
-    }
+    // Mở modal để chọn cách duyệt (hoàn kho hoặc không hoàn kho)
+    openApprovalModal(returnItem);
 }
 
 async function rejectReturn(returnItem) {
@@ -437,6 +375,82 @@ async function rejectAllReturns() {
             severity: 'error',
             summary: 'Lỗi',
             detail: 'Có lỗi khi xử lý hàng loạt',
+            life: 3000
+        });
+    }
+}
+
+// ===== APPROVAL WITH INVENTORY OPTIONS =====
+function openApprovalModal(returnItem) {
+    selectedReturnForApproval.value = returnItem;
+    approvalNote.value = '';
+    restoreInventory.value = true;
+    showApprovalModal.value = true;
+}
+
+function closeApprovalModal() {
+    showApprovalModal.value = false;
+    selectedReturnForApproval.value = null;
+    approvalNote.value = '';
+    restoreInventory.value = true;
+}
+
+async function confirmApproval() {
+    if (!selectedReturnForApproval.value) return;
+
+    try {
+        let endpoint = restoreInventory.value
+            ? `${API_ENDPOINTS.chiTietTraHang}/${selectedReturnForApproval.value.id}/approve-with-inventory`
+            : `${API_ENDPOINTS.chiTietTraHang}/${selectedReturnForApproval.value.id}/approve-no-inventory`;
+
+        let response;
+        try {
+            response = await fetchWithErrorHandling(endpoint, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    ghiChu: approvalNote.value || (restoreInventory.value ? 'Đã chấp nhận trả hàng và hoàn kho' : 'Đã chấp nhận trả hàng không hoàn kho')
+                })
+            });
+        } catch (err) {
+            // Fallback to legacy approve endpoint if specialized one not available
+            console.warn('Specialized approve endpoint failed, falling back to /approve. Error:', err?.message);
+            endpoint = `${API_ENDPOINTS.chiTietTraHang}/${selectedReturnForApproval.value.id}/approve`;
+            response = await fetchWithErrorHandling(endpoint, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    ghiChu: approvalNote.value || 'Đã chấp nhận trả hàng'
+                })
+            });
+        }
+
+        if (response.success) {
+            // Cập nhật local state
+            const id = selectedReturnForApproval.value.id;
+            const idx = returnedProducts.value.findIndex((p) => p.id === id);
+            if (idx !== -1) returnedProducts.value[idx].trangThaiHoaDon = 'APPROVED';
+
+            if (currentReturnItems.value.length > 0) {
+                const midx = currentReturnItems.value.findIndex((p) => p.id === id);
+                if (midx !== -1) currentReturnItems.value[midx].trangThaiHoaDon = 'APPROVED';
+            }
+
+            const inventoryMsg = restoreInventory.value ? ' và đã hoàn lại kho' : ' nhưng không hoàn kho';
+            toast.add({
+                severity: 'success',
+                summary: 'Thành công',
+                detail: `Đã chấp nhận yêu cầu trả hàng${inventoryMsg}`,
+                life: 3000
+            });
+
+            closeApprovalModal();
+            await refreshAllData();
+        }
+    } catch (error) {
+        console.error('Error approving return:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Lỗi',
+            detail: `Không thể chấp nhận yêu cầu trả hàng: ${error?.message || 'Đã xảy ra lỗi'}`,
             life: 3000
         });
     }
@@ -846,10 +860,6 @@ onMounted(() => {
                     <Button v-if="isLoading" @click="forceStopLoading" class="btn btn-warning" size="small">
                         <i class="pi pi-stop me-1"></i>
                         Dừng tải
-                    </Button>
-                    <Button @click="testApiConnection" class="btn btn-info" size="small">
-                        <i class="pi pi-cog me-1"></i>
-                        Test API
                     </Button>
                     <Button @click="exportData" class="btn btn-success" size="small">
                         <i class="pi pi-download me-1"></i>
@@ -1289,23 +1299,30 @@ onMounted(() => {
 
                         <!-- Actions -->
                         <div class="actions-section">
-                            <div class="action-buttons">
-                                <Button v-if="returnItem.duongDanAnh" @click="showEvidenceImage(returnItem)" size="small" severity="info" outlined title="Xem ảnh minh chứng">
-                                    <i class="pi pi-image me-1"></i>
-                                    Xem ảnh
-                                </Button>
-                                <Button v-if="returnItem.trangThaiHoaDon === 'PENDING'" @click="approveReturn(returnItem)" size="small" severity="success" title="Chấp nhận">
-                                    <i class="pi pi-check me-1"></i>
-                                    Duyệt
-                                </Button>
-                                <Button v-if="returnItem.trangThaiHoaDon === 'PENDING'" @click="rejectReturn(returnItem)" size="small" severity="danger" outlined title="Từ chối">
-                                    <i class="pi pi-times me-1"></i>
-                                    Từ chối
-                                </Button>
-                                <Button @click="viewProductReturnHistory(returnItem)" size="small" outlined title="Lịch sử">
-                                    <i class="pi pi-history me-1"></i>
-                                    Lịch sử
-                                </Button>
+                            <div class="actions-container">
+                                <div class="actions-left">
+                                    <Button v-if="returnItem.duongDanAnh" @click="showEvidenceImage(returnItem)" size="small" severity="info" outlined title="Xem ảnh minh chứng">
+                                        <i class="pi pi-image me-1"></i>
+                                        Xem ảnh
+                                    </Button>
+                                </div>
+
+                                <div class="actions-right action-block">
+                                    <div class="action-header">
+                                        <i class="pi pi-shopping-bag text-primary me-2"></i>
+                                        <span>Kinh doanh tiếp sản phẩm không ?</span>
+                                    </div>
+                                    <div class="action-body">
+                                        <Button v-if="returnItem.trangThaiHoaDon === 'PENDING'" @click="approveReturn(returnItem)" size="small" severity="success" title="Chấp nhận">
+                                            <i class="pi pi-check me-1"></i>
+                                            Duyệt
+                                        </Button>
+                                        <Button v-if="returnItem.trangThaiHoaDon === 'PENDING'" @click="rejectReturn(returnItem)" size="small" severity="danger" outlined title="Từ chối">
+                                            <i class="pi pi-times me-1"></i>
+                                            Từ chối
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1434,6 +1451,50 @@ onMounted(() => {
 
             <template #footer>
                 <Button @click="closeReturnDetailModal" outlined>
+                    <i class="pi pi-times me-1"></i>
+                    Đóng
+                </Button>
+            </template>
+        </Dialog>
+        
+        <!-- Modal: Approval with Inventory Options -->
+        <Dialog v-model:visible="showApprovalModal" modal :style="{ width: '600px' }" header="Xác nhận chấp nhận trả hàng">
+            <div v-if="selectedReturnForApproval" class="approval-content">
+                <div class="mb-3">
+                    <h6 class="mb-2">{{ selectedReturnForApproval.tenSanPham }}</h6>
+                    <div class="d-flex justify-content-between text-muted">
+                        <span>Mã: {{ selectedReturnForApproval.maChiTietTraHang || ('TH-' + selectedReturnForApproval.id) }}</span>
+                        <span>{{ formatDate(selectedReturnForApproval.ngayTaoTraHang) }}</span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Ghi chú</label>
+                    <InputText v-model="approvalNote" type="text" class="w-100" placeholder="Nhập ghi chú (không bắt buộc)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Hoàn kho</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <InputSwitch v-model="restoreInventory" />
+                        <small class="text-muted">Bật để hoàn lại kho</small>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-center gap-3">
+                    <Button @click="confirmApproval" severity="success" size="large" class="px-4">
+                        <i class="pi pi-check me-2"></i>
+                        Xác nhận
+                    </Button>
+                    <Button @click="closeApprovalModal" severity="danger" size="large" outlined class="px-4">
+                        <i class="pi pi-times me-2"></i>
+                        Hủy
+                    </Button>
+                </div>
+            </div>
+
+            <template #footer>
+                <Button @click="closeApprovalModal" outlined>
                     <i class="pi pi-times me-1"></i>
                     Đóng
                 </Button>
@@ -1993,6 +2054,43 @@ onMounted(() => {
 }
 
 .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* New actions layout */
+.actions-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.actions-left {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.action-block {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.action-header {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+}
+
+.action-body {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;

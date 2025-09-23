@@ -36,7 +36,7 @@
                         </InputIcon>
                         <InputText
                             v-model="globalSearch"
-                            placeholder="Tìm kiếm tất cả thông tin nhân viên (tên, email, SĐT, mã NV, địa chỉ, tài khoản)..."
+                            placeholder="Tìm kiếm tất cả thông tin nhân viên (tên, email, SĐT, mã NV, tài khoản)..."
                             @input="onGlobalSearchInput"
                             class="w-full text-lg py-3"
                         />

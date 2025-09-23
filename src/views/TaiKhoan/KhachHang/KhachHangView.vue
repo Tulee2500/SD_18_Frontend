@@ -30,7 +30,7 @@
                         </InputIcon>
                         <InputText
                             v-model="globalSearch"
-                            placeholder="Tìm kiếm tất cả thông tin khách hàng (tên, email, SĐT, mã KH, địa chỉ, tài khoản)..."
+                            placeholder="Tìm kiếm tất cả thông tin khách hàng (tên, email, SĐT, mã KH, tài khoản)..."
                             @input="debouncedGlobalSearch"
                             class="w-full text-lg py-3"
                         />

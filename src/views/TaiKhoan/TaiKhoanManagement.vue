@@ -16,7 +16,7 @@
                 <Button 
                     label="Xuất CSV" 
                     icon="pi pi-upload" 
-                    severity="secondary" 
+                    severity="secondary" p-button p-component p-button-icon-only p-button-danger p-button-outlined p-button-sm
                     @click="handleExportCSV" 
                     :loading="exporting" 
                 />
@@ -244,14 +244,14 @@
                             @click="handleChangeStatus(slotProps.data)" 
                             :title="slotProps.data.trangThai === 1 ? 'Ngưng hoạt động' : 'Kích hoạt'" 
                         />
-                        <Button 
+                        <!-- <Button 
                             icon="pi pi-trash" 
                             outlined 
                             severity="danger" 
                             size="small" 
                             @click="confirmDeleteAccount(slotProps.data)" 
                             title="Xóa" 
-                        />
+                        /> -->
                     </div>
                 </template>
             </Column>
@@ -359,7 +359,7 @@
                     <div class="grid grid-cols-2 gap-4 mt-4">
      
 <!-- Đoạn code cần sửa trong template (dòng 360-376) -->
-<div class="grid grid-cols-2 gap-4 mt-4">
+<!-- <div class="grid grid-cols-2 gap-4 mt-4">
     <div>
         <label for="addNgaySinh" class="mb-3 block font-bold">Ngày sinh</label>
         <Calendar
@@ -374,7 +374,7 @@
         />
         <small class="text-gray-500">Tùy chọn - để trống nếu không có</small>
     </div>
-</div>
+</div> -->
 </div>
 
 
@@ -2116,26 +2116,18 @@ const checkBackendHealth = async () => {
     }
 }
 
-// ===== SAVE ACCOUNT METHOD =====
 const handleSaveAccount = async () => {
     submitted.value = true
     saving.value = true
     
     try {
-        // Kiểm tra backend health trước
-        console.log('🔍 Checking backend health...')
-        const isHealthy = await checkBackendHealth()
-        if (!isHealthy) {
-            throw new Error('Backend server không phản hồi. Vui lòng kiểm tra kết nối và đảm bảo server đang chạy.')
-        }
-        
-        validationErrors.value = {}
-        
-        if (!validateForm()) {
+        // Validation
+        const isValid = await validateForm()
+        if (!isValid) {
             toast.add({
                 severity: 'warn',
                 summary: 'Dữ liệu không hợp lệ',
-                detail: 'Vui lòng kiểm tra và sửa các lỗi được đánh dấu màu đỏ',
+                detail: 'Vui lòng kiểm tra các lỗi được đánh dấu màu đỏ',
                 life: 4000
             })
             return
@@ -2242,22 +2234,26 @@ const handleSaveAccount = async () => {
                 headers: error.config?.headers
             }
         })
-        
-        // Hiển thị lỗi chi tiết trong confirm dialog
+
+        // Gọi handler chung để hiển thị toast thân thiện và gán lỗi field
+        handleApiError(error, 'Không thể tạo tài khoản')
+
+        // Chuẩn bị thông tin cho confirm dialog (chỉ hiển thị khi không phải lỗi trùng lặp dữ liệu)
         let errorMessage = 'Không thể tạo tài khoản'
         let errorDetail = ''
-        
-        if (error.response?.data?.message) {
-            errorDetail = error.response.data.message
-        } else if (error.response?.data?.errors) {
-            const errors = Object.values(error.response.data.errors)
+
+        const respData = error.response?.data
+        if (respData?.message) {
+            errorDetail = respData.message
+        } else if (respData?.errors) {
+            const errors = Object.values(respData.errors)
             errorDetail = errors.join('\n')
         } else if (error.message) {
             errorDetail = error.message
         } else {
             errorDetail = 'Lỗi không xác định từ server'
         }
-        
+
         // Kiểm tra backend health
         if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
             errorMessage = 'Không thể kết nối đến server'
@@ -2266,30 +2262,40 @@ const handleSaveAccount = async () => {
             errorMessage = 'Không có quyền truy cập'
             errorDetail = 'Token xác thực không hợp lệ hoặc đã hết hạn'
         } else if (error.response?.status === 409) {
-            errorMessage = 'Email đã tồn tại'
-            errorDetail = 'Email này đã được sử dụng bởi tài khoản khác'
+            errorMessage = 'Dữ liệu bị trùng lặp'
+            errorDetail = respData?.message || 'Email hoặc số điện thoại đã tồn tại trong hệ thống'
         } else if (error.response?.status === 500) {
             errorMessage = 'Lỗi server'
-            errorDetail = 'Có lỗi xảy ra ở phía server. Vui lòng thử lại sau'
+            errorDetail = respData?.message || 'Có lỗi xảy ra ở phía server. Vui lòng thử lại sau'
         }
-        
-        confirm.require({
-            message: `❌ ${errorMessage}\n\n📋 Chi tiết lỗi:\n${errorDetail}`,
-            header: 'Lỗi tạo tài khoản',
-            icon: 'pi pi-exclamation-triangle',
-            rejectClass: 'p-button-secondary p-button-outlined',
-            rejectLabel: 'Đóng',
-            acceptLabel: 'Thử lại',
-            acceptClass: 'p-button-warning',
-            accept: () => {
-                // Thử lại tạo tài khoản
-                handleSaveAccount();
-            },
-            reject: () => {
-                // Đóng dialog và reset state
-                hideAddDialog();
-            }
-        })
+
+        // Nếu là lỗi trùng email/số điện thoại thì KHÔNG bật confirm (đã hiển thị toast + gán lỗi field)
+        const msg = (respData?.message || '').toLowerCase()
+        const isDuplicateCase = [400, 409].includes(error.response?.status || 0) || (
+            error.response?.status === 500 && (
+                msg.includes('đã tồn tại') || msg.includes('duplicate') || msg.includes('unique') || msg.includes('trùng') || msg.includes('constraint') || msg.includes('phone') || msg.includes('sdt') || msg.includes('điện thoại') || msg.includes('email')
+            )
+        )
+
+        if (!isDuplicateCase) {
+            confirm.require({
+                message: `❌ ${errorMessage}\n\n📋 Chi tiết lỗi:\n${errorDetail}`,
+                header: 'Lỗi tạo tài khoản',
+                icon: 'pi pi-exclamation-triangle',
+                rejectClass: 'p-button-secondary p-button-outlined',
+                rejectLabel: 'Đóng',
+                acceptLabel: 'Thử lại',
+                acceptClass: 'p-button-warning',
+                accept: () => {
+                    // Thử lại tạo tài khoản
+                    handleSaveAccount();
+                },
+                reject: () => {
+                    // Đóng dialog và reset state
+                    hideAddDialog();
+                }
+            })
+        }
     } finally {
         saving.value = false
     }
@@ -2362,10 +2368,10 @@ const handleApiError = (error, defaultMessage) => {
                     errorDetail = data.message
                     
                     if (data.message.includes('Email đã tồn tại')) {
-                        validationErrors.value.email = 'Email này đã tồn tại trong hệ thống'
-                        validationErrors.value.accountEmail = 'Email này đã tồn tại trong hệ thống'
+                        validationErrors.value.email = 'Email đã tồn tại'
+                        validationErrors.value.accountEmail = 'Email đã tồn tại'
                     } else if (data.message.includes('Số điện thoại đã tồn tại')) {
-                        validationErrors.value.sdt = 'Số điện thoại này đã tồn tại trong hệ thống'
+                        validationErrors.value.sdt = 'Số điện thoại đã tồn tại'
                     }
                 }
                 break
@@ -2392,16 +2398,41 @@ const handleApiError = (error, defaultMessage) => {
                 
             case 500:
                 errorMessage = 'Lỗi hệ thống'
-                errorDetail = 'Có lỗi xảy ra trên máy chủ. Vui lòng thử lại sau.'
+                errorDetail = data.message || 'Có lỗi xảy ra ở phía server. Vui lòng thử lại sau.'
                 
-                if (data.message && data.message.includes('constraint')) {
-                    severity = 'warn'
-                    errorDetail = 'Vi phạm ràng buộc dữ liệu. Email hoặc số điện thoại có thể đã tồn tại.'
+                {
+                    const msg = (data.message || '').toLowerCase()
+                    // Nếu backend trả 500 nhưng có dấu hiệu trùng lặp/constraint, chuyển sang cảnh báo và gán lỗi field cụ thể
+                    if (msg.includes('constraint') || msg.includes('duplicate') || msg.includes('unique') || msg.includes('đã tồn tại') || msg.includes('trùng')) {
+                        severity = 'warn'
+                        if (msg.includes('email')) {
+                            validationErrors.value.email = 'Email đã tồn tại'
+                            validationErrors.value.accountEmail = 'Email đã tồn tại'
+                            errorDetail = 'Email đã tồn tại trong hệ thống'
+                        }
+                        if (msg.includes('phone') || msg.includes('sdt') || msg.includes('điện thoại')) {
+                            validationErrors.value.sdt = 'Số điện thoại đã tồn tại'
+                            errorDetail = 'Số điện thoại đã tồn tại trong hệ thống'
+                        }
+                        if (!validationErrors.value.email && !validationErrors.value.sdt) {
+                            errorDetail = 'Vi phạm ràng buộc dữ liệu. Email hoặc số điện thoại có thể đã tồn tại.'
+                        }
+                    }
                 }
                 break
                 
             default:
-                errorDetail = data?.message || error.message || 'Lỗi không xác định từ máy chủ'
+            errorDetail = data?.message || error.message || 'Lỗi không xác định từ máy chủ'
+            {
+                const msg = (data?.message || '').toLowerCase()
+                if (msg.includes('email')) {
+                    validationErrors.value.email = validationErrors.value.email || 'Email không hợp lệ hoặc đã tồn tại'
+                    validationErrors.value.accountEmail = validationErrors.value.accountEmail || 'Email không hợp lệ hoặc đã tồn tại'
+                }
+                if (msg.includes('phone') || msg.includes('sdt') || msg.includes('điện thoại')) {
+                    validationErrors.value.sdt = validationErrors.value.sdt || 'Số điện thoại không hợp lệ hoặc đã tồn tại'
+                }
+            }
         }
     } else if (error.code === 'ECONNREFUSED') {
         errorMessage = 'Lỗi kết nối'

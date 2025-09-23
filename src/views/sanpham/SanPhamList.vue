@@ -1,8 +1,9 @@
+Code sản phẩm 
 <script setup>
-import { FilterMatchMode , FilterOperator  } from '@primevue/core/api';
+import { FilterMatchMode, FilterOperator } from '@primevue/core/api';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref , watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 // Cấu hình API base URL
 const API_BASE_URL = 'http://localhost:8080';
@@ -13,6 +14,7 @@ const products = ref([]);
 const productDialog = ref(false);
 const deleteProductDialog = ref(false);
 const confirmAddDialog = ref(false);
+const confirmAddDetailDialog = ref(false);
 // const confirmDetailDialog = ref(false);
 
 const deleteProductsDialog = ref(false);
@@ -1247,6 +1249,15 @@ function createId() {
     return 'CTSP' + id;
 }
 
+function createQR() {
+    let id = '';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 8; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return 'QR' + id;
+}
+
 function createProductId() {
     let id = '';
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -1433,6 +1444,7 @@ async function deleteSelectedProducts() {
 function openNewDetail(productId) {
     detail.value = {
         maChiTiet: createId(),
+        maQR: createQR(),
         soLuong: 0,
         giaGoc: null,
         giaBan: null,
@@ -1722,7 +1734,7 @@ async function saveDetail() {
         requiredFields.push('Mã chi tiết');
     }
     
-   if (detail.value.soLuong == null || detail.value.soLuong === '' || detail.value.soLuong <= 0) {
+    if (detail.value.soLuong == null || detail.value.soLuong === '' || detail.value.soLuong <= 0) {
         requiredFields.push('Số lượng phải > 0');
     } else if (detail.value.soLuong > 10000) {
         requiredFields.push('Số lượng tối đa = 10.000');
@@ -1784,6 +1796,7 @@ async function saveDetail() {
             // CẬP NHẬT CHI TIẾT HIỆN CÓ - CHỈ 1 BIẾN THỂ
             const detailData = {
                 maChiTiet: detail.value.maChiTiet,
+                maQR: detail.value.maQR || createQR(), // ĐẢM BẢO LUÔN CÓ MÃ QR
                 soLuong: Math.max(0, detail.value.soLuong || 0),
                 giaGoc: Math.max(0, detail.value.giaGoc || 0),
                 giaBan: Math.max(0, detail.value.giaBan || 0),
@@ -1803,6 +1816,7 @@ async function saveDetail() {
             console.log('🔄 Updating detail with data:', detailData);
             console.log('🎨 Màu sắc gửi đi:', detailData.mauSac);
             console.log('📏 Kích cỡ gửi đi:', detailData.kichCo);
+            console.log('🔗 Mã QR gửi đi:', detailData.maQR);
             
             await axios.put(`${API_BASE_URL}/api/san-pham-chi-tiet/update/${detail.value.id}`, detailData);
             
@@ -1840,6 +1854,7 @@ async function saveDetail() {
                     
                     const variantData = {
                         maChiTiet: createId(),
+                        maQR: createQR(), // TẠO MÃ QR RIÊNG CHO TỪNG BIẾN THỂ
                         soLuong: Math.max(0, detail.value.soLuong || 0),
                         giaGoc: Math.max(0, detail.value.giaGoc || 0),
                         giaBan: Math.max(0, detail.value.giaBan || 0),
@@ -1874,9 +1889,10 @@ async function saveDetail() {
             // Lưu từng biến thể hợp lệ
             for (const variant of validVariants) {
                 try {
+                    console.log(`📦 Creating variant with QR: ${variant.maQR} for ${variant.maChiTiet}`);
                     await axios.post(`${API_BASE_URL}/api/san-pham-chi-tiet/save`, variant);
                     successCount++;
-                    console.log(`✅ Created variant: ${variant.maChiTiet}`);
+                    console.log(`✅ Created variant: ${variant.maChiTiet} with QR: ${variant.maQR}`);
                 } catch (error) {
                     errorCount++;
                     console.error(`❌ Failed to create variant ${variant.maChiTiet}:`, error);
@@ -1885,7 +1901,7 @@ async function saveDetail() {
             
             // THÔNG BÁO KẾT QUẢ CHI TIẾT
             if (successCount > 0) {
-                let message = `Đã tạo ${successCount} biến thể mới`;
+                let message = `Đã tạo thành công ${successCount} biến thể `;
                 if (skippedCount > 0) {
                     message += `, bỏ qua ${skippedCount} biến thể trùng lặp`;
                 }
@@ -1895,7 +1911,7 @@ async function saveDetail() {
                 
                 toast.add({ 
                     severity: 'success', 
-                    summary: 'Thành công', 
+                    summary: 'Thêm thành thành công', 
                     detail: message, 
                     life: 4000 
                 });
@@ -2035,9 +2051,10 @@ function handleAddSanPhamConfirm() {
   saveProduct();              // gọi API thêm sản phẩm
   confirmAddDialog.value = false; // tắt dialog confirm
 }
-function handleUpdateSanPhamConfirm() {
-  editProduct();              // gọi API cập nhật sản phẩm
-  confirmUpdateDialog.value = false; // tắt dialog confirm
+
+function handleAddChiTiet() {
+  saveDetail();              // gọi API cập nhật sản phẩm
+  confirmAddDetailDialog.value = false; // tắt dialog confirm
 }
 
 
@@ -2480,6 +2497,12 @@ function collapseAll() {
                                 </template>
                             </Column>
                             <Column field="maChiTiet" header="Mã chi tiết" sortable style="min-width: 10rem"></Column>
+                           <Column field="maQR" header="Mã QR" sortable style="min-width: 12rem">
+                                <template #body="detailProps">
+                                    <span class="font-mono text-sm">{{ detailProps.data.maQR }}</span>
+                                </template>
+                            </Column>
+    
                             <Column field="size" header="Kích cỡ" sortable style="min-width: 8rem"></Column>
                             <Column field="color" header="Màu sắc" sortable style="min-width: 8rem"></Column>
                             <Column field="soLuong" header="Số lượng" sortable style="min-width: 8rem">
@@ -2717,6 +2740,19 @@ function collapseAll() {
                             :readonly="detail.isEditing" 
                         />
                         <small v-if="submitted && !detail.maChiTiet" class="text-red-500">Mã chi tiết là bắt buộc.</small>
+                    </div>
+                      <div class="col-span-6">
+                        <label for="maQR" class="block font-bold mb-3">
+                            Mã QR
+                        </label>
+                        <InputText 
+                            id="maQR" 
+                            v-model.trim="detail.maQR" 
+                            fluid 
+                            readonly="true"
+                            placeholder="Tự động tạo"
+                            class="bg-gray-50"
+                        />
                     </div>
                     <div class="col-span-4">
                         <label for="soLuong" class="block font-bold mb-3">Số lượng </label>
@@ -3054,14 +3090,14 @@ function collapseAll() {
                     v-if="detail.isEditing"
                     label="Cập nhật chi tiết" 
                     icon="pi pi-save" 
-                    @click="saveDetail" 
+                    @click="confirmAddDetailDialog = true" 
                     :loading="loading"
                 />
                 <Button 
                     v-else
                     :label="'Thêm chi tiết'" 
                     icon="pi pi-plus" 
-                    @click="saveDetail" 
+                    @click="confirmAddDetailDialog = true" 
                     :loading="loading"
                     :severity="getValidVariantsCount > 0 ? 'primary' : 'secondary'"
                 />
@@ -3220,6 +3256,21 @@ function collapseAll() {
             <template #footer>
                 <Button label="Hủy bỏ" icon="pi pi-times" text @click="deleteDetailDialog = false" :disabled="loading" />
                 <Button label="Xóa" icon="pi pi-trash" severity="danger" @click="deleteDetail" :loading="loading" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="confirmAddDetailDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="detail" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này ?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDetailDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddChiTiet" :loading="loading" />
             </template>
         </Dialog>
 
@@ -3466,3 +3517,4 @@ function collapseAll() {
     }
 }
 </style>
+
