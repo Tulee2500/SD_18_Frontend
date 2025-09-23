@@ -305,7 +305,6 @@ const loadGuestCart = async () => {
                     size: it.size ?? it.kichCo ?? it.sizeName ?? null,
                     color: it.color ?? it.mauSac ?? it.colorName ?? null,
                     stock: it.stock ?? it.soLuongTon ?? null,
-                    points: it.points ?? 0,
                     totalPrice: Number(it.totalPrice ?? price * quantity)
                 };
             });
@@ -406,7 +405,7 @@ const goToOrderTracking = () => {
         window.location.href = `/track-order?email=${encodeURIComponent(guestForm.value.email)}&code=${orderCode.value}`;
     } else {
         // Điều hướng user đã đăng nhập tới trang đơn hàng của họ
-        router.push('/profileOrders');
+        router.push('/returnGoods');
     }
 };
 
@@ -1287,6 +1286,27 @@ const submitGuestOrderWithEmail = async () => {
         console.log('Cart items:', JSON.parse(JSON.stringify(cartItems.value)));
         console.log('Subtotal:', subtotal.value, 'Shipping:', shippingFee.value, 'Total:', total.value);
 
+        // Chuẩn bị thông tin voucher đầy đủ
+        const voucherData = discount.value.voucher ? {
+            voucherId: discount.value.voucher.id,
+            maVoucher: discount.value.code,
+            tenVoucher: discount.value.voucher.tenVoucher,
+            loaiGiamGia: discount.value.voucher.loaiGiamGia,
+            giaTriGiam: discount.value.voucher.giaTriGiam,
+            giaTriGiamToiDa: discount.value.voucher.giaTriGiamToiDa,
+            giaTriGiamToiThieu: discount.value.voucher.giaTriGiamToiThieu,
+            giaTriVoucher: discount.value.value
+        } : {
+            voucherId: null,
+            maVoucher: null,
+            tenVoucher: null,
+            loaiGiamGia: null,
+            giaTriGiam: 0,
+            giaTriGiamToiDa: null,
+            giaTriGiamToiThieu: 0,
+            giaTriVoucher: 0
+        };
+
         const orderData = {
             khachHangId: null,
             tenNguoiDung: guestForm.value.tenNguoiDung,
@@ -1301,12 +1321,18 @@ const submitGuestOrderWithEmail = async () => {
             tongTien: subtotal.value,
             phiVanChuyen: shippingFee.value,
             tongThanhToan: total.value,
-            diemSuDung: 0,
-            giaTriDiem: discount.value.value || 0,
-            voucherId: discount.value.voucher?.id || null,
-            maVoucher: discount.value.code || null,
-            giaTriVoucher: discount.value.value || 0,
             ngayTao: new Date().toISOString(),
+            
+            // Thông tin voucher đầy đủ
+            voucherId: voucherData.voucherId,
+            maVoucher: voucherData.maVoucher,
+            tenVoucher: voucherData.tenVoucher,
+            loaiGiamGia: voucherData.loaiGiamGia,
+            giaTriGiam: voucherData.giaTriGiam,
+            giaTriGiamToiDa: voucherData.giaTriGiamToiDa,
+            giaTriGiamToiThieu: voucherData.giaTriGiamToiThieu,
+            giaTriVoucher: voucherData.giaTriVoucher,
+            
             chiTietSanPham: cartItems.value.map((item) => ({
                 idChiTietSanPham: item.productDetailId,
                 soLuong: item.quantity,
@@ -1430,6 +1456,27 @@ const submitUserOrderWithEmail = async () => {
         console.log('Cart items:', JSON.parse(JSON.stringify(cartItems.value)));
         console.log('Subtotal:', subtotal.value, 'Shipping:', shippingFee.value, 'Total:', total.value);
 
+        // Chuẩn bị thông tin voucher đầy đủ
+        const voucherData = discount.value.voucher ? {
+            voucherId: discount.value.voucher.id,
+            maVoucher: discount.value.code,
+            tenVoucher: discount.value.voucher.tenVoucher,
+            loaiGiamGia: discount.value.voucher.loaiGiamGia,
+            giaTriGiam: discount.value.voucher.giaTriGiam,
+            giaTriGiamToiDa: discount.value.voucher.giaTriGiamToiDa,
+            giaTriGiamToiThieu: discount.value.voucher.giaTriGiamToiThieu,
+            giaTriVoucher: discount.value.value
+        } : {
+            voucherId: null,
+            maVoucher: null,
+            tenVoucher: null,
+            loaiGiamGia: null,
+            giaTriGiam: 0,
+            giaTriGiamToiDa: null,
+            giaTriGiamToiThieu: 0,
+            giaTriVoucher: 0
+        };
+
         const orderData = {
             khachHangId: userInfo.value.id,
             tenNguoiDung: selectedShippingAddress.value.tenNguoiNhan,
@@ -1444,11 +1491,18 @@ const submitUserOrderWithEmail = async () => {
             tongTien: subtotal.value,
             phiVanChuyen: shippingFee.value,
             tongThanhToan: total.value,
-            diemSuDung: 0,
-            giaTriDiem: discount.value.value,
-            voucherId: discount.value.voucher?.id || null,
-            maVoucher: discount.value.code || null,
             ngayTao: new Date().toISOString(),
+            
+            // Thông tin voucher đầy đủ
+            voucherId: voucherData.voucherId,
+            maVoucher: voucherData.maVoucher,
+            tenVoucher: voucherData.tenVoucher,
+            loaiGiamGia: voucherData.loaiGiamGia,
+            giaTriGiam: voucherData.giaTriGiam,
+            giaTriGiamToiDa: voucherData.giaTriGiamToiDa,
+            giaTriGiamToiThieu: voucherData.giaTriGiamToiThieu,
+            giaTriVoucher: voucherData.giaTriVoucher,
+            
             chiTietSanPham: cartItems.value.map((item) => ({
                 idChiTietSanPham: item.productDetailId,
                 soLuong: item.quantity,
