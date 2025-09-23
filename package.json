@@ -11,6 +11,7 @@
         "lint": "eslint --fix . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
     },
     "dependencies": {
+        "@emailjs/browser": "^4.4.1",
         "@popperjs/core": "^2.11.8",
         "@primeuix/themes": "^1.0.0",
         "axios": "^1.10.0",

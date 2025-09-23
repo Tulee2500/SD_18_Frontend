@@ -1,868 +1,748 @@
-<template>
-    <div class="order-detail-container max-w-4xl mx-auto">
-      <!-- Custom Confirmation Modal -->
-      <Transition name="modal">
-        <div v-if="confirmModal.show" class="fixed inset-0 z-50 overflow-y-auto">
-          <!-- Backdrop -->
-          <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="hideConfirmModal">
-              <div class="absolute inset-0 bg-gray-900 opacity-75"></div>
-            </div>
+<script setup>
+import axios from 'axios';
+import { useToast } from 'primevue/usetoast';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 
-            <!-- Modal -->
-            <div class="inline-block align-bottom bg-white rounded-2xl px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-              <!-- Icon -->
-              <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-4"
-                   :class="{
-                     'bg-red-100': confirmModal.type === 'danger',
-                     'bg-yellow-100': confirmModal.type === 'warning',
-                     'bg-blue-100': confirmModal.type === 'info'
-                   }">
-                <svg v-if="confirmModal.type === 'danger'" class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <svg v-else-if="confirmModal.type === 'warning'" class="h-8 w-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <svg v-else class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+const router = useRouter();
+const route = useRoute();
+const toast = useToast();
 
-              <!-- Content -->
-              <div class="text-center">
-                <h3 class="text-lg leading-6 font-bold text-gray-900 mb-2">
-                  {{ confirmModal.title }}
-                </h3>
-                <div class="mt-2">
-                  <p class="text-sm text-gray-600" v-html="confirmModal.message"></p>
-                </div>
-              </div>
+// State
+const orders = ref([]);
+const isLoadingOrders = ref(false);
+const orderDetails = reactive({});
+const loadingOrderDetails = reactive({});
+const showAllProducts = reactive({});
+const showAllOrders = ref(false);
 
-              <!-- Actions -->
-              <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-center gap-3">
-                <button
-                  type="button"
-                  class="w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 sm:w-auto sm:text-sm transition-all"
-                  @click="hideConfirmModal"
-                  :disabled="confirmModal.loading"
-                >
-                  {{ confirmModal.cancelText }}
-                </button>
-                <button
-                  type="button"
-                  class="w-full inline-flex justify-center items-center rounded-xl border border-transparent shadow-sm px-4 py-3 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:w-auto sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="{
-                    'bg-red-600 hover:bg-red-700 focus:ring-red-500': confirmModal.type === 'danger',
-                    'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500': confirmModal.type === 'warning',
-                    'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500': confirmModal.type === 'info'
-                  }"
-                  @click="handleConfirm"
-                  :disabled="confirmModal.loading"
-                >
-                  <svg v-if="confirmModal.loading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {{ confirmModal.loading ? 'Đang xử lý...' : confirmModal.confirmText }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Transition>
+// State để cache URL ảnh
+const imageCache = ref({});
+const loadingImages = ref(new Set());
 
-      <!-- Loading State -->
-      <div v-if="isLoading" class="flex justify-center items-center py-20">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-      </div>
+// API Configuration
+const API_BASE_URL = 'http://localhost:8080';
 
-      <!-- Order Not Found -->
-      <div v-else-if="!order" class="text-center py-20">
-        <i class="pi pi-exclamation-triangle text-6xl text-gray-400 mb-4"></i>
-        <h3 class="text-xl font-semibold text-gray-700 mb-2">Không tìm thấy đơn hàng</h3>
-        <p class="text-gray-500 mb-6">Đơn hàng không tồn tại hoặc đã bị xóa.</p>
-        <button
-          @click="goBack"
-          class="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition"
-        >
-          Quay lại
-        </button>
-      </div>
+// Detail mode based on route param
+const isDetailMode = computed(() => !!route.params.id);
+const currentOrderId = computed(() => (route.params.id ? String(route.params.id) : null));
+const currentOrder = computed(() => {
+    if (!isDetailMode.value) return null;
+    return orders.value.find((o) => String(o.id) === currentOrderId.value) || null;
+});
 
-      <!-- Order Detail Content -->
-      <div v-else class="bg-white rounded-lg shadow-sm overflow-hidden">
-        <!-- Header -->
-        <div class="bg-white border-b border-gray-200 px-6 py-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h1 class="text-xl font-semibold text-gray-800">
-                CHI TIẾT ĐƠN HÀNG - #{{ order.maHoaDon || order.id }}
-              </h1>
-              <div class="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                <span>Ngày đặt hàng: <strong>{{ formatDate(order.ngayTao) }}</strong></span>
-                <span>Trạng thái:
-                  <span :class="['font-medium', getStatusColor(order.trangThaiHoaDon)]">
-                    {{ getStatusLabel(order.trangThaiHoaDon) }}
-                  </span>
-                </span>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <!-- Nút hủy đơn hàng -->
-              <button
-                v-if="canCancelOrder()"
-                @click="showCancelConfirmation"
-                :disabled="isCancelling"
-                class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
-              >
-                <i class="pi pi-times"></i>
-                <span>{{ isCancelling ? 'Đang hủy...' : 'Hủy đơn' }}</span>
-              </button>
+// Auth helpers
+const getAuthToken = () => localStorage.getItem('auth_token');
 
-              <button
-                @click="goBack"
-                class="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-              >
-                <i class="pi pi-arrow-left"></i>
-                <span>Quay lại</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="p-6">
-          <!-- Customer & Payment Info -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- Customer Info -->
-            <div class="bg-gray-50 rounded-lg p-4">
-              <div class="flex items-center gap-2 mb-4">
-                <i class="pi pi-user text-gray-600"></i>
-                <h3 class="font-semibold text-gray-800">THÔNG TIN KHÁCH HÀNG</h3>
-              </div>
-              <div class="space-y-3">
-                <div>
-                  <span class="text-sm text-gray-600">Người nhận:</span>
-                  <p class="font-medium text-gray-800">
-                    {{ order.tenKhachHang || order.tenNguoiNhan || order.khachHang?.hoTen || 'Chưa có thông tin' }}
-                  </p>
-                </div>
-                <div v-if="order.sdt || order.khachHang?.sdt">
-                  <span class="text-sm text-gray-600">Số điện thoại:</span>
-                  <p class="font-medium text-gray-800">{{ order.sdt || order.khachHang?.sdt }}</p>
-                </div>
-                <div>
-                  <span class="text-sm text-gray-600">Địa chỉ nhận hàng:</span>
-                  <p class="font-medium text-gray-800">{{ order.diaChi || 'Chưa có địa chỉ' }}</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Payment Info -->
-            <div class="bg-gray-50 rounded-lg p-4">
-              <div class="flex items-center gap-2 mb-4">
-                <i class="pi pi-credit-card text-gray-600"></i>
-                <h3 class="font-semibold text-gray-800">HÌNH THỨC THANH TOÁN</h3>
-              </div>
-              <div class="space-y-3">
-                <p class="font-medium text-gray-800">
-                  {{ getPaymentMethodLabel(order.phuongThucThanhToan) }}
-                </p>
-                <div class="flex items-center gap-2">
-                  <div class="w-2 h-2 rounded-full" :class="getPaymentStatusColor(getActualPaymentStatus())"></div>
-                  <span class="text-sm font-medium" :class="getPaymentStatusTextColor(getActualPaymentStatus())">
-                    {{ getPaymentStatusLabel(getActualPaymentStatus()) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Product Info -->
-          <div class="mb-8">
-            <div class="flex items-center gap-2 mb-4">
-              <i class="pi pi-box text-gray-600"></i>
-              <h3 class="font-semibold text-gray-800">THÔNG TIN SẢN PHẨM</h3>
-            </div>
-
-            <div v-if="orderItems.length === 0" class="text-center py-8 text-gray-500">
-              Không có sản phẩm nào trong đơn hàng này
-            </div>
-
-            <div v-else class="space-y-4">
-              <div
-                v-for="item in orderItems"
-                :key="item.id"
-                class="flex items-center gap-4 p-4 border border-gray-200 rounded-lg"
-              >
-                <!-- Product Image -->
-                <div class="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                  <img
-                    v-if="item.idHinhAnh || item.tenHinhAnh"
-                    :src="getImageUrl(item)"
-                    :alt="getProductName(item)"
-                    class="w-full h-full object-cover"
-                    @error="handleImageError"
-                  />
-                  <i v-else class="pi pi-image text-gray-400 text-2xl"></i>
-                </div>
-
-                <!-- Product Details -->
-                <div class="flex-1">
-                  <h4 class="font-semibold text-gray-800 uppercase text-sm mb-1">
-                    {{ getProductName(item) }}
-                  </h4>
-                  <div class="text-sm text-gray-600">
-                    <span v-if="item.mauSac || item.color">{{ item.mauSac || item.color }}</span>
-                    <span v-if="item.kichThuoc || item.size"> / Size: {{ item.kichThuoc || item.size }}</span>
-                    <span v-if="item.chatLieu || item.material"> / {{ item.chatLieu || item.material }}</span>
-                  </div>
-                </div>
-
-                <!-- Quantity & Price -->
-                <div class="text-right">
-                  <p class="font-semibold text-gray-800">
-                    {{ getItemQuantity(item) }} x {{ formatCurrency(getItemPrice(item)) }}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Order Summary -->
-          <div class="border-t border-gray-200 pt-6 mb-8">
-            <div class="max-w-md ml-auto space-y-3">
-              <div class="flex justify-between">
-                <span class="text-gray-600">Giá tạm tính:</span>
-                <span class="font-medium">{{ formatCurrency(getSubtotal()) }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Phí vận chuyển:</span>
-                <span class="font-medium">
-                  {{ (order.phiVanChuyen || 0) > 0 ? formatCurrency(order.phiVanChuyen) : 'Miễn phí' }}
-                </span>
-              </div>
-              <div v-if="order.giamGia" class="flex justify-between">
-                <span class="text-gray-600">Giảm giá:</span>
-                <span class="font-medium text-red-600">-{{ formatCurrency(order.giamGia) }}</span>
-              </div>
-              <div class="flex justify-between text-lg font-semibold border-t border-gray-200 pt-3">
-                <span>Tổng tiền:</span>
-                <span class="text-gray-800">{{ formatCurrency(getTotalAmount()) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Order Status Timeline -->
-          <div>
-            <div class="flex items-center gap-2 mb-4">
-              <i class="pi pi-clock text-gray-600"></i>
-              <h3 class="font-semibold text-gray-800">TÌNH TRẠNG ĐƠN HÀNG</h3>
-            </div>
-
-            <div class="flex justify-center">
-              <div class="flex flex-col items-center">
-                <!-- Status Icon -->
-                <div class="w-16 h-16 rounded-full flex items-center justify-center mb-3"
-                     :class="getStatusIconClass(order.trangThaiHoaDon)">
-                  <i :class="getStatusIcon(order.trangThaiHoaDon)" class="text-2xl text-gray-800"></i>
-                </div>
-
-                <!-- Status Text -->
-                <h4 class="font-semibold text-gray-800 mb-1">
-                  {{ getStatusLabel(order.trangThaiHoaDon) }}
-                </h4>
-
-                <!-- Status Time -->
-                <p class="text-sm text-gray-500">
-                  {{ formatDateTime(order.ngayCapNhat || order.ngayTao) }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </template>
-
-  <script setup>
-  import { ref, onMounted, computed } from 'vue';
-  import { useRoute, useRouter } from 'vue-router';
-  import axios from 'axios';
-  import { useToast } from 'primevue/usetoast';
-
-  const route = useRoute();
-  const router = useRouter();
-  const toast = useToast();
-
-  // State
-  const order = ref(null);
-  const orderDetails = ref([]);
-  const isLoading = ref(true);
-  const isCancelling = ref(false);
-
-  // Confirmation Modal State
-  const confirmModal = ref({
-    show: false,
-    title: '',
-    message: '',
-    confirmText: 'Xác nhận',
-    cancelText: 'Hủy',
-    type: 'danger', // 'danger', 'warning', 'info'
-    onConfirm: null,
-    loading: false
-  });
-
-  // State để cache URL ảnh
-  const imageCache = ref({});
-  const loadingImages = ref(new Set());
-
-  // API Configuration
-  const API_BASE_URL = 'http://localhost:8080';
-
-  // Auth helpers
-  const getAuthToken = () => localStorage.getItem('auth_token');
-
-  // Computed property for order items
-  const orderItems = computed(() => {
-    return orderDetails.value || [];
-  });
-
-  // Confirmation Modal Functions
-  const showConfirmModal = (title, message, onConfirm, options = {}) => {
-    confirmModal.value = {
-      show: true,
-      title,
-      message,
-      confirmText: options.confirmText || 'Xác nhận',
-      cancelText: options.cancelText || 'Hủy',
-      type: options.type || 'danger',
-      onConfirm,
-      loading: false
-    };
-  };
-
-  const hideConfirmModal = () => {
-    confirmModal.value.show = false;
-    confirmModal.value.loading = false;
-    confirmModal.value.onConfirm = null;
-  };
-
-  const handleConfirm = async () => {
-    if (confirmModal.value.onConfirm) {
-      confirmModal.value.loading = true;
-      try {
-        await confirmModal.value.onConfirm();
-        hideConfirmModal();
-      } catch (error) {
-        confirmModal.value.loading = false;
-        console.error('Error in confirmation action:', error);
-      }
-    }
-  };
-
-  // Show cancel confirmation modal
-  const showCancelConfirmation = () => {
-    const orderNumber = order.value.maHoaDon || order.value.id;
-
-    showConfirmModal(
-      'Xác nhận hủy đơn hàng',
-      `Bạn có chắc chắn muốn hủy đơn hàng <strong>#${orderNumber}</strong> không?<br><br><span class="text-amber-600">⚠️ Hành động này không thể hoàn tác!</span>`,
-      async () => {
-        await cancelOrder();
-      },
-      {
-        confirmText: 'Hủy đơn hàng',
-        cancelText: 'Giữ lại đơn',
-        type: 'danger'
-      }
-    );
-  };
-
-  // Load order detail
-  const loadOrderDetail = async () => {
-    isLoading.value = true;
+// Load orders và tự động load chi tiết
+const loadOrders = async () => {
+    isLoadingOrders.value = true;
     try {
-      const orderId = route.params.id;
+        const response = await axios.get(`${API_BASE_URL}/hoa-don/my-orders`, {
+            headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-      if (!orderId) {
-        throw new Error('Order ID not found');
-      }
+        const allOrders = response.data || [];
+        orders.value = allOrders.filter((order) => {
+            return order.loaiHoaDon === 'ONLINE' || order.phuongThucDatHang === 'ONLINE' || order.isOnline === true || order.type === 'ONLINE';
+        });
 
-      // Load order basic info
-      const orderResponse = await axios.get(`${API_BASE_URL}/hoa-don/${orderId}`, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json'
+        // Khởi tạo state showAllProducts cho mỗi order
+        orders.value.forEach((order) => {
+            showAllProducts[order.id] = false;
+        });
+
+        // Tự động load chi tiết cho tất cả đơn hàng
+        for (const order of orders.value) {
+            await loadOrderDetails(order.id);
         }
-      });
 
-      order.value = orderResponse.data;
+        console.log(`Loaded ${orders.value.length} online orders with details`);
 
-      // Load order details
-      try {
-        const detailResponse = await axios.get(`${API_BASE_URL}/hoa-don/${orderId}/chi-tiet`, {
-          headers: {
-            'Authorization': `Bearer ${getAuthToken()}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        // Debug dữ liệu thực tế
+        if (orders.value.length > 0) {
+            const firstOrder = orders.value[0];
+            console.log('=== ORDER DEBUG ===');
+            console.log('First Order:', firstOrder);
 
-        orderDetails.value = detailResponse.data?.data?.chiTietSanPham || detailResponse.data || [];
+            const firstOrderId = firstOrder?.id;
+            const firstItem = orderDetails[firstOrderId]?.chiTietSanPham?.[0];
+            console.log('First Item:', firstItem);
 
-        console.log('Order loaded:', order.value);
-        console.log('Order details loaded:', orderDetails.value);
-
-      } catch (detailError) {
-        console.warn('Could not load order details:', detailError);
-        orderDetails.value = [];
-      }
-
-    } catch (error) {
-      console.error('Error loading order detail:', error);
-
-      if (error.response?.status === 404) {
-        toast.add({
-          severity: 'error',
-          summary: 'Không tìm thấy',
-          detail: 'Đơn hàng không tồn tại',
-          life: 3000
-        });
-      } else if (error.response?.status === 401) {
-        toast.add({
-          severity: 'error',
-          summary: 'Lỗi xác thực',
-          detail: 'Vui lòng đăng nhập lại',
-          life: 3000
-        });
-        router.push('/auth/login');
-      } else {
-        toast.add({
-          severity: 'error',
-          summary: 'Lỗi',
-          detail: 'Không thể tải thông tin đơn hàng',
-          life: 3000
-        });
-      }
-
-      order.value = null;
+            console.log('=== TOTAL CALCULATION ===');
+            console.log('tongThanhToan:', firstOrder?.tongThanhToan);
+            console.log('tongTien:', firstOrder?.tongTien);
+            console.log('giaTriDiem:', firstOrder?.giaTriDiem);
+            console.log('phiVanChuyen:', firstOrder?.phiVanChuyen);
+            console.log('soTienThanhToan:', firstOrder?.soTienThanhToan);
+            console.log('Computed total:', getTotalAmount(firstOrder));
+        }
+        } catch (error) {
+        console.error('Error loading orders:', error);
+        if (error.response?.status === 401) {
+            toast.add({
+                severity: 'error',
+                summary: 'Lỗi',
+                detail: 'Phiên đăng nhập hết hạn',
+                life: 3000
+            });
+        }
+        orders.value = [];
     } finally {
-      isLoading.value = false;
+        isLoadingOrders.value = false;
     }
-  };
+};
 
-  // Navigation
-  const goBack = () => {
-    router.push('/profile/orders');
-  };
+// Load single order summary when in detail mode
+const loadOrderSummary = async (orderId) => {
+    if (!orderId) return;
+    isLoadingOrders.value = true;
+    try {
+        const response = await axios.get(`${API_BASE_URL}/hoa-don/${orderId}`, {
+            headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const ord = response.data?.data || response.data;
+        orders.value = ord ? [ord] : [];
+        if (orders.value.length > 0) {
+            await loadOrderDetails(orders.value[0].id);
+        }
+    } catch (error) {
+        console.error('Error loading order summary:', error);
+        orders.value = [];
+    } finally {
+        isLoadingOrders.value = false;
+    }
+};
 
-  // Product helper functions
-  const getProductName = (item) => {
-    return item.tenSanPham ||
-           item.sanPham?.tenSanPham ||
-           item.product?.name ||
-           item.name ||
-           'Sản phẩm không xác định';
-  };
+// Load order details
+const loadOrderDetails = async (orderId) => {
+    if (orderDetails[orderId]) return; // Đã load rồi
 
-  // ========== GỌI API LẤY ĐƯỜNG DẪN THỰC TẾ ==========
-  const getImageUrl = (item) => {
-    console.log('FIXED VERSION - Getting image URL for item:', item);
+    loadingOrderDetails[orderId] = true;
+    try {
+        const response = await axios.get(`${API_BASE_URL}/hoa-don/${orderId}/chi-tiet`, {
+            headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-    const key = item.idHinhAnh || item.tenHinhAnh;
+        orderDetails[orderId] = response.data.data;
 
-    // Nếu đã có trong cache
-    if (key && imageCache.value[key]) {
-      console.log('FIXED VERSION - Using cached URL:', imageCache.value[key]);
-      return imageCache.value[key];
+        // Load ảnh cho từng sản phẩm trong order
+        const products = orderDetails[orderId]?.chiTietSanPham || [];
+        for (const product of products) {
+            if (product.idSanPham) {
+                await loadProductImage(product.idSanPham, product);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading order details:', error);
+    } finally {
+        loadingOrderDetails[orderId] = false;
+    }
+};
+
+// Hàm mới để load ảnh sản phẩm
+const loadProductImage = async (productId, item) => {
+    console.log('🖼️ Loading image for product:', productId);
+    console.log('📝 Item data:', item);
+
+    const cacheKey = `product_${productId}`;
+
+    if (imageCache.value[cacheKey] || loadingImages.value.has(cacheKey)) {
+        return;
     }
 
-    // Nếu đang load, trả về placeholder
-    if (key && loadingImages.value.has(key)) {
-      console.log('FIXED VERSION - Loading in progress, using placeholder');
-      return getPlaceholderImage(item);
-    }
-
-    // Nếu có key thì load async
-    if (key) {
-      console.log('FIXED VERSION - Starting async load for key:', key);
-      loadImageUrl(key, item);
-      return getPlaceholderImage(item);
-    }
-
-    console.log('FIXED VERSION - No image key found, using placeholder');
-    return getPlaceholderImage(item);
-  };
-
-  // Load đường dẫn ảnh từ API
-  const loadImageUrl = async (key, item) => {
-    if (loadingImages.value.has(key)) return;
-
-    loadingImages.value.add(key);
+    loadingImages.value.add(cacheKey);
 
     try {
-      console.log('Loading image URL for key:', key);
+        let imageUrl = null;
 
-      // Gọi API để lấy đường dẫn thực tế
-      const response = await axios.get(`${API_BASE_URL}/hinh-anh/duong-dan/${key}`);
+        // Phương án 1: Nếu có idHinhAnh, gọi API lấy thông tin hình ảnh
+        if (item.idHinhAnh) {
+            try {
+                console.log(`🔍 Trying image API: ${API_BASE_URL}/hinh-anh/${item.idHinhAnh}`);
 
-      if (response.data) {
-        console.log('Got image URL from API:', response.data);
-        // Cache URL để dùng cho lần sau
-        imageCache.value[key] = response.data;
+                const imageResponse = await axios.get(`${API_BASE_URL}/hinh-anh/${item.idHinhAnh}`, {
+                headers: {
+                    Authorization: `Bearer ${getAuthToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
 
-        // Force re-render để cập nhật ảnh
-        orderDetails.value = [...orderDetails.value];
-      }
+                console.log('📦 Image API response:', imageResponse.data);
+
+                if (imageResponse.data && imageResponse.data.duongDan) {
+                    imageUrl = imageResponse.data.duongDan;
+                    console.log('✅ Found image from duongDan:', imageUrl);
+                }
+
+            } catch (error) {
+                console.log(`❌ Image API failed:`, error.response?.status || error.message);
+            }
+        }
+
+        // Phương án 2: Nếu có tenHinhAnh, gọi API lấy đường dẫn theo tên
+        if (!imageUrl && item.tenHinhAnh) {
+            try {
+                console.log(`🔍 Trying duong-dan API: ${API_BASE_URL}/hinh-anh/duong-dan/${item.tenHinhAnh}`);
+
+                const pathResponse = await axios.get(`${API_BASE_URL}/hinh-anh/duong-dan/${item.tenHinhAnh}`, {
+                    headers: {
+                        Authorization: `Bearer ${getAuthToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log('📦 Path API response:', pathResponse.data);
+
+                if (pathResponse.data) {
+                    imageUrl = pathResponse.data; // API trả về URL đầy đủ
+                    console.log('✅ Found image from duong-dan API:', imageUrl);
+                }
 
     } catch (error) {
-      console.error('Error loading image URL for', key, ':', error);
-    } finally {
-      loadingImages.value.delete(key);
-    }
-  };
+                console.log(`❌ Path API failed:`, error.response?.status || error.message);
+            }
+        }
 
-  const getPlaceholderImage = (item) => {
-    const productName = getProductName(item);
+        // Phương án 3: Thử các endpoint sản phẩm để lấy thông tin ảnh
+        if (!imageUrl) {
+            const endpoints = [
+                `/api/san-pham/${productId}`,
+                `/san-pham/${productId}`,
+                `/api/products/${productId}`,
+                `/products/${productId}`,
+                `/api/san-pham/detail/${productId}`
+            ];
+
+            for (const endpoint of endpoints) {
+                try {
+                    console.log(`🔍 Trying product endpoint: ${API_BASE_URL}${endpoint}`);
+
+                    const productResponse = await axios.get(`${API_BASE_URL}${endpoint}`, {
+                        headers: {
+                            Authorization: `Bearer ${getAuthToken()}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    console.log('📦 Product API response:', productResponse.data);
+                    const productData = productResponse.data;
+
+                    // Thử các field khả thi cho URL ảnh
+                    const possibleImageFields = [
+                        'hinhAnhChinh', 'anhChinh', 'image', 'imageUrl', 'hinhAnh',
+                        'duongDan', 'url', 'anh', 'anhDaiDien', 'imagePath'
+                    ];
+
+                    for (const field of possibleImageFields) {
+                        if (productData[field]) {
+                            imageUrl = productData[field];
+                            console.log(`✅ Found image field '${field}':`, imageUrl);
+                            break;
+                        }
+                    }
+
+                    // Nếu có nested object hình ảnh
+                    if (!imageUrl && productData.hinhAnh) {
+                        imageUrl = productData.hinhAnh.duongDan || productData.hinhAnh.url || productData.hinhAnh.path;
+                        console.log('✅ Found nested image:', imageUrl);
+                    }
+
+                    // Nếu tìm thấy ảnh thì thoát khỏi loop
+                    if (imageUrl) break;
+
+                } catch (error) {
+                    console.log(`❌ Endpoint ${endpoint} failed:`, error.response?.status || error.message);
+                    continue;
+                }
+            }
+        }
+
+        if (imageUrl) {
+            // Chuẩn hóa URL - nếu đã có http thì giữ nguyên, nếu không thì thêm base URL
+            const finalImageUrl = imageUrl.startsWith('http')
+                ? imageUrl
+                : `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+
+            imageCache.value[cacheKey] = finalImageUrl;
+            // Trigger reactivity
+            imageCache.value = { ...imageCache.value };
+
+            console.log(`✅ Successfully loaded image for product ${productId}:`, finalImageUrl);
+        } else {
+            console.log(`❌ No image found for product ${productId} after trying all methods`);
+        }
+
+    } catch (error) {
+        console.error('❌ Critical error loading product image for', productId, ':', error);
+    } finally {
+        loadingImages.value.delete(cacheKey);
+    }
+};
+
+// Lấy danh sách hóa đơn hiển thị (3 đầu tiên hoặc tất cả)
+const getDisplayedOrders = () => {
+    if (showAllOrders.value || orders.value.length <= 3) {
+        return orders.value;
+    }
+    return orders.value.slice(0, 3);
+};
+
+// Đếm số hóa đơn còn lại chưa hiển thị
+const getRemainingOrdersCount = () => {
+    return Math.max(0, orders.value.length - 3);
+};
+
+// Toggle hiển thị tất cả hóa đơn
+const toggleShowAllOrders = () => {
+    showAllOrders.value = !showAllOrders.value;
+};
+
+// Lấy danh sách sản phẩm hiển thị (2 sản phẩm đầu hoặc tất cả)
+const getDisplayedProducts = (orderId) => {
+    const products = orderDetails[orderId]?.chiTietSanPham || [];
+    if (showAllProducts[orderId] || products.length <= 2) {
+        return products;
+    }
+    return products.slice(0, 2);
+};
+
+// Đếm số sản phẩm còn lại chưa hiển thị
+const getRemainingProductsCount = (orderId) => {
+    const products = orderDetails[orderId]?.chiTietSanPham || [];
+    return Math.max(0, products.length - 2);
+};
+
+// Toggle hiển thị tất cả sản phẩm
+const toggleShowAllProducts = (orderId) => {
+    showAllProducts[orderId] = !showAllProducts[orderId];
+};
+
+// ========== SỬA HÀM LẤY ẢNH SẢN PHẨM ==========
+const getProductImage = (item) => {
+    // Kiểm tra các field ảnh có sẵn từ backend trước
+    const directImageFields = [
+        'duongDan', 'hinhAnhUrl', 'imageUrl', 'image', 'url',
+        'anhChinh', 'hinhAnhChinh', 'path', 'imagePath'
+    ];
+
+    // Thử lấy ảnh trực tiếp từ item
+    for (const field of directImageFields) {
+        if (item[field]) {
+            const imageUrl = item[field].startsWith('http')
+                ? item[field]
+                : `${API_BASE_URL}${item[field].startsWith('/') ? '' : '/'}${item[field]}`;
+            console.log(`✅ Found direct image from field '${field}':`, imageUrl);
+            return imageUrl;
+        }
+    }
+
+    // Thử lấy từ nested object
+    const nestedPaths = [
+        'hinhAnh.duongDan', 'hinhAnh.url', 'hinhAnh.path',
+        'chiTietSanPham.hinhAnh.duongDan',
+        'image.url', 'image.path'
+    ];
+
+    for (const path of nestedPaths) {
+        const value = getNestedValue(item, path);
+        if (value) {
+            const imageUrl = value.startsWith('http')
+                ? value
+                : `${API_BASE_URL}${value.startsWith('/') ? '' : '/'}${value}`;
+            console.log(`✅ Found nested image from path '${path}':`, imageUrl);
+            return imageUrl;
+        }
+    }
+
+    // Nếu có idHinhAnh và tenHinhAnh, dùng cache hoặc load
+    const productId = item.idSanPham || item.sanPhamId;
+    const cacheKey = `product_${productId}`;
+
+    if (imageCache.value[cacheKey]) {
+        return imageCache.value[cacheKey];
+    }
+
+    // Trigger load ảnh nếu có thông tin
+    if ((item.idHinhAnh || item.tenHinhAnh) && productId) {
+        loadProductImage(productId, item);
+    }
+
+    // Trả về placeholder nếu chưa có ảnh
+    return getPlaceholderImage(item);
+};
+
+// Helper function để lấy nested value
+const getNestedValue = (obj, path) => {
+    return path.split('.').reduce((current, key) => {
+        return current && current[key] !== undefined ? current[key] : null;
+    }, obj);
+};
+
+const getPlaceholderImage = (item) => {
+    const productName = item?.tenSanPham || 'Sản phẩm';
     return `data:image/svg+xml;base64,${btoa(`
-      <svg width="80" height="80" xmlns="http://www.w3.org/2000/svg">
-        <rect width="80" height="80" fill="#f3f4f6"/>
-        <text x="40" y="35" text-anchor="middle" dominant-baseline="middle"
+      <svg width="64" height="64" xmlns="http://www.w3.org/2000/svg">
+        <rect width="64" height="64" fill="#f3f4f6"/>
+        <text x="32" y="28" text-anchor="middle" dominant-baseline="middle"
               font-family="Arial" font-size="8" fill="#9ca3af">
-          ${productName.substring(0, 15)}
+          ${productName.substring(0, 10)}
         </text>
-        <text x="40" y="50" text-anchor="middle" dominant-baseline="middle"
+        <text x="32" y="40" text-anchor="middle" dominant-baseline="middle"
               font-family="Arial" font-size="6" fill="#9ca3af">
           No Image
         </text>
       </svg>
     `)}`;
-  };
+};
 
-  const getItemQuantity = (item) => {
-    return item.soLuong || item.quantity || 1;
-  };
+// View order detail - chuyển sang trang chi tiết
+const viewOrderDetail = (orderId) => {
+    router.push(`/profile/orders/${orderId}`);
+};
 
-  const getItemPrice = (item) => {
-    return item.giaBan || item.donGia || item.price || 0;
-  };
+// Handle image error
+const handleImageError = (event) => {
+    event.target.src = getPlaceholderImage();
+};
 
-  // Handle image error
-  const handleImageError = (event) => {
-    const img = event.target;
-    const productText = getProductName({ tenSanPham: 'Product' });
-
-    img.src = `data:image/svg+xml;base64,${btoa(`
-      <svg width="80" height="80" xmlns="http://www.w3.org/2000/svg">
-        <rect width="80" height="80" fill="#f3f4f6"/>
-        <text x="40" y="35" text-anchor="middle" dominant-baseline="middle"
-              font-family="Arial" font-size="8" fill="#9ca3af">
-          ${productText}
-        </text>
-        <text x="40" y="50" text-anchor="middle" dominant-baseline="middle"
-              font-family="Arial" font-size="6" fill="#9ca3af">
-          Image Error
-        </text>
-      </svg>
-    `)}`;
-
-    console.log('Image error handled with placeholder');
-  };
-
-  // ========== LOGIC THANH TOÁN VÀ HỦY ĐƠN HÀNG ==========
-
-  // Kiểm tra trạng thái thanh toán thực tế
-  const getActualPaymentStatus = () => {
-    const paymentMethod = order.value?.phuongThucThanhToan;
-
-    // Nếu thanh toán online (ONLINE, VNPAY, BANK_TRANSFER, etc.) thì coi như đã thanh toán
-    if (paymentMethod && paymentMethod !== 'COD' && paymentMethod !== 'CASH') {
-      return 'DA_THANH_TOAN';
+// Utility functions
+const formatDate = (date) => {
+    if (!date && date !== 0) return '';
+    // Trường hợp backend trả về mảng ngày [yyyy, MM, dd, HH, mm, ss]
+    if (Array.isArray(date) && date.length >= 3) {
+        const [y, M, d, hh = 0, mm = 0, ss = 0] = date.map(Number);
+        const dt = new Date(y, M - 1, d, hh, mm, ss);
+        return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('vi-VN');
     }
-
-    // Debug log để xem giá trị thực tế
-    console.log('Payment method:', paymentMethod);
-    console.log('Payment status:', order.value?.trangThaiThanhToan);
-
-    // Nếu là COD/CASH thì theo trạng thái gốc
-    return order.value?.trangThaiThanhToan || 'CHUA_THANH_TOAN';
-  };
-
-  // Kiểm tra có thể hủy đơn hàng không
-  const canCancelOrder = () => {
-    if (!order.value) return false;
-
-    const status = order.value.trangThaiHoaDon;
-    const allowedStatuses = ['CHO_XAC_NHAN', 'CHO_THANH_TOAN'];
-
-    return allowedStatuses.includes(status);
-  };
-
-  // Hủy đơn hàng
-  const cancelOrder = async () => {
-    if (!canCancelOrder()) return;
-
-    isCancelling.value = true;
-
-    try {
-      await axios.put(`${API_BASE_URL}/hoa-don/${order.value.id}/cancel`, {}, {
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // Cập nhật trạng thái local
-      order.value.trangThaiHoaDon = 'DA_HUY';
-
-      toast.add({
-        severity: 'success',
-        summary: 'Thành công',
-        detail: 'Đơn hàng đã được hủy',
-        life: 3000
-      });
-
-    } catch (error) {
-      console.error('Error cancelling order:', error);
-
-      toast.add({
-        severity: 'error',
-        summary: 'Lỗi',
-        detail: 'Không thể hủy đơn hàng. Vui lòng thử lại.',
-        life: 3000
-      });
-    } finally {
-      isCancelling.value = false;
+    // Nếu là số hoặc chuỗi số (epoch millis)
+    if (typeof date === 'number' || /^\d+$/.test(String(date))) {
+        return new Date(Number(date)).toLocaleDateString('vi-VN');
     }
-  };
-
-  // Utility functions
-  const formatDate = (date) => {
-    if (!date) return '';
+    // Chuẩn ISO hoặc có dấu 'T'
+    if (typeof date === 'string' && /T/.test(date)) {
     return new Date(date).toLocaleDateString('vi-VN');
-  };
+    }
+    // Định dạng dd/MM/yyyy hoặc dd-MM-yyyy
+    if (typeof date === 'string' && /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/.test(date)) {
+        const match = date.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+        const d = Number(match[1]);
+        const m = Number(match[2]) - 1;
+        const y = Number(match[3]);
+        return new Date(y, m, d).toLocaleDateString('vi-VN');
+    }
+    // Fallback: thay space thành 'T' nếu có giờ
+    if (typeof date === 'string' && date.includes(' ')) {
+        const tryIso = new Date(date.replace(' ', 'T'));
+        if (!isNaN(tryIso.getTime())) return tryIso.toLocaleDateString('vi-VN');
+    }
+    const dt = new Date(date);
+    return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('vi-VN');
+};
 
-  const formatDateTime = (date) => {
-    if (!date) return '';
-    const d = new Date(date);
-    return `${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${d.toLocaleDateString('vi-VN')}`;
-  };
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN').format(amount || 0) + 'đ';
+};
 
-  const formatCurrency = (amount) => {
-    if (!amount && amount !== 0) return '0đ';
-    return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
-  };
+// ========== SỬA HÀM TÍNH TỔNG TIỀN THEO OrderDetail.vue ==========
+const getTotalAmount = (order) => {
+    // Ưu tiên dùng tổng tiền thực tế đã thanh toán từ backend (như OrderDetail.vue)
+    const backendTotal = order.tongThanhToan || order.tongTien || order.totalAmount || order.total || order.amount || order.thanhTien || order.soTien;
+    if (backendTotal !== undefined && backendTotal !== null) {
+        console.log('Using backend total:', backendTotal);
+        return backendTotal;
+    }
 
-  // Calculate totals
-  const getSubtotal = () => {
-    return orderItems.value.reduce((total, item) => {
-      const quantity = getItemQuantity(item);
-      const price = getItemPrice(item);
-      return total + (quantity * price);
-    }, 0);
-  };
+    // Tính toán từ các thành phần (như OrderDetail.vue)
+    const subtotal = order.tongTienGoc || order.tongTien || order.tamTinh || order.tongTienHang || 0;
+    const discount = order.giamGia || order.giaTriDiem || order.giaTriGiam || order.voucherDiscount || order.voucherValue || order.tongTienGiamGia || order.tongTienVoucher || order.tienDiem || 0;
+    const shipping = order.phiVanChuyen || order.phiShip || order.shippingFee || 0;
 
-  const getTotalAmount = () => {
-    return order.value?.tongThanhToan ||
-           order.value?.tongTien ||
-           order.value?.totalAmount ||
-           order.value?.total ||
-           (getSubtotal() + (order.value?.phiVanChuyen || 0) - (order.value?.giamGia || 0));
-  };
+    // Công thức: Tạm tính - Giảm giá + Phí vận chuyển (như OrderDetail.vue)
+    const computedTotal = subtotal - Math.abs(discount) + shipping;
 
-  // Status functions
-  const getStatusLabel = (status) => {
+    console.log('=== TOTAL CALCULATION LIKE OrderDetail.vue ===');
+    console.log('Subtotal:', subtotal);
+    console.log('Discount:', discount);
+    console.log('Shipping:', shipping);
+    console.log('Computed total:', computedTotal);
+
+    return Math.max(0, computedTotal);
+};
+
+const getStatusLabel = (status) => {
     const statusMap = {
-      'CHO_XAC_NHAN': 'Chờ xác nhận',
-      'CHO_THANH_TOAN': 'Chờ thanh toán',
-      'DA_XAC_NHAN': 'Đã xác nhận',
-      'DANG_GIAO': 'Đang giao',
-      'DA_GIAO': 'Đã giao',
-      'HOAN_THANH': 'Hoàn thành',
-      'DA_HUY': 'Đã hủy'
+        CHO_XAC_NHAN: 'Chờ xác nhận',
+        CHO_THANH_TOAN: 'Chờ thanh toán',
+        DA_XAC_NHAN: 'Đã xác nhận',
+        DANG_GIAO: 'Đang giao',
+        DA_GIAO: 'Đã giao',
+        HOAN_THANH: 'Hoàn thành',
+        DA_HUY: 'Đã hủy'
     };
-    return statusMap[status] || status || 'Không xác định';
-  };
+    return statusMap[status] || status;
+};
 
-  const getStatusColor = (status) => {
-    const colorMap = {
-      'CHO_XAC_NHAN': 'text-yellow-600',
-      'CHO_THANH_TOAN': 'text-orange-600',
-      'DA_XAC_NHAN': 'text-blue-600',
-      'DANG_GIAO': 'text-purple-600',
-      'DA_GIAO': 'text-green-600',
-      'HOAN_THANH': 'text-green-600',
-      'DA_HUY': 'text-red-600'
-    };
-    return colorMap[status] || 'text-gray-600';
-  };
-
-  const getStatusIcon = (status) => {
-    const iconMap = {
-      'CHO_XAC_NHAN': 'pi pi-clock',
-      'CHO_THANH_TOAN': 'pi pi-credit-card',
-      'DA_XAC_NHAN': 'pi pi-check-circle',
-      'DANG_GIAO': 'pi pi-send',
-      'DA_GIAO': 'pi pi-check',
-      'HOAN_THANH': 'pi pi-check-circle',
-      'DA_HUY': 'pi pi-times-circle'
-    };
-    return iconMap[status] || 'pi pi-info-circle';
-  };
-
-  const getStatusIconClass = (status) => {
+const getStatusClass = (status) => {
     const classMap = {
-      'CHO_XAC_NHAN': 'bg-yellow-100',
-      'CHO_THANH_TOAN': 'bg-orange-100',
-      'DA_XAC_NHAN': 'bg-blue-100',
-      'DANG_GIAO': 'bg-purple-100',
-      'DA_GIAO': 'bg-green-100',
-      'HOAN_THANH': 'bg-green-100',
-      'DA_HUY': 'bg-red-100'
+        CHO_XAC_NHAN: 'bg-yellow-100 text-yellow-800',
+        CHO_THANH_TOAN: 'bg-orange-100 text-orange-800',
+        DA_XAC_NHAN: 'bg-blue-100 text-blue-800',
+        DANG_GIAO: 'bg-purple-100 text-purple-800',
+        DA_GIAO: 'bg-green-100 text-green-800',
+        HOAN_THANH: 'bg-green-100 text-green-800',
+        DA_HUY: 'bg-red-100 text-red-800'
     };
-    return classMap[status] || 'bg-gray-100';
-  };
+    return classMap[status] || 'bg-gray-100 text-gray-800';
+};
 
-  // Payment functions
-  const getPaymentMethodLabel = (method) => {
-    const methodMap = {
-      'COD': 'Thanh toán khi giao hàng (COD)',
-      'BANK_TRANSFER': 'Chuyển khoản ngân hàng',
-      'CASH': 'Thanh toán tiền mặt',
-      'CARD': 'Thanh toán bằng thẻ',
-      'ONLINE': 'Thanh toán online'
-    };
-    return methodMap[method] || method || 'Thanh toán khi giao hàng (COD)';
-  };
+// Lifecycle
+onMounted(() => {
+    if (isDetailMode.value) {
+        loadOrderSummary(route.params.id);
+    } else {
+        loadOrders();
+    }
+});
+</script>
 
-  const getPaymentStatusLabel = (status) => {
-    const statusMap = {
-      'CHUA_THANH_TOAN': 'Chưa thanh toán',
-      'DA_THANH_TOAN': 'Đã thanh toán',
-      'DANG_CHO': 'Đang chờ thanh toán'
-    };
-    return statusMap[status] || status || 'Chưa thanh toán';
-  };
+<template>
+    <div class="rounded-lg bg-white p-6 shadow-sm">
+        <h4 class="mb-6 text-xl font-semibold text-gray-800">
+            {{ isDetailMode ? 'CHI TIẾT ĐƠN HÀNG' : 'HÓA ĐƠN CỦA TÔI' }}
+        </h4>
 
-  const getPaymentStatusColor = (status) => {
-    const colorMap = {
-      'CHUA_THANH_TOAN': 'bg-gray-400',
-      'DA_THANH_TOAN': 'bg-green-500',
-      'DANG_CHO': 'bg-yellow-500'
-    };
-    return colorMap[status] || 'bg-gray-400';
-  };
+        <div v-if="isLoadingOrders" class="flex justify-center py-12">
+            <div class="h-12 w-12 animate-spin rounded-full border-b-2 border-orange-500"></div>
+        </div>
 
-  const getPaymentStatusTextColor = (status) => {
-    const colorMap = {
-      'CHUA_THANH_TOAN': 'text-gray-600',
-      'DA_THANH_TOAN': 'text-green-600',
-      'DANG_CHO': 'text-yellow-600'
-    };
-    return colorMap[status] || 'text-gray-600';
-  };
+        <div v-else-if="orders.length === 0" class="py-12 text-center">
+            <i class="pi pi-file-text mb-4 text-6xl text-gray-300"></i>
+            <p class="text-gray-500">Bạn chưa có hóa đơn nào</p>
+        </div>
 
-  // Lifecycle
-  onMounted(() => {
-    loadOrderDetail();
-  });
-  </script>
+        <!-- Detail view -->
+        <div v-else-if="isDetailMode && currentOrder" class="space-y-6">
+            <div class="overflow-hidden rounded-lg border border-gray-200">
+                <!-- Header -->
+                <div class="flex items-center justify-between bg-gray-50 px-6 py-4">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm font-semibold text-gray-800">{{ currentOrder.maHoaDon }}</span>
+                        <span class="text-sm text-gray-500">{{ formatDate(currentOrder.ngayTao || currentOrder.ngayDat || currentOrder.ngayDatHang || currentOrder.createdAt) }}</span>
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                            <i class="pi pi-globe mr-1"></i>
+                            Online
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span :class="['rounded-full px-3 py-1 text-sm font-medium', getStatusClass(currentOrder.trangThaiHoaDon)]">
+                            {{ getStatusLabel(currentOrder.trangThaiHoaDon) }}
+                        </span>
+                    </div>
+                </div>
 
-  <style scoped>
-  /* Modal animations */
-  .modal-enter-active, .modal-leave-active {
-    transition: opacity 0.3s ease;
-  }
+                <!-- Products list (all) -->
+                <div class="p-6">
+                    <div v-if="loadingOrderDetails[currentOrder.id]" class="flex justify-center py-8">
+                        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-orange-500"></div>
+                    </div>
 
-  .modal-enter-active .modal-container,
-  .modal-leave-active .modal-container {
-    transition: all 0.3s ease;
-  }
+                    <div v-else-if="orderDetails[currentOrder.id]" class="mb-6 space-y-4">
+                        <div v-for="item in orderDetails[currentOrder.id].chiTietSanPham" :key="item.id" class="flex items-center space-x-4">
+                            <div class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-gray-200">
+                                <img :src="getProductImage(item)" :alt="item.tenSanPham" class="h-full w-full object-cover" @error="handleImageError" />
+                            </div>
+                            <div class="flex-1">
+                                <h5 class="mb-1 font-medium text-gray-900">{{ item.tenSanPham }}</h5>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-black-500 text-sm font-semibold">{{ item.soLuong }} x {{ formatCurrency(item.giaBan) }}</p>
+                            </div>
+                        </div>
 
-  .modal-enter-from, .modal-leave-to {
-    opacity: 0;
-  }
+                        <!-- Totals -->
+                        <div class="mt-4 border-t border-gray-200 pt-4">
+                            <p class="text-sm text-red-500">Thành tiền: {{ formatCurrency(getTotalAmount(currentOrder)) }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-  .modal-enter-from .modal-container,
-  .modal-leave-to .modal-container {
-    opacity: 0;
-    transform: scale(0.9) translateY(-20px);
-  }
+        <!-- List view -->
+        <div v-else class="space-y-6">
+            <!-- Hiển thị hóa đơn (3 đầu tiên hoặc tất cả) -->
+            <div v-for="order in getDisplayedOrders()" :key="order.id" class="overflow-hidden rounded-lg border border-gray-200">
+                <!-- Header hóa đơn -->
+                <div class="flex items-center justify-between bg-gray-50 px-6 py-4">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm font-semibold text-gray-800">{{ order.maHoaDon }}</span>
+                        <span class="text-sm text-gray-500">{{ formatDate(order.ngayTao || order.ngayDat || order.ngayDatHang || order.createdAt) }}</span>
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                            <i class="pi pi-globe mr-1"></i>
+                            Online
+                            </span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span :class="['rounded-full px-3 py-1 text-sm font-medium', getStatusClass(order.trangThaiHoaDon)]">
+                            {{ getStatusLabel(order.trangThaiHoaDon) }}
+                                </span>
+                    </div>
+                </div>
 
-  /* Loading animation */
-  @keyframes spin {
+                <!-- Danh sách sản phẩm -->
+                <div class="p-6">
+                    <div v-if="loadingOrderDetails[order.id]" class="flex justify-center py-8">
+                        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-orange-500"></div>
+                    </div>
+
+                    <div v-else-if="orderDetails[order.id]" class="mb-6 space-y-4">
+                        <!-- Hiển thị sản phẩm (2 đầu tiên hoặc tất cả) -->
+                        <div v-for="item in getDisplayedProducts(order.id)" :key="item.id" class="flex items-center space-x-4">
+                            <!-- Hình ảnh sản phẩm -->
+                            <div class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-gray-200">
+                                <img :src="getProductImage(item)" :alt="item.tenSanPham" class="h-full w-full object-cover" @error="handleImageError" />
+                            </div>
+
+                            <!-- Thông tin sản phẩm -->
+                            <div class="flex-1">
+                                <h5 class="mb-1 font-medium text-gray-900">{{ item.tenSanPham }}</h5>
+                                <div class="text-sm text-gray-500">
+                                    <span v-if="item.giaGiam" class="mr-2 line-through">{{ formatCurrency(item.giaGoc) }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Số lượng và giá -->
+                            <div class="text-right">
+                                <p class="text-black-500 text-sm font-semibold">{{ item.soLuong }} x {{ formatCurrency(item.giaBan) }}</p>
+                    </div>
+                </div>
+
+                        <!-- Nút "Xem thêm" nếu có nhiều hơn 2 sản phẩm -->
+                        <div v-if="getRemainingProductsCount(order.id) > 0 && !showAllProducts[order.id]" class="pt-2 text-center">
+                            <button @click="toggleShowAllProducts(order.id)" class="flex items-center justify-center space-x-1 text-sm font-medium text-orange-600 hover:text-orange-700">
+                                <span>Xem thêm {{ getRemainingProductsCount(order.id) }} sản phẩm</span>
+                                <i class="pi pi-chevron-down"></i>
+                            </button>
+                        </div>
+
+                        <!-- Nút "Thu gọn" nếu đang hiển thị tất cả -->
+                        <div v-if="showAllProducts[order.id] && orderDetails[order.id].chiTietSanPham.length > 2" class="pt-2 text-center">
+                            <button @click="toggleShowAllProducts(order.id)" class="flex items-center justify-center space-x-1 text-sm font-medium text-orange-600 hover:text-orange-700">
+                                <span>Thu gọn</span>
+                                <i class="pi pi-chevron-up"></i>
+                            </button>
+                    </div>
+                </div>
+
+                    <!-- Thành tiền và nút xem chi tiết -->
+                    <div class="flex items-center justify-between border-t border-gray-200 pt-4">
+                        <div class="text-right">
+                            <p class="text-sm text-red-500">Thành tiền: {{ formatCurrency(getTotalAmount(order)) }}</p>
+                        </div>
+
+                        <button @click="viewOrderDetail(order.id)" class="rounded-lg bg-orange-600 px-6 py-2 text-white transition hover:bg-orange-700">Xem chi tiết</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nút "Xem thêm hóa đơn" nếu có nhiều hơn 3 hóa đơn -->
+            <div v-if="getRemainingOrdersCount() > 0 && !showAllOrders" class="pt-6 text-center">
+                <button @click="toggleShowAllOrders" class="mx-auto flex items-center justify-center space-x-2 rounded-lg bg-gray-100 px-6 py-3 text-gray-700 transition hover:bg-gray-200">
+                    <span>Xem thêm {{ getRemainingOrdersCount() }} hóa đơn</span>
+                    <i class="pi pi-chevron-down"></i>
+                </button>
+            </div>
+
+            <!-- Nút "Thu gọn" nếu đang hiển thị tất cả hóa đơn -->
+            <div v-if="showAllOrders && orders.length > 3" class="pt-6 text-center">
+                <button @click="toggleShowAllOrders" class="mx-auto flex items-center justify-center space-x-2 rounded-lg bg-gray-100 px-6 py-3 text-gray-700 transition hover:bg-gray-200">
+                    <span>Thu gọn danh sách</span>
+                    <i class="pi pi-chevron-up"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style scoped>
+@keyframes spin {
     to {
-      transform: rotate(360deg);
+        transform: rotate(360deg);
     }
-  }
+}
 
-  .animate-spin {
+.animate-spin {
     animation: spin 1s linear infinite;
-  }
+}
 
-  /* Status colors */
-  .text-yellow-600 { color: #d97706; }
-  .text-orange-600 { color: #ea580c; }
-  .text-blue-600 { color: #2563eb; }
-  .text-purple-600 { color: #9333ea; }
-  .text-green-600 { color: #16a34a; }
-  .text-red-600 { color: #dc2626; }
-  .text-gray-600 { color: #4b5563; }
-  .text-gray-800 { color: #1f2937; }
-
-  .bg-yellow-100 { background-color: #fef3c7; }
-  .bg-orange-100 { background-color: #fed7aa; }
-  .bg-blue-100 { background-color: #dbeafe; }
-  .bg-purple-100 { background-color: #ede9fe; }
-  .bg-green-100 { background-color: #d1fae5; }
-  .bg-red-100 { background-color: #fee2e2; }
-  .bg-gray-100 { background-color: #f3f4f6; }
-
-  .bg-orange-600 { background-color: #ea580c; }
-  .hover\:bg-orange-700:hover { background-color: #c2410c; }
-  .bg-red-600 { background-color: #dc2626; }
-  .hover\:bg-red-700:hover { background-color: #b91c1c; }
-
-  /* Payment status colors */
-  .bg-gray-400 { background-color: #9ca3af; }
-  .bg-green-500 { background-color: #10b981; }
-  .bg-yellow-500 { background-color: #f59e0b; }
-
-  /* Responsive design */
-  @media (max-width: 1024px) {
-    .lg\:grid-cols-2 {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  /* Transitions */
-  button {
-    transition: all 0.2s ease;
-  }
-
-  .hover\:bg-gray-100:hover {
+.bg-yellow-100 {
+    background-color: #fef3c7;
+}
+.text-yellow-800 {
+    color: #92400e;
+}
+.bg-orange-100 {
+    background-color: #fed7aa;
+}
+.text-orange-800 {
+    color: #9a3412;
+}
+.bg-blue-100 {
+    background-color: #dbeafe;
+}
+.text-blue-800 {
+    color: #1e40af;
+}
+.bg-purple-100 {
+    background-color: #ede9fe;
+}
+.text-purple-800 {
+    color: #5b21b6;
+}
+.bg-green-100 {
+    background-color: #d1fae5;
+}
+.text-green-800 {
+    color: #065f46;
+}
+.bg-red-100 {
+    background-color: #fee2e2;
+}
+.text-red-800 {
+    color: #991b1b;
+}
+.bg-gray-100 {
     background-color: #f3f4f6;
-  }
+}
+.text-gray-800 {
+    color: #1f2937;
+}
 
-  /* Utility classes */
-  .max-w-4xl {
-    max-width: 56rem;
-  }
+button {
+    transition: all 0.2s ease;
+}
 
-  .mx-auto {
-    margin-left: auto;
-    margin-right: auto;
-  }
+.transition {
+    transition: all 0.3s ease;
+}
 
-  .flex-shrink-0 {
-    flex-shrink: 0;
-  }
+/* Thêm style cho nút xem thêm */
+button:hover {
+    transform: translateY(-1px);
+}
 
-  .border-gray-200 {
-    border-color: #e5e7eb;
-  }
-
-  .border-t {
-    border-top-width: 1px;
-  }
-  </style>
+.pi-chevron-down,
+.pi-chevron-up {
+    font-size: 12px;
+}
+</style>

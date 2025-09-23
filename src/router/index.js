@@ -14,38 +14,45 @@ const router = createRouter({
         {
             path: '/products',
             name: 'products',
-            component: () => import('@/views/user/product/ProductList.vue')
+            component: () => import('@/views/user/product/ProductList.vue'),
+            meta: { requiresAuth: false }
         },
         {
             path: '/card',
             name: 'card',
-            component: () => import('@/views/user/card/Card.vue')
+            component: () => import('@/views/user/card/Card.vue'),
+            meta: { requiresAuth: false }
         },
         {
             path: '/checkout',
             name: 'checkout',
-            component: () => import('@/views/user/card/ThanhToan.vue')
+            component: () => import('@/views/user/card/ThanhToan.vue'),
+            meta: { requiresAuth: false }
         },
         {
             path: '/order-success/:orderId',
             name: 'order-success',
-            component: () => import('@/views/user/card/OrderSuccess.vue')
+            component: () => import('@/views/user/card/OrderSuccess.vue'),
+            meta: { requiresAuth: false }
+        },
+        {
+            path: '/track-order',
+            name: 'track-order',
+            component: () => import('@/views/user/card/OrderTrackingView.vue'),
+            meta: { requiresAuth: false }
         },
         {
             path: '/product/:id',
             name: 'product',
-            component: () => import('@/views/user/product/Product.vue')
+            component: () => import('@/views/user/product/Product.vue'),
+            meta: { requiresAuth: false }
         },
-        {
-            path: '/profile',
-            name: 'profile',
-            component: () => import('@/views/user/profile/ThongTinCaNhan.vue'),
-            meta: { requiresAuth: true }
-        },
+        
         {
             path: '/payment-return',
             name: 'PaymentReturn',
-            component: () => import('@/views/user/card/PaymentReturn.vue')
+            component: () => import('@/views/user/card/PaymentReturn.vue'),
+            meta: { requiresAuth: false }
         },
         {
             path: '/profile',
@@ -56,18 +63,19 @@ const router = createRouter({
                     path: '/profileInfo', // Route: /profileInfo (absolute path)
                     name: 'profileInfo',
                     component: () => import('@/components/user/profile/ProfileInfo.vue'),
-                    meta: { requiresAuth: true }
+                    meta: { requiresAuth: false }
                 },
                 {
                     path: '/profile/orders/:id',
                     name: 'OrderDetail',
-                    component: () => import('@/views/user/profile/OrderDetailPage.vue')
+                    component: () => import('@/views/user/profile/OrderDetailPage.vue'),
+                    meta: { requiresAuth: false }
                 },
                 {
                     path: '/profileOrders', // Route: /profileOrders
                     name: 'ProfileOrders',
                     component: () => import('@/components/user/profile/ProfileOrders .vue'),
-                    meta: { requiresAuth: true }
+                    meta: { requiresAuth: false }
                 },
                 {
                     path: '/returnGoods', // Route: /profileOrders
@@ -79,7 +87,7 @@ const router = createRouter({
                     path: '/profileAddresses', // Route: /profileAddresses
                     name: 'ProfileAddresses',
                     component: () => import('@/components/user/profile/ProfileAddresses .vue'),
-                    meta: { requiresAuth: true }
+                    meta: { requiresAuth: false }
                 }
             ]
         },
@@ -87,17 +95,14 @@ const router = createRouter({
         {
             path: '/gioithieu',
             name: 'gioi-thieu',
-            component: () => import('@/views/user/gioithieu/Gioithieu.vue')
+            component: () => import('@/views/user/gioithieu/Gioithieu.vue'),
+            meta: { requiresAuth: false }
         },
         {
             path: '/lienhe',
             name: 'lien-he',
-            component: () => import('@/views/user/lienhe/LienHe.vue')
-        },
-        {
-            path: '/product/:id',
-            name: 'product',
-            component: () => import('@/views/user/product/Product.vue')
+            component: () => import('@/views/user/lienhe/LienHe.vue'),
+            meta: { requiresAuth: false }
         },
 
         // ADMIN ROUTES - CẦN ĐĂNG NHẬP VÀ LÀ ADMIN/NHÂN VIÊN
