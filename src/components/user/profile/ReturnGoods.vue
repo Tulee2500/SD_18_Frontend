@@ -1127,7 +1127,7 @@ const getReturnNotice = (order) => {
     const statusMessages = {
         CHO_XAC_NHAN: 'Đơn hàng chờ xác nhận',
         PENDING: 'Đơn hàng chờ xác nhận',
-        DA_XAC_NHAN: 'Đơn hàng chưa được giao',
+        DA_XAC_NHAN: 'Đơn hàng chưa được giao', 
         CONFIRMED: 'Đơn hàng chưa được giao',
         DANG_GIAO: 'Đơn hàng đang được giao',
         SHIPPING: 'Đơn hàng đang được giao',
@@ -1692,8 +1692,8 @@ onMounted(() => {
         <div class="page-header">
             <div class="header-content">
                 <div>
-                    <h1 class="page-title">Trả hàng</h1>
-                    <p class="page-subtitle">Chọn đơn hàng và sản phẩm bạn muốn trả</p>
+                    <h1 class="page-title">Đơn hàng của tôi </h1>
+                    <p class="page-subtitle">Chọn đơn hàng và sản phẩm bạn muốn xem</p>
                 </div>
                 <Button @click="goBack" outlined class="back-btn">
                     <i class="pi pi-arrow-left mr-2"></i>
@@ -1721,7 +1721,7 @@ onMounted(() => {
                     </div>
                     <div class="filter-controls">
                         <Dropdown v-model="selectedStatus" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Trạng thái" class="status-filter" @change="onFilterChange" />
-                        <Calendar v-model="selectedDate" placeholder="Chọn ngày" dateFormat="dd/mm/yy" class="date-filter" @date-select="onFilterChange" />
+                        <!-- <Calendar v-model="selectedDate" placeholder="Chọn ngày" dateFormat="dd/mm/yy" class="date-filter" @date-select="onFilterChange" /> -->
                         <Button @click="clearFilters" outlined severity="secondary" size="small">
                             <i class="pi pi-times mr-1"></i>
                             Xóa bộ lọc
