@@ -79,7 +79,7 @@
             </div>
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveDanhMuc" />
+                <Button label="Lưu" icon="pi pi-check" @click="confirmAddDialog = true" />
             </template>
         </Dialog>
 
@@ -107,6 +107,21 @@
                 <Button label="Có" icon="pi pi-check" text @click="deleteSelectedDanhMucs" />
             </template>
         </Dialog>
+
+         <Dialog v-model:visible="confirmAddDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="danhMuc" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddDanhMucConfirm" :loading="loading" />
+            </template>
+        </Dialog>
     </div>
 </template>
 
@@ -132,6 +147,8 @@ const statuses = ref([
     { label: 'Hoạt động', value: 1 },
     { label: 'Ngừng hoạt động', value: 0 }
 ]);
+
+const confirmAddDialog = ref(false);
 
 // Computed property to check for duplicate names
 const isDuplicateName = computed(() => {
@@ -340,6 +357,15 @@ async function changeStatus(dm) {
 
 function getStatusLabel(status) {
     return status === 1 ? 'success' : 'danger';
+}
+
+function handleAddDanhMucConfirm() {
+  saveDanhMuc();              // gọi API thêm danh mục
+  confirmAddDialog.value = false; // tắt dialog confirm
+}
+function handleUpdateDanhMucConfirm() {
+  editDanhMuc();              // gọi API cập nhật danh mục
+  confirmUpdateDialog.value = false; // tắt dialog confirm
 }
 
 function exportCSV() {

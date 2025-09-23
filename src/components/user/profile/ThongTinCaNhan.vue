@@ -1050,7 +1050,48 @@
 
   const formatDate = (date) => {
     if (!date) return '';
-    return new Date(date).toLocaleDateString('vi-VN');
+    
+    try {
+      let parsedDate;
+      
+      if (typeof date === 'string') {
+        // Xử lý format dd/mm/yyyy hh:mm:ss
+        if (date.includes('/') && date.includes(' ')) {
+          const [datePart, timePart] = date.split(' ');
+          const [day, month, year] = datePart.split('/');
+          const [hour, minute, second] = timePart.split(':');
+          
+          // Tạo Date object với format yyyy-mm-ddThh:mm:ss và cộng thêm 7 giờ
+          const dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${(second || '00').padStart(2, '0')}`;
+          parsedDate = new Date(dateString);
+          
+          // Cộng thêm 7 giờ (7 * 60 * 60 * 1000 milliseconds)
+          parsedDate.setTime(parsedDate.getTime() + (7 * 60 * 60 * 1000));
+        } else {
+          // Thử parse trực tiếp và cộng thêm 7 giờ
+          parsedDate = new Date(date);
+          parsedDate.setTime(parsedDate.getTime() + (7 * 60 * 60 * 1000));
+        }
+      } else {
+        parsedDate = new Date(date);
+        parsedDate.setTime(parsedDate.getTime() + (7 * 60 * 60 * 1000));
+      }
+      
+      if (isNaN(parsedDate.getTime())) {
+        return '';
+      }
+      
+      return parsedDate.toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error, 'Input:', date);
+      return '';
+    }
   };
 
   const formatDateForInput = (date) => {

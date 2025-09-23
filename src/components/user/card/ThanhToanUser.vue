@@ -221,7 +221,71 @@ const checkAuthMode = () => {
     console.log('🔐 Auth mode:', isGuestMode.value ? 'Guest' : 'Logged in');
 };
 
-const loadGuestCart = () => {
+// Enrich guest cart items with DB info (ensure mã hàng from backend)
+const enrichGuestItemsFromDB = async () => {
+    try {
+        const itemsNeedingCode = cartItems.value.filter(
+            (it) => !it.code || it.code === 'SP' || it.code === 'UNKNOWN'
+        );
+
+        if (itemsNeedingCode.length === 0) return;
+
+        const uniqueDetailIds = [...new Set(itemsNeedingCode.map((it) => it.productDetailId))].filter(Boolean);
+
+        const responses = await Promise.all(
+            uniqueDetailIds.map((id) =>
+                axios
+                    .get(`${API_BASE_URL}/api/san-pham-chi-tiet/${id}`)
+                    .then((res) => ({ id, data: res.data }))
+                    .catch((err) => {
+                        console.warn('Failed to fetch detail for id', id, err);
+                        return { id, data: null };
+                    })
+            )
+        );
+
+        const byId = new Map(responses.map((r) => [r.id, r.data]));
+
+        let updated = false;
+        cartItems.value = cartItems.value.map((it) => {
+            if (!it.code || it.code === 'SP' || it.code === 'UNKNOWN') {
+                const detail = byId.get(it.productDetailId);
+                if (detail) {
+                    updated = true;
+                    return {
+                        ...it,
+                        code: detail.maChiTiet || it.code,
+                        name: it.name || detail.sanPham?.tenSanPham || it.name,
+                        size: it.size || detail.kichCo?.tenKichCo || it.size,
+                        color: it.color || (detail.mauSac ? { id: detail.mauSac.id, name: detail.mauSac.tenMauSac } : it.color)
+                    };
+                }
+            }
+            return it;
+        });
+
+        if (updated) {
+            // persist back to localStorage to keep consistency across pages
+            try {
+                const guestCart = localStorage.getItem('guest_cart');
+                if (guestCart) {
+                    const raw = JSON.parse(guestCart) || [];
+                    const enriched = raw.map((it) => {
+                        const match = cartItems.value.find((ci) => (ci.productDetailId ?? ci.idChiTietSanPham ?? ci.idSanPhamChiTiet) === (it.productDetailId ?? it.idChiTietSanPham ?? it.idSanPhamChiTiet));
+                        return match ? { ...it, code: match.code, name: match.name, size: match.size, color: match.color } : it;
+                    });
+                    localStorage.setItem('guest_cart', JSON.stringify(enriched));
+                }
+            } catch (e) {
+                console.warn('Failed to persist enriched guest cart:', e);
+            }
+        }
+    } catch (e) {
+        console.warn('enrichGuestItemsFromDB (checkout) error:', e);
+    }
+};
+
+const loadGuestCart = async () => {
     try {
         const guestCart = localStorage.getItem('guest_cart');
         if (guestCart) {
@@ -234,7 +298,7 @@ const loadGuestCart = () => {
                     cartDetailId: it.cartDetailId ?? it.id ?? null,
                     productDetailId: it.productDetailId ?? it.idChiTietSanPham ?? it.idSanPhamChiTiet ?? it.variantId ?? null,
                     name: it.name ?? it.tenSanPham ?? it.productName ?? 'Sản phẩm',
-                    code: it.code ?? it.maSanPham ?? it.sku ?? '',
+                    code: it.code ?? it.maChiTiet ?? it.maSanPham ?? it.sku ?? '',
                     image: it.image ?? it.hinhAnh ?? it.imageUrl ?? '',
                     price,
                     quantity,
@@ -246,6 +310,8 @@ const loadGuestCart = () => {
                 };
             });
             console.log('✅ Guest cart normalized:', cartItems.value);
+            // Enrich missing or placeholder codes
+            await enrichGuestItemsFromDB();
         } else {
             cartItems.value = [];
         }

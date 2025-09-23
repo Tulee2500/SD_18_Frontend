@@ -79,7 +79,7 @@
             </div>
             <template #footer>
                 <Button label="Hủy" icon="pi pi-times" text @click="hideDialog" />
-                <Button label="Lưu" icon="pi pi-check" @click="saveMauSac" />
+                <Button label="Lưu" icon="pi pi-check" @click="confirmAddDialog = true" />
             </template>
         </Dialog>
 
@@ -94,6 +94,21 @@
             <template #footer>
                 <Button label="Không" icon="pi pi-times" text @click="deleteMauSacDialog = false" />
                 <Button label="Có" icon="pi pi-check" @click="deleteMauSac" />
+            </template>
+        </Dialog>
+
+         <Dialog v-model:visible="confirmAddDialog" header="Xác nhận" modal>
+            <div class="flex items-center gap-4">
+                <i class="pi pi-exclamation-triangle !text-3xl text-red-500" />
+                <div>
+                    <p v-if="mauSac" class="mb-2">
+                        Bạn có chắc chắn muốn thực hiện hành động này ?
+                    </p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Hủy bỏ" icon="pi pi-times" text @click="confirmAddDialog = false" :disabled="loading" />
+                <Button label="Thực hiện" icon="pi pi-check" severity="success" @click="handleAddMauSacConfirm" :loading="loading" />
             </template>
         </Dialog>
 
@@ -133,6 +148,8 @@ const statuses = ref([
     { label: 'Ngừng hoạt động', value: 0 }
 ]);
 
+const confirmAddDialog = ref(false);
+
 // Computed property to check for duplicate names
 const isDuplicateName = computed(() => {
     if (!mauSac.value.tenMauSac) return false;
@@ -157,6 +174,15 @@ function getRowIndex(index) {
     const currentPage = dt.value ? dt.value.d_first / dt.value.d_rows : 0;
     const rowsPerPage = dt.value ? dt.value.d_rows : 10;
     return currentPage * rowsPerPage + index + 1;
+}
+
+function handleAddMauSacConfirm() {
+  saveMauSac();              // gọi API thêm màu sắc
+  confirmAddDialog.value = false; // tắt dialog confirm
+}
+function handleUpdateMauSacConfirm() {
+  editMauSac();              // gọi API cập nhật màu sắc
+  confirmUpdateDialog.value = false; // tắt dialog confirm
 }
 
 async function fetchData() {

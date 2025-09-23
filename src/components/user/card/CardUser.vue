@@ -27,6 +27,58 @@ const getAuthToken = () => {
     return localStorage.getItem('auth_token');
 };
 
+// 🔎 Enrich guest items with DB data (ensure mã hàng from backend)
+const enrichGuestItemsFromDB = async () => {
+    try {
+        const itemsNeedingCode = cartItems.value.filter(
+            (it) => !it.code || it.code === 'SP' || it.code === 'UNKNOWN'
+        );
+
+        if (itemsNeedingCode.length === 0) return;
+
+        const uniqueDetailIds = [...new Set(itemsNeedingCode.map((it) => it.productDetailId))].filter(Boolean);
+
+        const responses = await Promise.all(
+            uniqueDetailIds.map((id) =>
+                axios
+                    .get(`${API_BASE_URL}/api/san-pham-chi-tiet/${id}`)
+                    .then((res) => ({ id, data: res.data }))
+                    .catch((err) => {
+                        console.warn('Failed to fetch detail for id', id, err);
+                        return { id, data: null };
+                    })
+            )
+        );
+
+        const byId = new Map(responses.map((r) => [r.id, r.data]));
+
+        let updated = false;
+        cartItems.value = cartItems.value.map((it) => {
+            if (!it.code || it.code === 'SP' || it.code === 'UNKNOWN') {
+                const detail = byId.get(it.productDetailId);
+                if (detail) {
+                    updated = true;
+                    return {
+                        ...it,
+                        code: detail.maChiTiet || it.code,
+                        name: it.name || detail.sanPham?.tenSanPham || it.name,
+                        size: it.size || detail.kichCo?.tenKichCo || it.size,
+                        color: it.color || (detail.mauSac ? { id: detail.mauSac.id, name: detail.mauSac.tenMauSac } : it.color)
+                    };
+                }
+            }
+            return it;
+        });
+
+        if (updated) {
+            // persist back to localStorage to keep consistency
+            saveCartToLocalStorage();
+        }
+    } catch (e) {
+        console.warn('enrichGuestItemsFromDB error:', e);
+    }
+};
+
 const getUserId = () => {
     const userInfo = localStorage.getItem('user_info');
     if (userInfo) {
@@ -159,7 +211,7 @@ const loadCartFromBackend = async () => {
 };
 
 // 🛒 Load cart from localStorage (for guest users)
-const loadCartFromLocalStorage = () => {
+const loadCartFromLocalStorage = async () => {
     console.log('🔄 Loading guest cart from localStorage...');
 
     try {
@@ -181,6 +233,8 @@ const loadCartFromLocalStorage = () => {
                 points: item.points,
                 totalPrice: item.totalPrice
             }));
+            // Enrich missing or placeholder codes from DB
+            await enrichGuestItemsFromDB();
             console.log('✅ Guest cart loaded and processed:', cartItems.value);
         } else {
             cartItems.value = [];

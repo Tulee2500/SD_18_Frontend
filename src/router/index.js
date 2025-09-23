@@ -47,12 +47,7 @@ const router = createRouter({
             component: () => import('@/views/user/product/Product.vue'),
             meta: { requiresAuth: false }
         },
-        {
-            path: '/profile',
-            name: 'profile',
-            component: () => import('@/views/user/profile/ThongTinCaNhan.vue'),
-            meta: { requiresAuth: false }
-        },
+        
         {
             path: '/payment-return',
             name: 'PaymentReturn',
@@ -81,6 +76,12 @@ const router = createRouter({
                     name: 'ProfileOrders',
                     component: () => import('@/components/user/profile/ProfileOrders .vue'),
                     meta: { requiresAuth: false }
+                },
+                {
+                    path: '/returnGoods', // Route: /profileOrders
+                    name: 'ReturnGoods',
+                    component: () => import('@/components/user/profile/ReturnGoods.vue'),
+                    meta: { requiresAuth: true }
                 },
                 {
                     path: '/profileAddresses', // Route: /profileAddresses
@@ -312,6 +313,11 @@ const router = createRouter({
                     name: 'BanHang',
                     path: '/ban-hang',
                     component: () => import('@/views/BanHang/BanHangView.vue')
+                },
+                {
+                    name: 'TraHang',
+                    path: '/tra-hang',
+                    component: () => import('@/views/TraHang/traHang.vue')
                 }
             ]
         },

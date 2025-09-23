@@ -102,6 +102,11 @@ const model = ref([
                 label: 'Hóa đơn',
                 icon: 'pi pi-fw pi-receipt',
                 to: '/hoa-don'
+            },
+            {
+                label: 'Trả hàng',
+                icon: 'pi pi-fw pi-undo',
+                to: '/tra-hang'
             }
         ]
     }
